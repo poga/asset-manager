@@ -194,3 +194,39 @@ Rules:
         "frames": frames,
         "animation_type": result.get("animation_type"),
     }
+
+
+def extract_frame(
+    image_path: Path,
+    frame: dict,
+    scale: int = 1,
+) -> Image.Image:
+    """
+    Extract a single frame from a spritesheet.
+
+    Args:
+        image_path: Path to the spritesheet
+        frame: Dict with x, y, width, height
+        scale: Scale factor for output (default 1)
+
+    Returns:
+        PIL Image of the extracted frame
+    """
+    image_path = Path(image_path)
+
+    with Image.open(image_path) as img:
+        # Crop to frame
+        box = (
+            frame["x"],
+            frame["y"],
+            frame["x"] + frame["width"],
+            frame["y"] + frame["height"],
+        )
+        cropped = img.crop(box)
+
+        # Scale if requested
+        if scale != 1:
+            new_size = (cropped.width * scale, cropped.height * scale)
+            cropped = cropped.resize(new_size, Image.Resampling.NEAREST)
+
+        return cropped.copy()

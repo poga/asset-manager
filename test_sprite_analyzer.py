@@ -78,3 +78,36 @@ class TestAnalyzeSpritesheet:
         assert isinstance(frame["y"], int)
         assert isinstance(frame["width"], int)
         assert isinstance(frame["height"], int)
+
+
+class TestExtractFrame:
+    """Tests for extract_frame function."""
+
+    def test_extracts_single_frame(self, sample_spritesheet):
+        """extract_frame returns PIL Image of specified frame."""
+        from sprite_analyzer import extract_frame
+
+        frame_info = {"x": 0, "y": 0, "width": 32, "height": 32}
+        result = extract_frame(sample_spritesheet, frame_info)
+
+        assert isinstance(result, Image.Image)
+        assert result.size == (32, 32)
+
+    def test_extracts_correct_region(self, sample_spritesheet):
+        """extract_frame extracts correct pixel region."""
+        from sprite_analyzer import extract_frame
+
+        # Second cell in first row
+        frame_info = {"x": 32, "y": 0, "width": 32, "height": 32}
+        result = extract_frame(sample_spritesheet, frame_info)
+
+        assert result.size == (32, 32)
+
+    def test_scale_parameter(self, sample_spritesheet):
+        """extract_frame respects scale parameter."""
+        from sprite_analyzer import extract_frame
+
+        frame_info = {"x": 0, "y": 0, "width": 32, "height": 32}
+        result = extract_frame(sample_spritesheet, frame_info, scale=2)
+
+        assert result.size == (64, 64)
