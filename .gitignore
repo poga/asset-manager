@@ -1,0 +1,11 @@
+# Asset index cache
+.assetindex/
+assets.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Assets (track separately or use git-lfs)
+assets/
