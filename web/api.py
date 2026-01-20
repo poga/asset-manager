@@ -27,6 +27,8 @@ app.add_middleware(
 
 # Database path - can be overridden for testing
 _db_path: Optional[Path] = None
+# Assets path - can be overridden for testing
+_assets_path: Optional[Path] = None
 
 COLOR_NAMES = {
     "red": ("#ff0000", "#cc0000", "#990000", "#ff3333", "#cc3333"),
@@ -49,6 +51,12 @@ def set_db_path(path: Path):
     _db_path = path
 
 
+def set_assets_path(path: Path):
+    """Set assets path (for testing)."""
+    global _assets_path
+    _assets_path = path
+
+
 def get_db() -> sqlite3.Connection:
     """Get database connection."""
     path = _db_path or find_db()
@@ -65,6 +73,21 @@ def find_db() -> Path:
         if db_path.exists():
             return db_path
     raise FileNotFoundError("No assets.db found")
+
+
+def get_assets_path() -> Path:
+    """Get assets directory path."""
+    return _assets_path or find_assets()
+
+
+def find_assets() -> Path:
+    """Find assets folder in current directory or parent directories."""
+    current = Path.cwd()
+    for parent in [current] + list(current.parents):
+        assets_path = parent / "assets"
+        if assets_path.exists() and assets_path.is_dir():
+            return assets_path
+    raise FileNotFoundError("No assets folder found")
 
 
 @app.get("/api/health")
@@ -310,7 +333,9 @@ def image(asset_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    image_path = Path(row["path"])
+    # Paths in DB are relative to assets folder
+    assets_dir = get_assets_path()
+    image_path = assets_dir / row["path"]
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image file not found")
 

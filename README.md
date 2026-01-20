@@ -75,3 +75,48 @@ uv run pytest test_assetindex.py
 ## Supported Formats
 
 PNG, GIF, JPG, WEBP, Aseprite (.ase, .aseprite)
+
+## Web Interface
+
+A web UI for browsing and searching assets.
+
+### Folder Structure
+
+```
+asset-manager/
+├── assets/              # Asset images (required)
+│   ├── PackName1/
+│   │   └── images...
+│   └── PackName2/
+│       └── images...
+├── assets.db            # SQLite database (required)
+└── web/
+    ├── api.py           # Backend API
+    └── frontend/        # Vue.js frontend
+```
+
+- **`assets.db`** - Place at project root. The API searches upward from CWD to find it.
+- **`assets/`** - Place at project root. Paths in the database are relative to this folder.
+
+### Running the Web Interface
+
+```bash
+# Start backend (from project root)
+uv run web/api.py
+
+# Start frontend (in separate terminal)
+cd web/frontend
+npm install
+npm run dev
+```
+
+- Backend: http://localhost:8000
+- Frontend: http://localhost:5173
+
+### API Endpoints
+
+- `GET /api/search` - Search assets (query params: `q`, `tag`, `color`, `pack`, `type`, `limit`)
+- `GET /api/image/{id}` - Serve asset image
+- `GET /api/asset/{id}` - Asset details
+- `GET /api/similar/{id}` - Find visually similar assets
+- `GET /api/filters` - Available filter options

@@ -221,5 +221,49 @@ def test_image_not_found(test_db):
     assert response.status_code == 404
 
 
+def test_image_serves_file(test_db, tmp_path):
+    """Image endpoint serves actual image file."""
+    from api import set_db_path, set_assets_path
+    set_db_path(test_db)
+
+    # Create assets folder structure
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    pack_dir = assets_dir / "testpack"
+    pack_dir.mkdir()
+
+    # Create a test image file (1x1 PNG)
+    image_file = pack_dir / "test.png"
+    # Minimal valid PNG (1x1 transparent pixel)
+    png_data = bytes([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  # PNG signature
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,  # IHDR chunk
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,  # 1x1
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,  # 8-bit RGBA
+        0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,  # IDAT chunk
+        0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+        0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
+        0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,  # IEND chunk
+        0x42, 0x60, 0x82
+    ])
+    image_file.write_bytes(png_data)
+
+    # Update database with relative path (relative to assets folder)
+    conn = sqlite3.connect(test_db)
+    conn.execute(
+        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
+        "VALUES (10, 1, 'testpack/test.png', 'test.png', 'png', 'test123', 1, 1)"
+    )
+    conn.commit()
+    conn.close()
+
+    # Set assets path
+    set_assets_path(assets_dir)
+
+    response = client.get("/api/image/10")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
