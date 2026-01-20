@@ -12,7 +12,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 
 app = FastAPI(title="Asset Search API")
@@ -155,6 +155,66 @@ def search(
             "tags": row["tags"].split(",") if row["tags"] else [],
             "width": row["width"],
             "height": row["height"],
+        })
+
+    return {"assets": assets, "total": len(assets)}
+
+
+def hamming_distance(h1: bytes, h2: bytes) -> int:
+    """Calculate hamming distance between two hashes."""
+    return sum(bin(a ^ b).count("1") for a, b in zip(h1, h2))
+
+
+@app.get("/api/similar/{asset_id}")
+def similar(
+    asset_id: int,
+    limit: int = 20,
+    distance: int = 15,
+):
+    """Find visually similar assets."""
+    conn = get_db()
+
+    # Get reference hash
+    row = conn.execute(
+        "SELECT phash FROM asset_phash WHERE asset_id = ?", [asset_id]
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found or no phash")
+
+    ref_hash = row["phash"]
+
+    # Find similar
+    results = []
+    for row in conn.execute("""
+        SELECT ap.asset_id, ap.phash, a.filename, a.path, p.name as pack_name,
+               a.width, a.height
+        FROM asset_phash ap
+        JOIN assets a ON ap.asset_id = a.id
+        LEFT JOIN packs p ON a.pack_id = p.id
+        WHERE ap.asset_id != ?
+    """, [asset_id]):
+        dist = hamming_distance(ref_hash, row["phash"])
+        if dist <= distance:
+            results.append((dist, row))
+
+    conn.close()
+
+    results.sort(key=lambda x: x[0])
+    results = results[:limit]
+
+    assets = []
+    for dist, row in results:
+        assets.append({
+            "id": row["asset_id"],
+            "path": row["path"],
+            "filename": row["filename"],
+            "pack": row["pack_name"],
+            "tags": [],
+            "width": row["width"],
+            "height": row["height"],
+            "distance": dist,
         })
 
     return {"assets": assets, "total": len(assets)}
