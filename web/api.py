@@ -292,6 +292,23 @@ def filters():
     }
 
 
+@app.get("/api/image/{asset_id}")
+def image(asset_id: int):
+    """Serve asset image file."""
+    conn = get_db()
+    row = conn.execute("SELECT path FROM assets WHERE id = ?", [asset_id]).fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    image_path = Path(row["path"])
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Image file not found")
+
+    return FileResponse(image_path)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

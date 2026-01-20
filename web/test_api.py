@@ -212,5 +212,14 @@ def test_filters_returns_options(test_db):
     assert "creature" in data["tags"]
 
 
+def test_image_not_found(test_db):
+    """Image endpoint returns 404 for unknown asset."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/image/999")
+    assert response.status_code == 404
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
