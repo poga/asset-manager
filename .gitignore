@@ -13,3 +13,4 @@ assets/
 
 # Worktrees
 .worktrees/
+node_modules
