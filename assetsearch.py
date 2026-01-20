@@ -379,14 +379,11 @@ def stats(
         ORDER BY count DESC
     """).fetchall()
 
-    console.print(f"\n[bold]Index Statistics[/bold]")
-    console.print(f"  Packs: {pack_count}")
-    console.print(f"  Assets: {asset_count}")
-    console.print(f"  Tags: {tag_count}")
-    console.print(f"  File types:")
+    print(f"packs\t{pack_count}")
+    print(f"assets\t{asset_count}")
+    print(f"tags\t{tag_count}")
     for ft in filetypes:
-        console.print(f"    - {ft['filetype']}: {ft['count']}")
-    console.print()
+        print(f"{ft['filetype']}\t{ft['count']}")
 
 
 @app.command()
