@@ -5,6 +5,7 @@
 #     "fastapi>=0.109",
 #     "httpx>=0.27",
 #     "pytest>=8.0",
+#     "pillow>=10.0",
 # ]
 # ///
 """Tests for web API."""
@@ -346,6 +347,61 @@ def test_search_includes_frames(test_db):
     asset = data["assets"][0]
     assert "frames" in asset
     assert len(asset["frames"]) == 2
+
+
+def test_asset_frame_serves_cropped_image(test_db, tmp_path):
+    """Get single frame serves cropped image."""
+    from api import set_db_path, set_assets_path
+    set_db_path(test_db)
+
+    # Create a 64x32 spritesheet (2 frames of 32x32)
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    pack_dir = assets_dir / "testpack"
+    pack_dir.mkdir()
+
+    from PIL import Image
+    img = Image.new("RGBA", (64, 32), (0, 0, 0, 0))
+    # First frame: red
+    for x in range(32):
+        for y in range(32):
+            img.putpixel((x, y), (255, 0, 0, 255))
+    # Second frame: blue
+    for x in range(32, 64):
+        for y in range(32):
+            img.putpixel((x, y), (0, 0, 255, 255))
+    img.save(pack_dir / "spritesheet.png")
+
+    set_assets_path(assets_dir)
+
+    # Add asset and frames to DB
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    conn.execute(
+        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
+        "VALUES (20, 1, 'testpack/spritesheet.png', 'spritesheet.png', 'png', 'xyz', 64, 32)"
+    )
+    conn.execute(
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (20, 0, 0, 0, 32, 32)"
+    )
+    conn.execute(
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (20, 1, 32, 0, 32, 32)"
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.get("/api/asset/20/frame/0")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+
+
+def test_asset_frame_not_found(test_db):
+    """Get frame returns 404 for unknown frame index."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/asset/1/frame/99")
+    assert response.status_code == 404
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@
 # dependencies = [
 #     "fastapi>=0.109",
 #     "uvicorn>=0.27",
+#     "pillow>=10.0",
 # ]
 # ///
 """Web API for asset search."""
@@ -12,9 +13,11 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
+from io import BytesIO
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 app = FastAPI(title="Asset Search API")
 
@@ -405,6 +408,56 @@ def asset_frames(asset_id: int):
         ],
         "animation_type": asset["animation_type"],
     }
+
+
+@app.get("/api/asset/{asset_id}/frame/{frame_index}")
+def asset_frame(asset_id: int, frame_index: int, scale: int = 1):
+    """Serve a single extracted frame as PNG."""
+    conn = get_db()
+
+    # Get asset path
+    asset = conn.execute(
+        "SELECT path FROM assets WHERE id = ?", [asset_id]
+    ).fetchone()
+
+    if not asset:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Get frame info
+    frame = conn.execute("""
+        SELECT x, y, width, height FROM sprite_frames
+        WHERE asset_id = ? AND frame_index = ?
+    """, [asset_id, frame_index]).fetchone()
+
+    conn.close()
+
+    if not frame:
+        raise HTTPException(status_code=404, detail="Frame not found")
+
+    # Extract frame
+    from PIL import Image
+
+    assets_dir = get_assets_path()
+    image_path = assets_dir / asset["path"]
+
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Image file not found")
+
+    with Image.open(image_path) as img:
+        box = (frame["x"], frame["y"], frame["x"] + frame["width"], frame["y"] + frame["height"])
+        cropped = img.crop(box)
+
+        if scale > 1:
+            new_size = (cropped.width * scale, cropped.height * scale)
+            cropped = cropped.resize(new_size, Image.Resampling.NEAREST)
+
+        # Save to buffer
+        buffer = BytesIO()
+        cropped.save(buffer, format="PNG")
+        buffer.seek(0)
+
+    return StreamingResponse(buffer, media_type="image/png")
 
 
 if __name__ == "__main__":
