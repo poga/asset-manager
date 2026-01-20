@@ -287,17 +287,11 @@ def tags(
     """, [limit]).fetchall()
 
     if not rows:
-        console.print("[yellow]No tags found.[/yellow]")
+        print("No tags found.", file=sys.stderr)
         return
 
-    table = Table(title="Tags")
-    table.add_column("Tag", style="cyan")
-    table.add_column("Count", justify="right", style="green")
-
     for row in rows:
-        table.add_row(row['name'], str(row['count']))
-
-    console.print(table)
+        print(f"{row['name']}\t{row['count']}")
 
 
 @app.command()
