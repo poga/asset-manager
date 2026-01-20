@@ -170,6 +170,33 @@ def get_image_info(path: Path) -> dict:
         return {}
 
 
+def extract_colors(path: Path, num_colors: int = 5) -> list[tuple[str, float]]:
+    """Extract dominant colors from image."""
+    try:
+        with Image.open(path) as img:
+            # Convert to RGB, ignore alpha
+            img = img.convert("RGB")
+            # Resize for speed
+            img.thumbnail((100, 100))
+            # Get colors
+            colors = img.getcolors(maxcolors=10000)
+            if not colors:
+                return []
+            # Sort by count
+            colors.sort(key=lambda x: x[0], reverse=True)
+            total = sum(c[0] for c in colors)
+            # Get top colors
+            result = []
+            for count, rgb in colors[:num_colors]:
+                hex_color = "#{:02x}{:02x}{:02x}".format(*rgb)
+                percentage = count / total
+                if percentage >= 0.05:  # At least 5%
+                    result.append((hex_color, percentage))
+            return result
+    except Exception:
+        return []
+
+
 def extract_tags_from_path(path: Path, asset_root: Path) -> list[str]:
     """Extract tags from file path."""
     rel_path = path.relative_to(asset_root)
@@ -344,6 +371,16 @@ def index(
             # Extract and add tags
             tags = extract_tags_from_path(file_path, asset_root)
             add_tags(conn, asset_id, tags, "path")
+
+            # Extract colors for images
+            if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+                colors = extract_colors(file_path)
+                for hex_color, percentage in colors:
+                    conn.execute(
+                        """INSERT OR REPLACE INTO asset_colors (asset_id, color_hex, percentage)
+                           VALUES (?, ?, ?)""",
+                        [asset_id, hex_color, percentage]
+                    )
 
             new_count += 1
             progress.advance(index_task)
