@@ -44,14 +44,14 @@ describe('AssetModal', () => {
     const wrapper = mount(AssetModal, {
       props: { asset: mockAsset }
     })
-    expect(wrapper.find('button').text()).toContain('Find Similar')
+    expect(wrapper.find('.find-similar-btn').text()).toContain('Find Similar')
   })
 
   it('emits find-similar event on button click', async () => {
     const wrapper = mount(AssetModal, {
       props: { asset: mockAsset }
     })
-    await wrapper.find('button').trigger('click')
+    await wrapper.find('.find-similar-btn').trigger('click')
     expect(wrapper.emitted('find-similar')).toBeTruthy()
     expect(wrapper.emitted('find-similar')[0]).toEqual([1])
   })
