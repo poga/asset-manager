@@ -16,6 +16,35 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+# Basic color name to hex ranges
+COLOR_NAMES = {
+    "red": ("#ff0000", "#cc0000", "#990000", "#ff3333", "#cc3333"),
+    "green": ("#00ff00", "#00cc00", "#009900", "#33ff33", "#33cc33", "#336633", "#669966"),
+    "blue": ("#0000ff", "#0000cc", "#000099", "#3333ff", "#3333cc", "#333366"),
+    "yellow": ("#ffff00", "#cccc00", "#999900", "#ffff33"),
+    "orange": ("#ff8800", "#ff6600", "#cc6600", "#ff9933"),
+    "purple": ("#ff00ff", "#cc00cc", "#990099", "#9900ff", "#6600cc"),
+    "brown": ("#8b4513", "#a0522d", "#cd853f", "#d2691e", "#8b5a2b"),
+    "black": ("#000000", "#111111", "#222222", "#333333"),
+    "white": ("#ffffff", "#eeeeee", "#dddddd", "#cccccc"),
+    "gray": ("#888888", "#999999", "#aaaaaa", "#777777", "#666666"),
+    "grey": ("#888888", "#999999", "#aaaaaa", "#777777", "#666666"),
+}
+
+
+def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    """Convert hex color to RGB tuple."""
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+
+def color_distance(c1: str, c2: str) -> float:
+    """Calculate distance between two hex colors."""
+    r1, g1, b1 = hex_to_rgb(c1)
+    r2, g2, b2 = hex_to_rgb(c2)
+    return ((r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2) ** 0.5
+
+
 app = typer.Typer(help="Search your game asset index")
 console = Console()
 
@@ -123,6 +152,7 @@ def find_db() -> Path:
 def search(
     query: Optional[str] = typer.Argument(None, help="Search filename/path"),
     tag: list[str] = typer.Option([], "--tag", "-t", help="Filter by tag"),
+    color: Optional[str] = typer.Option(None, "--color", "-c", help="Filter by dominant color (hex or name)"),
     pack: Optional[str] = typer.Option(None, "--pack", "-p", help="Filter by pack"),
     filetype: Optional[str] = typer.Option(None, "--type", help="Filter by filetype"),
     db: Optional[Path] = typer.Option(None, "--db", help="Path to assets.db"),
@@ -159,6 +189,31 @@ def search(
                 )
             """)
             params.append(t.lower())
+
+    if color:
+        # Resolve color name to hex values
+        color_lower = color.lower()
+        if color_lower in COLOR_NAMES:
+            hex_values = COLOR_NAMES[color_lower]
+            placeholders = ",".join("?" * len(hex_values))
+            conditions.append(f"""
+                a.id IN (
+                    SELECT asset_id FROM asset_colors
+                    WHERE color_hex IN ({placeholders})
+                    AND percentage >= 0.1
+                )
+            """)
+            params.extend(hex_values)
+        else:
+            # Direct hex match (with some tolerance)
+            conditions.append("""
+                a.id IN (
+                    SELECT asset_id FROM asset_colors
+                    WHERE color_hex = ?
+                    AND percentage >= 0.1
+                )
+            """)
+            params.append(color if color.startswith("#") else f"#{color}")
 
     where = " AND ".join(conditions) if conditions else "1=1"
 
