@@ -311,22 +311,21 @@ def info(
     """, [asset_id]).fetchone()
 
     if not row:
-        console.print(f"[red]Asset {asset_id} not found.[/red]")
+        print(f"Asset {asset_id} not found.", file=sys.stderr)
         raise typer.Exit(1)
 
-    console.print(f"\n[bold cyan]{row['filename']}[/bold cyan]")
-    console.print(f"  Path: {row['path']}")
-    console.print(f"  Pack: {row['pack_name'] or '-'}")
-    console.print(f"  Type: {row['filetype']}")
-    console.print(f"  Size: {row['file_size']} bytes")
+    print(row['path'])
+    print(f"pack\t{row['pack_name'] or '-'}")
+    print(f"type\t{row['filetype']}")
+    print(f"size\t{row['file_size']}")
     if row['width']:
-        console.print(f"  Dimensions: {row['width']}x{row['height']}")
+        print(f"dimensions\t{row['width']}x{row['height']}")
     if row['frame_count']:
-        console.print(f"  Frames: {row['frame_count']} ({row['frame_width']}x{row['frame_height']} each)")
+        print(f"frames\t{row['frame_count']}\t{row['frame_width']}x{row['frame_height']}")
 
     # Tags
     tags = conn.execute("""
-        SELECT t.name, at.source
+        SELECT t.name
         FROM asset_tags at
         JOIN tags t ON at.tag_id = t.id
         WHERE at.asset_id = ?
@@ -334,7 +333,7 @@ def info(
     """, [asset_id]).fetchall()
 
     if tags:
-        console.print(f"  Tags: {', '.join(t['name'] for t in tags)}")
+        print(f"tags\t{','.join(t['name'] for t in tags)}")
 
     # Colors
     colors = conn.execute("""
@@ -345,8 +344,8 @@ def info(
     """, [asset_id]).fetchall()
 
     if colors:
-        color_str = ", ".join(f"{c['color_hex']} ({c['percentage']:.0%})" for c in colors)
-        console.print(f"  Colors: {color_str}")
+        color_str = ",".join(f"{c['color_hex']}:{c['percentage']:.0%}" for c in colors)
+        print(f"colors\t{color_str}")
 
     # Related
     related = conn.execute("""
@@ -357,11 +356,8 @@ def info(
     """, [asset_id]).fetchall()
 
     if related:
-        console.print("  Related:")
-        for r in related:
-            console.print(f"    - {r['filename']} ({r['relation_type']})")
-
-    console.print()
+        related_str = ",".join(f"{r['filename']}:{r['relation_type']}" for r in related)
+        print(f"related\t{related_str}")
 
 
 @app.command()
