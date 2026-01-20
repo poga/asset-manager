@@ -148,6 +148,11 @@ def find_db() -> Path:
     raise typer.BadParameter("No assets.db found. Run assetindex.py first.")
 
 
+def hamming_distance(h1: bytes, h2: bytes) -> int:
+    """Calculate hamming distance between two hashes."""
+    return sum(bin(a ^ b).count("1") for a, b in zip(h1, h2))
+
+
 @app.command()
 def search(
     query: Optional[str] = typer.Argument(None, help="Search filename/path"),
@@ -430,6 +435,89 @@ def stats(
     for ft in filetypes:
         console.print(f"    - {ft['filetype']}: {ft['count']}")
     console.print()
+
+
+@app.command()
+def similar(
+    reference: str = typer.Argument(..., help="Asset ID or path to image"),
+    db: Optional[Path] = typer.Option(None, "--db", help="Path to assets.db"),
+    limit: int = typer.Option(10, "--limit", "-n", help="Max results"),
+    max_distance: int = typer.Option(15, "--distance", "-d", help="Max hamming distance"),
+):
+    """Find visually similar assets."""
+    db_path = db or find_db()
+    conn = get_db(db_path)
+
+    # Get reference hash
+    ref_hash = None
+    ref_name = reference
+
+    if reference.isdigit():
+        # By ID
+        row = conn.execute(
+            "SELECT phash FROM asset_phash WHERE asset_id = ?", [int(reference)]
+        ).fetchone()
+        if row:
+            ref_hash = row["phash"]
+    else:
+        # By path (in DB or external file)
+        row = conn.execute(
+            "SELECT ap.phash FROM asset_phash ap JOIN assets a ON ap.asset_id = a.id WHERE a.path LIKE ?",
+            [f"%{reference}%"]
+        ).fetchone()
+        if row:
+            ref_hash = row["phash"]
+        elif Path(reference).exists():
+            # External file - compute hash
+            try:
+                import imagehash
+                from PIL import Image
+                with Image.open(reference) as img:
+                    h = imagehash.phash(img)
+                    ref_hash = h.hash.tobytes()
+                    ref_name = Path(reference).name
+            except ImportError:
+                console.print("[red]Install imagehash for external file similarity: pip install imagehash[/red]")
+                raise typer.Exit(1)
+
+    if not ref_hash:
+        console.print(f"[red]Could not find or compute hash for: {reference}[/red]")
+        raise typer.Exit(1)
+
+    # Find similar
+    results = []
+    for row in conn.execute("""
+        SELECT ap.asset_id, ap.phash, a.filename, a.path, p.name as pack_name
+        FROM asset_phash ap
+        JOIN assets a ON ap.asset_id = a.id
+        LEFT JOIN packs p ON a.pack_id = p.id
+    """):
+        dist = hamming_distance(ref_hash, row["phash"])
+        if dist <= max_distance and dist > 0:  # Exclude exact match
+            results.append((dist, row))
+
+    results.sort(key=lambda x: x[0])
+    results = results[:limit]
+
+    if not results:
+        console.print(f"[yellow]No similar assets found for {ref_name}[/yellow]")
+        return
+
+    table = Table(title=f"Similar to {ref_name}")
+    table.add_column("Dist", style="dim", width=4)
+    table.add_column("ID", style="dim", width=6)
+    table.add_column("Filename", style="cyan")
+    table.add_column("Pack", style="green")
+
+    for dist, row in results:
+        table.add_row(
+            str(dist),
+            str(row["asset_id"]),
+            row["filename"],
+            row["pack_name"] or "-",
+        )
+
+    console.print(table)
 
 
 if __name__ == "__main__":

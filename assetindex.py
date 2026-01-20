@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import imagehash
 import typer
 from PIL import Image
 from rich.console import Console
@@ -168,6 +169,16 @@ def get_image_info(path: Path) -> dict:
             }
     except Exception:
         return {}
+
+
+def compute_phash(path: Path) -> Optional[bytes]:
+    """Compute perceptual hash of image."""
+    try:
+        with Image.open(path) as img:
+            h = imagehash.phash(img)
+            return h.hash.tobytes()
+    except Exception:
+        return None
 
 
 def extract_colors(path: Path, num_colors: int = 5) -> list[tuple[str, float]]:
@@ -380,6 +391,15 @@ def index(
                         """INSERT OR REPLACE INTO asset_colors (asset_id, color_hex, percentage)
                            VALUES (?, ?, ?)""",
                         [asset_id, hex_color, percentage]
+                    )
+
+                # Compute perceptual hash
+                phash = compute_phash(file_path)
+                if phash:
+                    conn.execute(
+                        """INSERT OR REPLACE INTO asset_phash (asset_id, phash)
+                           VALUES (?, ?)""",
+                        [asset_id, phash]
                     )
 
             new_count += 1
