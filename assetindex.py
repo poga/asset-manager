@@ -268,6 +268,25 @@ def extract_colors(path: Path, num_colors: int = 5) -> list[tuple[str, float]]:
         return []
 
 
+def parse_animation_info(path: Path) -> dict:
+    """Parse _AnimationInfo.txt file."""
+    info = {}
+    try:
+        text = path.read_text()
+        # Parse frame size
+        match = re.search(r"(\d+)x(\d+)px", text)
+        if match:
+            info["frame_size"] = f"{match.group(1)}x{match.group(2)}"
+
+        # Parse frame durations
+        durations = re.findall(r"(\d+)ms:\s*([^.]+)", text)
+        if durations:
+            info["durations"] = {anim.strip().lower(): int(ms) for ms, anim in durations}
+    except Exception:
+        pass
+    return info
+
+
 def extract_tags_from_path(path: Path, asset_root: Path) -> list[str]:
     """Extract tags from file path."""
     rel_path = path.relative_to(asset_root)
@@ -442,6 +461,18 @@ def index(
             # Extract and add tags
             tags = extract_tags_from_path(file_path, asset_root)
             add_tags(conn, asset_id, tags, "path")
+
+            # Check for animation info in same or parent directory
+            anim_info = {}
+            for info_name in ["_AnimationInfo.txt", "AnimationInfo.txt"]:
+                info_path = file_path.parent / info_name
+                if info_path.exists():
+                    anim_info = parse_animation_info(info_path)
+                    break
+
+            # Add frame size as tag if found in metadata
+            if anim_info.get("frame_size"):
+                add_tags(conn, asset_id, [anim_info["frame_size"]], "metadata")
 
             # Extract colors for images
             if file_path.suffix.lower() in IMAGE_EXTENSIONS:
