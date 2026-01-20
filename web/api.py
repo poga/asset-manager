@@ -342,6 +342,45 @@ def image(asset_id: int):
     return FileResponse(image_path)
 
 
+@app.get("/api/asset/{asset_id}/frames")
+def asset_frames(asset_id: int):
+    """Get sprite frame metadata for an asset."""
+    conn = get_db()
+
+    # Verify asset exists
+    asset = conn.execute(
+        "SELECT id, animation_type FROM assets WHERE id = ?", [asset_id]
+    ).fetchone()
+
+    if not asset:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Get frames
+    frames = conn.execute("""
+        SELECT frame_index, x, y, width, height
+        FROM sprite_frames
+        WHERE asset_id = ?
+        ORDER BY frame_index
+    """, [asset_id]).fetchall()
+
+    conn.close()
+
+    return {
+        "frames": [
+            {
+                "index": f["frame_index"],
+                "x": f["x"],
+                "y": f["y"],
+                "width": f["width"],
+                "height": f["height"],
+            }
+            for f in frames
+        ],
+        "animation_type": asset["animation_type"],
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -276,5 +276,51 @@ def test_image_serves_file(test_db, tmp_path):
     assert response.headers["content-type"] == "image/png"
 
 
+def test_asset_frames_returns_frame_data(test_db):
+    """Get asset frames returns frame metadata."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # Add sprite frames for asset 1
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    conn.execute(
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 0, 0, 0, 32, 32)"
+    )
+    conn.execute(
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 1, 32, 0, 32, 32)"
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.get("/api/asset/1/frames")
+    assert response.status_code == 200
+    data = response.json()
+    assert "frames" in data
+    assert len(data["frames"]) == 2
+    assert data["frames"][0]["x"] == 0
+    assert data["frames"][1]["x"] == 32
+
+
+def test_asset_frames_not_found(test_db):
+    """Get asset frames returns 404 for unknown asset."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/asset/999/frames")
+    assert response.status_code == 404
+
+
+def test_asset_frames_empty_for_non_spritesheet(test_db):
+    """Get asset frames returns empty list for non-spritesheet."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/asset/1/frames")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["frames"] == []
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
