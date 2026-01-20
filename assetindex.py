@@ -363,6 +363,30 @@ def scan_assets(asset_root: Path) -> list[Path]:
     return sorted(assets)
 
 
+def detect_relationships(conn: sqlite3.Connection):
+    """Detect relationships between assets (sprite <-> shadow <-> gif)."""
+    # Find shadow variants
+    conn.execute("""
+        INSERT OR IGNORE INTO asset_relations (asset_id, related_id, relation_type)
+        SELECT a1.id, a2.id, 'shadow'
+        FROM assets a1
+        JOIN assets a2 ON a2.path LIKE '%_Shadows/%' || a1.filename
+        WHERE a1.path NOT LIKE '%_Shadows/%'
+    """)
+
+    # Find GIF previews
+    conn.execute("""
+        INSERT OR IGNORE INTO asset_relations (asset_id, related_id, relation_type)
+        SELECT a1.id, a2.id, 'gif_preview'
+        FROM assets a1
+        JOIN assets a2 ON a2.path LIKE '%_GIFs/%'
+            AND REPLACE(a2.filename, '.gif', '') = REPLACE(a1.filename, '.png', '')
+        WHERE a1.filetype = 'png' AND a2.filetype = 'gif'
+    """)
+
+    conn.commit()
+
+
 @app.command()
 def index(
     asset_path: Path = typer.Argument(..., help="Path to assets directory"),
@@ -519,6 +543,10 @@ def index(
                 [preview_path, row["id"]]
             )
     conn.commit()
+
+    # Detect asset relationships
+    console.print("Detecting asset relationships...")
+    detect_relationships(conn)
 
     console.print(f"\n[green]Done![/green] Indexed {new_count} new/changed, skipped {skip_count} unchanged.")
 
