@@ -172,5 +172,45 @@ def test_similar_not_found(test_db):
     assert response.status_code == 404
 
 
+def test_asset_detail(test_db):
+    """Get asset detail returns full info."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/asset/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == 1
+    assert data["filename"] == "goblin.png"
+    assert data["path"] == "/assets/creatures/goblin.png"
+    assert data["pack"] == "creatures"
+    assert "goblin" in data["tags"]
+    assert len(data["colors"]) > 0
+
+
+def test_asset_detail_not_found(test_db):
+    """Get asset detail returns 404 for unknown asset."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/asset/999")
+    assert response.status_code == 404
+
+
+def test_filters_returns_options(test_db):
+    """Get filters returns available filter options."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/filters")
+    assert response.status_code == 200
+    data = response.json()
+    assert "packs" in data
+    assert "tags" in data
+    assert "colors" in data
+    assert "creatures" in data["packs"]
+    assert "creature" in data["tags"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
