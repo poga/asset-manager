@@ -357,6 +357,128 @@ def get_category(path: Path, pack_path: Path) -> str:
     return ""
 
 
+def store_sprite_frames(conn: sqlite3.Connection, asset_id: int, frames: list[dict]):
+    """Store sprite frame data for an asset."""
+    # Clear existing frames
+    conn.execute("DELETE FROM sprite_frames WHERE asset_id = ?", [asset_id])
+
+    # Insert new frames
+    for frame in frames:
+        conn.execute("""
+            INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, [
+            asset_id,
+            frame["index"],
+            frame["x"],
+            frame["y"],
+            frame["width"],
+            frame["height"],
+        ])
+
+
+def index_asset(
+    conn: sqlite3.Connection,
+    file_path: Path,
+    asset_root: Path,
+    analyze_sprites: bool = True,
+) -> int:
+    """Index a single asset file. Returns asset ID."""
+    rel_path = str(file_path.relative_to(asset_root))
+    current_hash = file_hash(file_path)
+
+    # Detect pack
+    pack_name, pack_path = detect_pack(file_path, asset_root)
+    pack_id = None
+    if pack_name:
+        pack_rel = str(pack_path.relative_to(asset_root))
+        version = extract_version(pack_name)
+        conn.execute(
+            """INSERT OR REPLACE INTO packs (name, path, version, indexed_at)
+               VALUES (?, ?, ?, ?)""",
+            [pack_name, pack_rel, version, datetime.now()]
+        )
+        pack_id = conn.execute("SELECT id FROM packs WHERE path = ?", [pack_rel]).fetchone()[0]
+
+    # Get image info
+    img_info = get_image_info(file_path) if file_path.suffix.lower() in IMAGE_EXTENSIONS else {}
+
+    # Category
+    category = get_category(file_path, pack_path) if pack_name else ""
+
+    # Analyze sprites if image
+    analysis_method = None
+    animation_type = None
+    frames = []
+
+    if analyze_sprites and file_path.suffix.lower() in IMAGE_EXTENSIONS:
+        try:
+            from sprite_analyzer import analyze_spritesheet
+            result = analyze_spritesheet(file_path)
+            frames = result.get("frames", [])
+            animation_type = result.get("animation_type")
+            analysis_method = "ai" if len(frames) > 1 else "single"
+        except Exception:
+            analysis_method = "failed"
+
+    # Insert or update asset
+    conn.execute(
+        """INSERT OR REPLACE INTO assets
+           (pack_id, path, filename, filetype, file_hash, file_size,
+            width, height, frame_count, frame_width, frame_height,
+            category, analysis_method, animation_type, indexed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [
+            pack_id,
+            rel_path,
+            file_path.name,
+            file_path.suffix.lower().lstrip("."),
+            current_hash,
+            file_path.stat().st_size,
+            img_info.get("width"),
+            img_info.get("height"),
+            len(frames) if frames else img_info.get("frame_count"),
+            frames[0]["width"] if frames else img_info.get("frame_width"),
+            frames[0]["height"] if frames else img_info.get("frame_height"),
+            category,
+            analysis_method,
+            animation_type,
+            datetime.now(),
+        ]
+    )
+
+    asset_id = conn.execute("SELECT id FROM assets WHERE path = ?", [rel_path]).fetchone()[0]
+
+    # Store sprite frames
+    if frames and len(frames) > 1:
+        store_sprite_frames(conn, asset_id, frames)
+
+    # Extract and add tags
+    tags = extract_tags_from_path(file_path, asset_root)
+    add_tags(conn, asset_id, tags, "path")
+
+    # Extract colors
+    if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+        colors = extract_colors(file_path)
+        for hex_color, percentage in colors:
+            conn.execute(
+                """INSERT OR REPLACE INTO asset_colors (asset_id, color_hex, percentage)
+                   VALUES (?, ?, ?)""",
+                [asset_id, hex_color, percentage]
+            )
+
+        # Compute perceptual hash
+        phash = compute_phash(file_path)
+        if phash:
+            conn.execute(
+                """INSERT OR REPLACE INTO asset_phash (asset_id, phash)
+                   VALUES (?, ?)""",
+                [asset_id, phash]
+            )
+
+    return asset_id
+
+
 def add_tags(conn: sqlite3.Connection, asset_id: int, tags: list[str], source: str):
     """Add tags to an asset."""
     for tag in tags:

@@ -663,6 +663,41 @@ class TestCLI:
 # =============================================================================
 
 
+class TestSpriteAnalysisIntegration:
+    """Tests for sprite analysis during indexing."""
+
+    def test_stores_sprite_frames(self, temp_dir):
+        """Indexing stores sprite frames for detected spritesheets."""
+        # Create a simple 64x32 spritesheet (2 frames)
+        img_path = temp_dir / "TestPack" / "sprite.png"
+        img_path.parent.mkdir(parents=True)
+        img = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
+        img.save(img_path)
+
+        db_path = temp_dir / "test.db"
+        conn = assetindex.get_db(db_path)
+
+        # Index the file
+        assetindex.index_asset(conn, img_path, temp_dir)
+        conn.commit()
+
+        # Check frames were stored
+        asset_id = conn.execute(
+            "SELECT id FROM assets WHERE filename = 'sprite.png'"
+        ).fetchone()[0]
+
+        frames = conn.execute(
+            "SELECT * FROM sprite_frames WHERE asset_id = ? ORDER BY frame_index",
+            [asset_id]
+        ).fetchall()
+
+        assert len(frames) == 2
+        assert frames[0]["width"] == 32
+        assert frames[1]["x"] == 32
+
+        conn.close()
+
+
 class TestSpriteFramesSchema:
     """Tests for sprite_frames table."""
 
