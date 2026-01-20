@@ -453,5 +453,116 @@ def similar(
         print(f"{dist}\t{row['asset_id']}\t{row['path']}\t{row['pack_name'] or '-'}")
 
 
+COMMAND_HELP = {
+    "search": {
+        "desc": "Search assets by name, tags, or filters",
+        "usage": "assetsearch.py search [QUERY] [OPTIONS]",
+        "args": [
+            ("QUERY", "Search filename/path"),
+        ],
+        "opts": [
+            ("-t, --tag TAG", "Filter by tag (can repeat)"),
+            ("-c, --color COLOR", "Filter by dominant color (hex or name)"),
+            ("-p, --pack PACK", "Filter by pack"),
+            ("--type TYPE", "Filter by filetype"),
+            ("--db PATH", "Path to assets.db"),
+            ("-n, --limit N", "Max results (default: 50)"),
+        ],
+    },
+    "packs": {
+        "desc": "List all indexed packs",
+        "usage": "assetsearch.py packs [OPTIONS]",
+        "args": [],
+        "opts": [
+            ("--db PATH", "Path to assets.db"),
+        ],
+    },
+    "tags": {
+        "desc": "List all tags with counts",
+        "usage": "assetsearch.py tags [OPTIONS]",
+        "args": [],
+        "opts": [
+            ("--db PATH", "Path to assets.db"),
+            ("-n, --limit N", "Max tags to show (default: 50)"),
+        ],
+    },
+    "info": {
+        "desc": "Show detailed info for an asset",
+        "usage": "assetsearch.py info ASSET_ID [OPTIONS]",
+        "args": [
+            ("ASSET_ID", "Asset ID"),
+        ],
+        "opts": [
+            ("--db PATH", "Path to assets.db"),
+        ],
+    },
+    "stats": {
+        "desc": "Show index statistics",
+        "usage": "assetsearch.py stats [OPTIONS]",
+        "args": [],
+        "opts": [
+            ("--db PATH", "Path to assets.db"),
+        ],
+    },
+    "similar": {
+        "desc": "Find visually similar assets",
+        "usage": "assetsearch.py similar REFERENCE [OPTIONS]",
+        "args": [
+            ("REFERENCE", "Asset ID or path to image"),
+        ],
+        "opts": [
+            ("--db PATH", "Path to assets.db"),
+            ("-n, --limit N", "Max results (default: 10)"),
+            ("-d, --distance N", "Max hamming distance (default: 15)"),
+        ],
+    },
+    "help": {
+        "desc": "Show help for a command",
+        "usage": "assetsearch.py help [COMMAND]",
+        "args": [
+            ("COMMAND", "Command name"),
+        ],
+        "opts": [],
+    },
+}
+
+
+@app.command()
+def help(
+    command: Optional[str] = typer.Argument(None, help="Command name"),
+):
+    """Show help for a command."""
+    if command is None:
+        print("assetsearch - Search your game asset index")
+        print()
+        print("Commands:")
+        for name, info in COMMAND_HELP.items():
+            print(f"  {name:10s} {info['desc']}")
+        print()
+        print("Use 'assetsearch.py help <command>' for details.")
+        return
+
+    if command not in COMMAND_HELP:
+        print(f"Unknown command: {command}", file=sys.stderr)
+        raise typer.Exit(1)
+
+    info = COMMAND_HELP[command]
+    print(f"{command} - {info['desc']}")
+    print()
+    print(f"Usage: {info['usage']}")
+
+    if info['args']:
+        print()
+        print("Arguments:")
+        for arg, desc in info['args']:
+            print(f"  {arg:20s} {desc}")
+
+    if info['opts']:
+        print()
+        print("Options:")
+        for opt, desc in info['opts']:
+            print(f"  {opt:20s} {desc}")
+
+
 if __name__ == "__main__":
     app()
