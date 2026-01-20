@@ -174,9 +174,34 @@ def search(
     params.append(limit)
 
     rows = conn.execute(sql, params).fetchall()
-    conn.close()
 
     assets = []
+    asset_ids = [row["id"] for row in rows]
+
+    # Fetch frames for all assets in one query
+    frames_by_asset = {}
+    if asset_ids:
+        placeholders = ",".join("?" * len(asset_ids))
+        frame_rows = conn.execute(f"""
+            SELECT asset_id, frame_index, x, y, width, height
+            FROM sprite_frames
+            WHERE asset_id IN ({placeholders})
+            ORDER BY asset_id, frame_index
+        """, asset_ids).fetchall()
+
+        for f in frame_rows:
+            aid = f["asset_id"]
+            if aid not in frames_by_asset:
+                frames_by_asset[aid] = []
+            frames_by_asset[aid].append({
+                "x": f["x"],
+                "y": f["y"],
+                "width": f["width"],
+                "height": f["height"],
+            })
+
+    conn.close()
+
     for row in rows:
         assets.append({
             "id": row["id"],
@@ -186,6 +211,7 @@ def search(
             "tags": row["tags"].split(",") if row["tags"] else [],
             "width": row["width"],
             "height": row["height"],
+            "frames": frames_by_asset.get(row["id"], []),
         })
 
     return {"assets": assets, "total": len(assets)}

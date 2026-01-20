@@ -322,5 +322,31 @@ def test_asset_frames_empty_for_non_spritesheet(test_db):
     assert data["frames"] == []
 
 
+def test_search_includes_frames(test_db):
+    """Search results include frame data for spritesheets."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # Add sprite frames for asset 1
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    conn.execute(
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 0, 0, 0, 32, 32)"
+    )
+    conn.execute(
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 1, 32, 0, 32, 32)"
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.get("/api/search?q=goblin")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["assets"]) == 1
+    asset = data["assets"][0]
+    assert "frames" in asset
+    assert len(asset["frames"]) == 2
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
