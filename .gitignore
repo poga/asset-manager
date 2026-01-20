@@ -10,3 +10,6 @@ __pycache__/
 # Assets (track separately or use git-lfs)
 assets/
 .DS_Store
+
+# Worktrees
+.worktrees/
