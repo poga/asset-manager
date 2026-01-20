@@ -631,7 +631,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(assetsearch.app, ["stats", "--db", str(db_path)])
         assert result.exit_code == 0
-        assert "Packs: 0" in result.stdout
+        assert "packs\t0" in result.stdout
 
     def test_assetsearch_packs_empty(self, temp_dir):
         """Test packs command with empty database."""
@@ -643,7 +643,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(assetsearch.app, ["packs", "--db", str(db_path)])
         assert result.exit_code == 0
-        assert "No packs indexed" in result.stdout
+        assert "No packs indexed" in result.output
 
     def test_assetsearch_tags_empty(self, temp_dir):
         """Test tags command with empty database."""
@@ -655,7 +655,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(assetsearch.app, ["tags", "--db", str(db_path)])
         assert result.exit_code == 0
-        assert "No tags found" in result.stdout
+        assert "No tags found" in result.output
 
 
 # =============================================================================
