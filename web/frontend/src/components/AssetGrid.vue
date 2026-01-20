@@ -10,7 +10,18 @@
         class="asset-item"
         @click="$emit('select', asset.id)"
       >
-        <img :src="`/api/image/${asset.id}`" :alt="asset.filename" />
+        <SpritePreview
+          v-if="asset.frames && asset.frames.length > 1"
+          :asset-id="asset.id"
+          :frames="asset.frames"
+          :width="asset.width"
+          :height="asset.height"
+        />
+        <img
+          v-else
+          :src="`/api/image/${asset.id}`"
+          :alt="asset.filename"
+        />
         <span class="filename">{{ asset.filename }}</span>
       </div>
     </div>
@@ -21,6 +32,8 @@
 </template>
 
 <script setup>
+import SpritePreview from './SpritePreview.vue'
+
 defineProps({
   assets: {
     type: Array,
@@ -60,6 +73,7 @@ defineEmits(['select'])
   max-width: 100px;
   max-height: 100px;
   object-fit: contain;
+  image-rendering: pixelated;
 }
 
 .filename {
