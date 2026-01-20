@@ -402,14 +402,12 @@ def similar(
     ref_name = reference
 
     if reference.isdigit():
-        # By ID
         row = conn.execute(
             "SELECT phash FROM asset_phash WHERE asset_id = ?", [int(reference)]
         ).fetchone()
         if row:
             ref_hash = row["phash"]
     else:
-        # By path (in DB or external file)
         row = conn.execute(
             "SELECT ap.phash FROM asset_phash ap JOIN assets a ON ap.asset_id = a.id WHERE a.path LIKE ?",
             [f"%{reference}%"]
@@ -417,7 +415,6 @@ def similar(
         if row:
             ref_hash = row["phash"]
         elif Path(reference).exists():
-            # External file - compute hash
             try:
                 import imagehash
                 from PIL import Image
@@ -426,11 +423,11 @@ def similar(
                     ref_hash = h.hash.tobytes()
                     ref_name = Path(reference).name
             except ImportError:
-                console.print("[red]Install imagehash for external file similarity: pip install imagehash[/red]")
+                print("Install imagehash for external file similarity: pip install imagehash", file=sys.stderr)
                 raise typer.Exit(1)
 
     if not ref_hash:
-        console.print(f"[red]Could not find or compute hash for: {reference}[/red]")
+        print(f"Could not find or compute hash for: {reference}", file=sys.stderr)
         raise typer.Exit(1)
 
     # Find similar
@@ -442,31 +439,18 @@ def similar(
         LEFT JOIN packs p ON a.pack_id = p.id
     """):
         dist = hamming_distance(ref_hash, row["phash"])
-        if dist <= max_distance and dist > 0:  # Exclude exact match
+        if dist <= max_distance and dist > 0:
             results.append((dist, row))
 
     results.sort(key=lambda x: x[0])
     results = results[:limit]
 
     if not results:
-        console.print(f"[yellow]No similar assets found for {ref_name}[/yellow]")
+        print(f"No similar assets found for {ref_name}", file=sys.stderr)
         return
 
-    table = Table(title=f"Similar to {ref_name}")
-    table.add_column("Dist", style="dim", width=4)
-    table.add_column("ID", style="dim", width=6)
-    table.add_column("Filename", style="cyan")
-    table.add_column("Pack", style="green")
-
     for dist, row in results:
-        table.add_row(
-            str(dist),
-            str(row["asset_id"]),
-            row["filename"],
-            row["pack_name"] or "-",
-        )
-
-    console.print(table)
+        print(f"{dist}\t{row['asset_id']}\t{row['path']}\t{row['pack_name'] or '-'}")
 
 
 if __name__ == "__main__":
