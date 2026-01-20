@@ -460,6 +460,91 @@ def asset_frame(asset_id: int, frame_index: int, scale: int = 1):
     return StreamingResponse(buffer, media_type="image/png")
 
 
+@app.get("/api/asset/{asset_id}/animation")
+def asset_animation(
+    asset_id: int,
+    fps: int = 10,
+    scale: int = 1,
+    format: str = "gif",
+):
+    """Generate animated GIF/WebP from spritesheet frames."""
+    conn = get_db()
+
+    asset = conn.execute(
+        "SELECT path FROM assets WHERE id = ?", [asset_id]
+    ).fetchone()
+
+    if not asset:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    frames_data = conn.execute("""
+        SELECT x, y, width, height FROM sprite_frames
+        WHERE asset_id = ? ORDER BY frame_index
+    """, [asset_id]).fetchall()
+
+    conn.close()
+
+    if not frames_data:
+        raise HTTPException(status_code=404, detail="No frames found")
+
+    from PIL import Image
+
+    assets_dir = get_assets_path()
+    image_path = assets_dir / asset["path"]
+
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Image file not found")
+
+    # Extract frames
+    pil_frames = []
+    with Image.open(image_path) as img:
+        for f in frames_data:
+            box = (f["x"], f["y"], f["x"] + f["width"], f["y"] + f["height"])
+            frame = img.crop(box)
+
+            if scale > 1:
+                new_size = (frame.width * scale, frame.height * scale)
+                frame = frame.resize(new_size, Image.Resampling.NEAREST)
+
+            # Convert to RGBA for consistency
+            if frame.mode != "RGBA":
+                frame = frame.convert("RGBA")
+
+            pil_frames.append(frame)
+
+    # Create animated image
+    buffer = BytesIO()
+    duration = int(1000 / fps)  # ms per frame
+
+    if format == "webp":
+        pil_frames[0].save(
+            buffer,
+            format="WEBP",
+            save_all=True,
+            append_images=pil_frames[1:],
+            duration=duration,
+            loop=0,
+        )
+        media_type = "image/webp"
+    else:
+        # GIF requires palette mode
+        gif_frames = [f.convert("P", palette=Image.Palette.ADAPTIVE) for f in pil_frames]
+        gif_frames[0].save(
+            buffer,
+            format="GIF",
+            save_all=True,
+            append_images=gif_frames[1:],
+            duration=duration,
+            loop=0,
+            disposal=2,
+        )
+        media_type = "image/gif"
+
+    buffer.seek(0)
+    return StreamingResponse(buffer, media_type=media_type)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

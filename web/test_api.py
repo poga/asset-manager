@@ -404,5 +404,44 @@ def test_asset_frame_not_found(test_db):
     assert response.status_code == 404
 
 
+def test_asset_animation_generates_gif(test_db, tmp_path):
+    """Animation endpoint generates animated GIF."""
+    from api import set_db_path, set_assets_path
+    set_db_path(test_db)
+
+    # Create a 64x32 spritesheet (2 frames of 32x32)
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    pack_dir = assets_dir / "testpack"
+    pack_dir.mkdir()
+
+    from PIL import Image
+    img = Image.new("RGBA", (64, 32), (0, 0, 0, 0))
+    for x in range(32):
+        for y in range(32):
+            img.putpixel((x, y), (255, 0, 0, 255))
+    for x in range(32, 64):
+        for y in range(32):
+            img.putpixel((x, y), (0, 0, 255, 255))
+    img.save(pack_dir / "anim.png")
+
+    set_assets_path(assets_dir)
+
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    conn.execute(
+        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
+        "VALUES (30, 1, 'testpack/anim.png', 'anim.png', 'png', 'anim123', 64, 32)"
+    )
+    conn.execute("INSERT INTO sprite_frames VALUES (NULL, 30, 0, 0, 0, 32, 32)")
+    conn.execute("INSERT INTO sprite_frames VALUES (NULL, 30, 1, 32, 0, 32, 32)")
+    conn.commit()
+    conn.close()
+
+    response = client.get("/api/asset/30/animation")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/gif"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
