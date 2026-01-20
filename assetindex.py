@@ -11,6 +11,7 @@
 """Build and update the game asset index."""
 
 import hashlib
+import json
 import re
 import sqlite3
 from datetime import datetime
@@ -720,6 +721,60 @@ def update(
     # Re-run index
     console.print(f"Updating index from [cyan]{asset_root}[/cyan]")
     index(asset_root, db, force=False)
+
+
+@app.command()
+def analyze(
+    image_path: Path = typer.Argument(..., help="Path to spritesheet image"),
+    output_format: str = typer.Option("json", "--format", "-f", help="Output format: json or table"),
+):
+    """Analyze a spritesheet and output frame data."""
+    if not image_path.exists():
+        console.print(f"[red]File not found: {image_path}[/red]")
+        raise typer.Exit(1)
+
+    from sprite_analyzer import analyze_spritesheet
+
+    result = analyze_spritesheet(image_path)
+
+    if output_format == "json":
+        console.print(json.dumps(result, indent=2))
+    else:
+        console.print(f"[cyan]Frames:[/cyan] {len(result['frames'])}")
+        console.print(f"[cyan]Animation:[/cyan] {result.get('animation_type', 'unknown')}")
+        for frame in result["frames"]:
+            console.print(f"  [{frame['index']}] x={frame['x']} y={frame['y']} {frame['width']}x{frame['height']}")
+
+
+@app.command()
+def extract(
+    image_path: Path = typer.Argument(..., help="Path to spritesheet image"),
+    output_dir: Path = typer.Argument(..., help="Output directory for frames"),
+    scale: int = typer.Option(1, "--scale", "-s", help="Scale factor"),
+):
+    """Extract individual frames from a spritesheet."""
+    if not image_path.exists():
+        console.print(f"[red]File not found: {image_path}[/red]")
+        raise typer.Exit(1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    from sprite_analyzer import analyze_spritesheet, extract_frame
+
+    result = analyze_spritesheet(image_path)
+    frames = result.get("frames", [])
+
+    if not frames:
+        console.print("[yellow]No frames detected[/yellow]")
+        raise typer.Exit(1)
+
+    for frame in frames:
+        frame_img = extract_frame(image_path, frame, scale=scale)
+        output_path = output_dir / f"frame_{frame['index']:03d}.png"
+        frame_img.save(output_path)
+        console.print(f"Extracted: {output_path.name}")
+
+    console.print(f"[green]Extracted {len(frames)} frames to {output_dir}[/green]")
 
 
 if __name__ == "__main__":

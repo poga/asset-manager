@@ -721,6 +721,51 @@ class TestSpriteFramesSchema:
 
 
 # =============================================================================
+# Sprite CLI Tests
+# =============================================================================
+
+
+class TestSpriteCLI:
+    """Tests for sprite CLI commands."""
+
+    def test_analyze_command(self, temp_dir):
+        """Test analyze command outputs frame data."""
+        from typer.testing import CliRunner
+
+        # Create test spritesheet
+        img_path = temp_dir / "sprite.png"
+        img = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
+        img.save(img_path)
+
+        runner = CliRunner()
+        result = runner.invoke(assetindex.app, ["analyze", str(img_path)])
+
+        assert result.exit_code == 0
+        assert "frames" in result.stdout
+        assert '"x":' in result.stdout
+
+    def test_extract_command(self, temp_dir):
+        """Test extract command creates frame files."""
+        from typer.testing import CliRunner
+
+        # Create test spritesheet
+        img_path = temp_dir / "sprite.png"
+        img = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
+        img.save(img_path)
+
+        output_dir = temp_dir / "output"
+        output_dir.mkdir()
+
+        runner = CliRunner()
+        result = runner.invoke(assetindex.app, ["extract", str(img_path), str(output_dir)])
+
+        assert result.exit_code == 0
+        # Should create frame_000.png, frame_001.png
+        assert (output_dir / "frame_000.png").exists()
+        assert (output_dir / "frame_001.png").exists()
+
+
+# =============================================================================
 # Entry point
 # =============================================================================
 
