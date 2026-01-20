@@ -49,12 +49,23 @@ def test_db():
             height INTEGER,
             frame_count INTEGER,
             frame_width INTEGER,
-            frame_height INTEGER
+            frame_height INTEGER,
+            analysis_method TEXT,
+            animation_type TEXT
         );
         CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
         CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, PRIMARY KEY (asset_id, tag_id));
         CREATE TABLE asset_colors (asset_id INTEGER, color_hex TEXT, percentage REAL, PRIMARY KEY (asset_id, color_hex));
         CREATE TABLE asset_phash (asset_id INTEGER PRIMARY KEY, phash BLOB);
+        CREATE TABLE sprite_frames (
+            id INTEGER PRIMARY KEY,
+            asset_id INTEGER,
+            frame_index INTEGER,
+            x INTEGER,
+            y INTEGER,
+            width INTEGER,
+            height INTEGER
+        );
 
         INSERT INTO packs (id, name, path) VALUES (1, 'creatures', '/assets/creatures');
         INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height)

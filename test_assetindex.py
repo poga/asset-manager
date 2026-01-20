@@ -659,6 +659,33 @@ class TestCLI:
 
 
 # =============================================================================
+# Sprite Frames Schema Tests
+# =============================================================================
+
+
+class TestSpriteFramesSchema:
+    """Tests for sprite_frames table."""
+
+    def test_sprite_frames_table_exists(self, temp_db):
+        """Verify sprite_frames table is created."""
+        conn = assetindex.get_db(temp_db)
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='sprite_frames'"
+        )
+        assert cursor.fetchone() is not None
+        conn.close()
+
+    def test_sprite_frames_columns(self, temp_db):
+        """Verify sprite_frames has correct columns."""
+        conn = assetindex.get_db(temp_db)
+        cursor = conn.execute("PRAGMA table_info(sprite_frames)")
+        columns = {row[1] for row in cursor.fetchall()}
+        expected = {"id", "asset_id", "frame_index", "x", "y", "width", "height"}
+        assert expected.issubset(columns)
+        conn.close()
+
+
+# =============================================================================
 # Entry point
 # =============================================================================
 
