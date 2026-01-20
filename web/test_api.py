@@ -64,6 +64,7 @@ def test_db():
         INSERT INTO tags (id, name) VALUES (1, 'creature'), (2, 'goblin'), (3, 'orc');
         INSERT INTO asset_tags VALUES (1, 1), (1, 2), (2, 1), (2, 3);
         INSERT INTO asset_colors VALUES (1, '#00ff00', 0.5), (2, '#ff0000', 0.6);
+        INSERT INTO asset_phash VALUES (1, X'0000000000000000'), (2, X'0000000000000001');
     """)
     conn.close()
 
@@ -134,6 +135,41 @@ def test_search_by_pack(test_db):
     assert response.status_code == 200
     data = response.json()
     assert len(data["assets"]) == 2
+
+
+def test_similar_returns_similar_assets(test_db):
+    """Find similar returns assets by visual similarity."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/similar/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert "assets" in data
+    # Asset 2 has hamming distance of 1 from asset 1
+    assert len(data["assets"]) == 1
+    assert data["assets"][0]["id"] == 2
+
+
+def test_similar_respects_distance(test_db):
+    """Find similar respects max distance parameter."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # Distance 0 should return nothing (only exact matches, excluding self)
+    response = client.get("/api/similar/1?distance=0")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["assets"]) == 0
+
+
+def test_similar_not_found(test_db):
+    """Find similar returns 404 for unknown asset."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/similar/999")
+    assert response.status_code == 404
 
 
 if __name__ == "__main__":
