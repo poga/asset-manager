@@ -220,6 +220,78 @@ def similar(
     return {"assets": assets, "total": len(assets)}
 
 
+@app.get("/api/asset/{asset_id}")
+def asset_detail(asset_id: int):
+    """Get detailed info for an asset."""
+    conn = get_db()
+
+    row = conn.execute("""
+        SELECT a.*, p.name as pack_name
+        FROM assets a
+        LEFT JOIN packs p ON a.pack_id = p.id
+        WHERE a.id = ?
+    """, [asset_id]).fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Get tags
+    tags = conn.execute("""
+        SELECT t.name FROM asset_tags at
+        JOIN tags t ON at.tag_id = t.id
+        WHERE at.asset_id = ?
+    """, [asset_id]).fetchall()
+
+    # Get colors
+    colors = conn.execute("""
+        SELECT color_hex, percentage FROM asset_colors
+        WHERE asset_id = ?
+        ORDER BY percentage DESC
+    """, [asset_id]).fetchall()
+
+    conn.close()
+
+    return {
+        "id": row["id"],
+        "path": row["path"],
+        "filename": row["filename"],
+        "filetype": row["filetype"],
+        "pack": row["pack_name"],
+        "width": row["width"],
+        "height": row["height"],
+        "frame_count": row["frame_count"],
+        "frame_width": row["frame_width"],
+        "frame_height": row["frame_height"],
+        "tags": [t["name"] for t in tags],
+        "colors": [{"hex": c["color_hex"], "percentage": c["percentage"]} for c in colors],
+    }
+
+
+@app.get("/api/filters")
+def filters():
+    """Get available filter options."""
+    conn = get_db()
+
+    packs = conn.execute("SELECT name FROM packs ORDER BY name").fetchall()
+    tags = conn.execute("""
+        SELECT t.name, COUNT(at.asset_id) as count
+        FROM tags t
+        JOIN asset_tags at ON t.id = at.tag_id
+        GROUP BY t.id
+        ORDER BY count DESC
+        LIMIT 100
+    """).fetchall()
+
+    conn.close()
+
+    return {
+        "packs": [p["name"] for p in packs],
+        "tags": [t["name"] for t in tags],
+        "colors": list(COLOR_NAMES.keys()),
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
