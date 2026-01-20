@@ -181,7 +181,6 @@ def search(
         params.append(filetype.lower().lstrip("."))
 
     if tag:
-        # All tags must match (AND)
         for t in tag:
             conditions.append("""
                 a.id IN (
@@ -193,7 +192,6 @@ def search(
             params.append(t.lower())
 
     if color:
-        # Resolve color name to hex values
         color_lower = color.lower()
         if color_lower in COLOR_NAMES:
             hex_values = COLOR_NAMES[color_lower]
@@ -207,7 +205,6 @@ def search(
             """)
             params.extend(hex_values)
         else:
-            # Direct hex match (with some tolerance)
             conditions.append("""
                 a.id IN (
                     SELECT asset_id FROM asset_colors
@@ -237,32 +234,15 @@ def search(
     rows = conn.execute(sql, params).fetchall()
 
     if not rows:
-        console.print("[yellow]No assets found.[/yellow]")
+        print("No assets found.", file=sys.stderr)
         return
-
-    table = Table(title=f"Assets ({len(rows)} results)")
-    table.add_column("ID", style="dim", width=6)
-    table.add_column("Filename", style="cyan")
-    table.add_column("Size", width=10)
-    table.add_column("Pack", style="green")
-    table.add_column("Tags", style="yellow")
 
     for row in rows:
         size = f"{row['width']}x{row['height']}" if row['width'] else "-"
         if row['frame_count'] and row['frame_count'] > 1:
             size += f" ({row['frame_count']}f)"
         tags = row['tags'] or ""
-        if len(tags) > 30:
-            tags = tags[:27] + "..."
-        table.add_row(
-            str(row['id']),
-            row['filename'],
-            size,
-            row['pack_name'] or "-",
-            tags,
-        )
-
-    console.print(table)
+        print(f"{row['id']}\t{row['path']}\t{size}\t{row['pack_name'] or '-'}\t{tags}")
 
 
 @app.command()
