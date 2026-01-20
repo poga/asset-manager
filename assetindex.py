@@ -181,6 +181,66 @@ def compute_phash(path: Path) -> Optional[bytes]:
         return None
 
 
+def generate_pack_preview(
+    conn: sqlite3.Connection,
+    pack_id: int,
+    asset_root: Path,
+    preview_dir: Path,
+    grid_size: int = 4,
+    thumb_size: int = 64,
+) -> Optional[str]:
+    """Generate a preview montage for a pack."""
+    # Get representative assets (prefer idle animations)
+    rows = conn.execute("""
+        SELECT path, filename FROM assets
+        WHERE pack_id = ?
+        AND filetype = 'png'
+        ORDER BY
+            CASE WHEN filename LIKE '%Idle%' THEN 0 ELSE 1 END,
+            category,
+            filename
+        LIMIT ?
+    """, [pack_id, grid_size * grid_size]).fetchall()
+
+    if len(rows) < 4:
+        return None
+
+    # Create montage
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    pack_row = conn.execute("SELECT name FROM packs WHERE id = ?", [pack_id]).fetchone()
+    preview_name = f"{pack_row['name']}.png"
+    preview_path = preview_dir / preview_name
+
+    try:
+        montage = Image.new("RGBA", (grid_size * thumb_size, grid_size * thumb_size), (0, 0, 0, 0))
+
+        for i, row in enumerate(rows):
+            x = (i % grid_size) * thumb_size
+            y = (i // grid_size) * thumb_size
+
+            img_path = asset_root / row["path"]
+            with Image.open(img_path) as img:
+                # For spritesheets, take first frame
+                if img.width > img.height:
+                    frame_w = img.height
+                    img = img.crop((0, 0, frame_w, frame_w))
+                elif img.height > img.width:
+                    frame_h = img.width
+                    img = img.crop((0, 0, frame_h, frame_h))
+
+                img.thumbnail((thumb_size, thumb_size), Image.Resampling.NEAREST)
+                # Center in cell
+                offset_x = (thumb_size - img.width) // 2
+                offset_y = (thumb_size - img.height) // 2
+                montage.paste(img, (x + offset_x, y + offset_y))
+
+        montage.save(preview_path)
+        return str(preview_path.relative_to(preview_dir.parent))
+    except Exception as e:
+        console.print(f"[yellow]Preview generation failed: {e}[/yellow]")
+        return None
+
+
 def extract_colors(path: Path, num_colors: int = 5) -> list[tuple[str, float]]:
     """Extract dominant colors from image."""
     try:
@@ -413,6 +473,20 @@ def index(
             SELECT COUNT(*) FROM assets WHERE assets.pack_id = packs.id
         )
     """)
+    conn.commit()
+
+    # Generate pack previews
+    preview_dir = db.parent / ".assetindex" / "previews"
+    console.print("Generating pack previews...")
+    for row in conn.execute("SELECT id, name, preview_path FROM packs"):
+        if row["preview_path"]:
+            continue  # Already has preview
+        preview_path = generate_pack_preview(conn, row["id"], asset_root, preview_dir)
+        if preview_path:
+            conn.execute(
+                "UPDATE packs SET preview_path = ?, preview_generated = TRUE WHERE id = ?",
+                [preview_path, row["id"]]
+            )
     conn.commit()
 
     console.print(f"\n[green]Done![/green] Indexed {new_count} new/changed, skipped {skip_count} unchanged.")
