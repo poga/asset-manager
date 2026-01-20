@@ -254,33 +254,18 @@ def packs(
     conn = get_db(db_path)
 
     rows = conn.execute("""
-        SELECT p.id, p.name, p.version, p.asset_count, p.preview_path
+        SELECT p.id, p.name, p.path, p.version, p.asset_count, p.preview_path
         FROM packs p
         ORDER BY p.name
     """).fetchall()
 
     if not rows:
-        console.print("[yellow]No packs indexed yet.[/yellow]")
+        print("No packs indexed yet.", file=sys.stderr)
         return
 
-    table = Table(title="Asset Packs")
-    table.add_column("ID", style="dim", width=4)
-    table.add_column("Name", style="cyan")
-    table.add_column("Version", width=8)
-    table.add_column("Assets", justify="right", width=8)
-    table.add_column("Preview", style="green")
-
     for row in rows:
-        preview = "Yes" if row['preview_path'] else "No"
-        table.add_row(
-            str(row['id']),
-            row['name'],
-            row['version'] or "-",
-            str(row['asset_count']),
-            preview,
-        )
-
-    console.print(table)
+        preview = row['preview_path'] or "-"
+        print(f"{row['id']}\t{row['name']}\t{row['version'] or '-'}\t{row['asset_count']}\t{row['path']}\t{preview}")
 
 
 @app.command()
