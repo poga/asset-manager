@@ -32,6 +32,7 @@ uv run assetindex.py --update
 
 ```bash
 # Search by name
+<<<<<<< HEAD
 uv run assetsearch.py goblin
 
 # Search by tags
@@ -46,6 +47,22 @@ uv run assetsearch.py --similar reference.png
 
 # Filter by pack
 uv run assetsearch.py --pack creatures
+=======
+uv run assetsearch.py search goblin
+
+# Search by tags
+uv run assetsearch.py search --tag creature --tag attack
+
+# Search by color
+uv run assetsearch.py search --color red
+uv run assetsearch.py search --color "#ff5500"
+
+# Find similar assets
+uv run assetsearch.py similar reference.png
+
+# Filter by pack
+uv run assetsearch.py search --pack creatures
+>>>>>>> 8a7a4f6 (docs: add README with project overview and usage)
 ```
 
 ### Utilities
