@@ -2,19 +2,17 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "rich>=13.0",
 #     "typer>=0.9",
 # ]
 # ///
 """Search your game asset index."""
 
+import sys
 import sqlite3
 from pathlib import Path
 from typing import Optional
 
 import typer
-from rich.console import Console
-from rich.table import Table
 
 # Basic color name to hex ranges
 COLOR_NAMES = {
@@ -46,7 +44,6 @@ def color_distance(c1: str, c2: str) -> float:
 
 
 app = typer.Typer(help="Search your game asset index")
-console = Console()
 
 SCHEMA = """
 -- Asset packs (top-level grouping)
