@@ -307,6 +307,61 @@ def parse_animation_info(path: Path) -> dict:
     return info
 
 
+def detect_frames(image_path: Path, anim_info: dict) -> list[dict]:
+    """
+    Detect frames using animation info or heuristics.
+
+    Priority:
+    1. Use _AnimationInfo.txt frame size if available
+    2. Fall back to dimension-based heuristics
+    """
+    try:
+        with Image.open(image_path) as img:
+            width, height = img.size
+    except Exception:
+        return []
+
+    # Get frame size from animation info
+    frame_size = anim_info.get("frame_size")
+    if frame_size:
+        match = re.match(r"(\d+)x(\d+)", frame_size)
+        if match:
+            fw, fh = int(match.group(1)), int(match.group(2))
+            if width % fw == 0 and height % fh == 0:
+                cols = width // fw
+                rows = height // fh
+                frames = []
+                for row in range(rows):
+                    for col in range(cols):
+                        frames.append({
+                            "index": row * cols + col,
+                            "x": col * fw,
+                            "y": row * fh,
+                            "width": fw,
+                            "height": fh,
+                        })
+                return frames
+
+    # Heuristic: horizontal strip of square frames
+    if width > height and height > 0 and width % height == 0:
+        frame_count = width // height
+        return [
+            {"index": i, "x": i * height, "y": 0, "width": height, "height": height}
+            for i in range(frame_count)
+        ]
+
+    # Heuristic: vertical strip of square frames
+    if height > width and width > 0 and height % width == 0:
+        frame_count = height // width
+        return [
+            {"index": i, "x": 0, "y": i * width, "width": width, "height": width}
+            for i in range(frame_count)
+        ]
+
+    # Single frame
+    return [{"index": 0, "x": 0, "y": 0, "width": width, "height": height}]
+
+
 def extract_tags_from_path(path: Path, asset_root: Path) -> list[str]:
     """Extract tags from file path."""
     rel_path = path.relative_to(asset_root)
