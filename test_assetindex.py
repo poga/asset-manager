@@ -8,7 +8,6 @@
 #     "rich>=13.0",
 #     "typer>=0.9",
 #     "python-dotenv>=1.0",
-#     "anthropic>=0.40",
 # ]
 # ///
 """Test suite for asset index system."""
@@ -699,6 +698,41 @@ class TestSpriteAnalysisIntegration:
 
         conn.close()
 
+    def test_uses_animation_info_for_frame_detection(self, temp_dir):
+        """Frame detection uses _AnimationInfo.txt when available."""
+        # Create a 128x64 image (could be 4x2 grid of 32x32 or 2x1 of 64x64)
+        pack_dir = temp_dir / "TestPack"
+        pack_dir.mkdir()
+        img_path = pack_dir / "sprite.png"
+        img = Image.new("RGBA", (128, 64), (100, 100, 100, 255))
+        img.save(img_path)
+
+        # Create animation info specifying 32x32 frames
+        info_path = pack_dir / "_AnimationInfo.txt"
+        info_path.write_text("Frame size: 32x32px")
+
+        db_path = temp_dir / "test.db"
+        conn = assetindex.get_db(db_path)
+
+        assetindex.index_asset(conn, img_path, temp_dir)
+        conn.commit()
+
+        asset_id = conn.execute(
+            "SELECT id FROM assets WHERE filename = 'sprite.png'"
+        ).fetchone()[0]
+
+        frames = conn.execute(
+            "SELECT * FROM sprite_frames WHERE asset_id = ? ORDER BY frame_index",
+            [asset_id]
+        ).fetchall()
+
+        # Should detect 4x2 = 8 frames of 32x32
+        assert len(frames) == 8
+        assert frames[0]["width"] == 32
+        assert frames[0]["height"] == 32
+
+        conn.close()
+
 
 class TestSpriteFramesSchema:
     """Tests for sprite_frames table."""
@@ -720,124 +754,6 @@ class TestSpriteFramesSchema:
         expected = {"id", "asset_id", "frame_index", "x", "y", "width", "height"}
         assert expected.issubset(columns)
         conn.close()
-
-
-# =============================================================================
-# Sprite CLI Tests
-# =============================================================================
-
-
-class TestSpriteCLI:
-    """Tests for sprite CLI commands."""
-
-    def test_analyze_command(self, temp_dir):
-        """Test analyze command outputs frame data."""
-        from typer.testing import CliRunner
-
-        # Create test spritesheet
-        img_path = temp_dir / "sprite.png"
-        img = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
-        img.save(img_path)
-
-        runner = CliRunner()
-        result = runner.invoke(assetindex.app, ["analyze", str(img_path)])
-
-        assert result.exit_code == 0
-        assert "frames" in result.stdout
-        assert '"x":' in result.stdout
-
-    def test_extract_command(self, temp_dir):
-        """Test extract command creates frame files."""
-        from typer.testing import CliRunner
-
-        # Create test spritesheet
-        img_path = temp_dir / "sprite.png"
-        img = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
-        img.save(img_path)
-
-        output_dir = temp_dir / "output"
-        output_dir.mkdir()
-
-        runner = CliRunner()
-        result = runner.invoke(assetindex.app, ["extract", str(img_path), str(output_dir)])
-
-        assert result.exit_code == 0
-        # Should create frame_000.png, frame_001.png
-        assert (output_dir / "frame_000.png").exists()
-        assert (output_dir / "frame_001.png").exists()
-
-    def test_analyze_save_stores_frames(self, temp_dir):
-        """Test analyze --save stores frames in database."""
-        from typer.testing import CliRunner
-
-        # Create test spritesheet
-        img_path = temp_dir / "sprite.png"
-        img = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
-        img.save(img_path)
-
-        # Create database with asset
-        db_path = temp_dir / "assets.db"
-        conn = sqlite3.connect(db_path)
-        conn.executescript(assetindex.SCHEMA)
-        conn.execute(
-            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
-            [1, str(img_path), "sprite.png", "png", "abc123"]
-        )
-        conn.commit()
-        conn.close()
-
-        runner = CliRunner()
-        result = runner.invoke(assetindex.app, ["analyze", str(img_path), "--save", "--db", str(db_path)])
-
-        assert result.exit_code == 0
-
-        # Verify frames stored in database
-        conn = sqlite3.connect(db_path)
-        frames = conn.execute("SELECT * FROM sprite_frames WHERE asset_id = 1").fetchall()
-        conn.close()
-
-        assert len(frames) == 2  # 64x32 = 2 frames of 32x32
-
-    def test_analyze_all_processes_assets(self, temp_dir):
-        """Test analyze-all processes all PNG assets."""
-        from typer.testing import CliRunner
-
-        # Create test assets folder with spritesheets
-        assets_dir = temp_dir / "assets"
-        assets_dir.mkdir()
-        img1 = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
-        img1.save(assets_dir / "sprite1.png")
-        img2 = Image.new("RGBA", (32, 64), (100, 100, 100, 255))
-        img2.save(assets_dir / "sprite2.png")
-
-        # Create database with assets
-        db_path = temp_dir / "assets.db"
-        conn = sqlite3.connect(db_path)
-        conn.executescript(assetindex.SCHEMA)
-        conn.execute(
-            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
-            [1, "sprite1.png", "sprite1.png", "png", "abc123"]
-        )
-        conn.execute(
-            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
-            [2, "sprite2.png", "sprite2.png", "png", "def456"]
-        )
-        conn.commit()
-        conn.close()
-
-        runner = CliRunner()
-        result = runner.invoke(assetindex.app, ["analyze-all", "--db", str(db_path), "--assets", str(assets_dir)])
-
-        assert result.exit_code == 0
-
-        # Verify frames stored for both assets
-        conn = sqlite3.connect(db_path)
-        frames1 = conn.execute("SELECT * FROM sprite_frames WHERE asset_id = 1").fetchall()
-        frames2 = conn.execute("SELECT * FROM sprite_frames WHERE asset_id = 2").fetchall()
-        conn.close()
-
-        assert len(frames1) >= 2  # Multiple frames detected
-        assert len(frames2) >= 2  # Multiple frames detected
 
 
 # =============================================================================
