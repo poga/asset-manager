@@ -79,8 +79,6 @@ CREATE TABLE IF NOT EXISTS assets (
     frame_width INTEGER,
     frame_height INTEGER,
     category TEXT,
-    analysis_method TEXT,
-    animation_type TEXT,
     indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -128,6 +126,7 @@ CREATE TABLE IF NOT EXISTS sprite_frames (
     y INTEGER NOT NULL,
     width INTEGER NOT NULL,
     height INTEGER NOT NULL,
+    duration_ms INTEGER,
     UNIQUE(asset_id, frame_index)
 );
 
@@ -365,27 +364,14 @@ def get_category(path: Path, pack_path: Path) -> str:
 
 def store_sprite_frames(conn: sqlite3.Connection, asset_id: int, frames: list[dict]):
     """Store sprite frame data for an asset."""
-    # Ensure table exists
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS sprite_frames (
-            id INTEGER PRIMARY KEY,
-            asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
-            frame_index INTEGER NOT NULL,
-            x INTEGER NOT NULL,
-            y INTEGER NOT NULL,
-            width INTEGER NOT NULL,
-            height INTEGER NOT NULL,
-            UNIQUE(asset_id, frame_index)
-        )
-    """)
     # Clear existing frames
     conn.execute("DELETE FROM sprite_frames WHERE asset_id = ?", [asset_id])
 
     # Insert new frames
     for frame in frames:
         conn.execute("""
-            INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, [
             asset_id,
             frame["index"],
@@ -393,6 +379,7 @@ def store_sprite_frames(conn: sqlite3.Connection, asset_id: int, frames: list[di
             frame["y"],
             frame["width"],
             frame["height"],
+            frame.get("duration_ms"),
         ])
 
 
@@ -426,8 +413,6 @@ def index_asset(
     category = get_category(file_path, pack_path) if pack_name else ""
 
     # Analyze sprites if image
-    analysis_method = None
-    animation_type = None
     frames = []
 
     if analyze_sprites and file_path.suffix.lower() in IMAGE_EXTENSIONS:
@@ -435,18 +420,16 @@ def index_asset(
             from sprite_analyzer import analyze_spritesheet
             result = analyze_spritesheet(file_path)
             frames = result.get("frames", [])
-            animation_type = result.get("animation_type")
-            analysis_method = "ai" if len(frames) > 1 else "single"
         except Exception:
-            analysis_method = "failed"
+            pass
 
     # Insert or update asset
     conn.execute(
         """INSERT OR REPLACE INTO assets
            (pack_id, path, filename, filetype, file_hash, file_size,
             width, height, frame_count, frame_width, frame_height,
-            category, analysis_method, animation_type, indexed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            category, indexed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             pack_id,
             rel_path,
@@ -460,8 +443,6 @@ def index_asset(
             frames[0]["width"] if frames else img_info.get("frame_width"),
             frames[0]["height"] if frames else img_info.get("frame_height"),
             category,
-            analysis_method,
-            animation_type,
             datetime.now(),
         ]
     )
