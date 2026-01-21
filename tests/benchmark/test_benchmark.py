@@ -8,10 +8,39 @@
 """Tests for benchmark module."""
 
 import json
+import sqlite3
 import tempfile
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture
+def test_db(tmp_path):
+    """Create a test database with schema and sample data."""
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript("""
+        CREATE TABLE assets (
+            id INTEGER PRIMARY KEY,
+            path TEXT NOT NULL UNIQUE
+        );
+        CREATE TABLE sprite_frames (
+            id INTEGER PRIMARY KEY,
+            asset_id INTEGER REFERENCES assets(id),
+            frame_index INTEGER NOT NULL,
+            x INTEGER NOT NULL,
+            y INTEGER NOT NULL,
+            width INTEGER NOT NULL,
+            height INTEGER NOT NULL
+        );
+    """)
+    conn.execute("INSERT INTO assets (id, path) VALUES (1, 'assets/test.png')")
+    conn.execute("INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 0, 0, 0, 32, 32)")
+    conn.execute("INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 1, 32, 0, 32, 32)")
+    conn.commit()
+    conn.close()
+    return db_path
 
 
 class TestLoadManifests:
@@ -133,6 +162,46 @@ class TestGetExpectedFrames:
         result = get_expected_frames(spec)
 
         assert result == frames
+
+
+class TestGetActualFrames:
+    """Tests for get_actual_frames function."""
+
+    def test_returns_frames_from_database(self, test_db):
+        """get_actual_frames queries sprite_frames table."""
+        from benchmark import get_actual_frames
+
+        result = get_actual_frames(test_db, "assets/test.png")
+
+        assert len(result) == 2
+        assert result[0] == {"index": 0, "x": 0, "y": 0, "width": 32, "height": 32}
+        assert result[1] == {"index": 1, "x": 32, "y": 0, "width": 32, "height": 32}
+
+    def test_returns_empty_for_missing_asset(self, test_db):
+        """get_actual_frames returns empty list for non-existent asset."""
+        from benchmark import get_actual_frames
+
+        result = get_actual_frames(test_db, "assets/nonexistent.png")
+
+        assert result == []
+
+    def test_orders_by_frame_index(self, test_db):
+        """get_actual_frames returns frames ordered by index."""
+        from benchmark import get_actual_frames
+
+        conn = sqlite3.connect(test_db)
+        conn.execute("INSERT INTO assets (id, path) VALUES (2, 'assets/unordered.png')")
+        conn.execute("INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (2, 2, 64, 0, 32, 32)")
+        conn.execute("INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (2, 0, 0, 0, 32, 32)")
+        conn.execute("INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (2, 1, 32, 0, 32, 32)")
+        conn.commit()
+        conn.close()
+
+        result = get_actual_frames(test_db, "assets/unordered.png")
+
+        assert result[0]["index"] == 0
+        assert result[1]["index"] == 1
+        assert result[2]["index"] == 2
 
 
 if __name__ == "__main__":

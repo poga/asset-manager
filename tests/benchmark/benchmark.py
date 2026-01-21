@@ -6,6 +6,7 @@
 """Benchmark system for verifying AI-analyzed spritesheet frames."""
 
 import json
+import sqlite3
 from pathlib import Path
 
 
@@ -52,4 +53,31 @@ def get_expected_frames(spec: dict) -> list[dict]:
             })
             index += 1
 
+    return frames
+
+
+def get_actual_frames(db_path: Path, asset_path: str) -> list[dict]:
+    """Query sprite_frames table for AI-analyzed frames."""
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+
+    cursor = conn.execute("""
+        SELECT sf.frame_index, sf.x, sf.y, sf.width, sf.height
+        FROM sprite_frames sf
+        JOIN assets a ON sf.asset_id = a.id
+        WHERE a.path = ?
+        ORDER BY sf.frame_index
+    """, [asset_path])
+
+    frames = []
+    for row in cursor:
+        frames.append({
+            "index": row["frame_index"],
+            "x": row["x"],
+            "y": row["y"],
+            "width": row["width"],
+            "height": row["height"]
+        })
+
+    conn.close()
     return frames
