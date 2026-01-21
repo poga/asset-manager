@@ -25,3 +25,31 @@ def load_manifests(benchmark_dir: Path) -> dict[str, dict]:
             result.update(json.load(f))
 
     return result
+
+
+def get_expected_frames(spec: dict) -> list[dict]:
+    """Compute expected frames from grid spec or return manual frames."""
+    # If spec has "frames" key, it's irregular - return directly
+    if "frames" in spec:
+        return spec["frames"]
+
+    # Otherwise, generate from grid spec
+    cols = spec["cols"]
+    rows = spec["rows"]
+    frame_width = spec["frame_width"]
+    frame_height = spec["frame_height"]
+
+    frames = []
+    index = 0
+    for row in range(rows):
+        for col in range(cols):
+            frames.append({
+                "index": index,
+                "x": col * frame_width,
+                "y": row * frame_height,
+                "width": frame_width,
+                "height": frame_height
+            })
+            index += 1
+
+    return frames
