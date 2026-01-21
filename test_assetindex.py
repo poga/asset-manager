@@ -764,6 +764,38 @@ class TestSpriteCLI:
         assert (output_dir / "frame_000.png").exists()
         assert (output_dir / "frame_001.png").exists()
 
+    def test_analyze_save_stores_frames(self, temp_dir):
+        """Test analyze --save stores frames in database."""
+        from typer.testing import CliRunner
+
+        # Create test spritesheet
+        img_path = temp_dir / "sprite.png"
+        img = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
+        img.save(img_path)
+
+        # Create database with asset
+        db_path = temp_dir / "assets.db"
+        conn = sqlite3.connect(db_path)
+        conn.executescript(assetindex.SCHEMA)
+        conn.execute(
+            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
+            [1, str(img_path), "sprite.png", "png", "abc123"]
+        )
+        conn.commit()
+        conn.close()
+
+        runner = CliRunner()
+        result = runner.invoke(assetindex.app, ["analyze", str(img_path), "--save", "--db", str(db_path)])
+
+        assert result.exit_code == 0
+
+        # Verify frames stored in database
+        conn = sqlite3.connect(db_path)
+        frames = conn.execute("SELECT * FROM sprite_frames WHERE asset_id = 1").fetchall()
+        conn.close()
+
+        assert len(frames) == 2  # 64x32 = 2 frames of 32x32
+
 
 # =============================================================================
 # Entry point

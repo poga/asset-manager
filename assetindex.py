@@ -727,6 +727,8 @@ def update(
 def analyze(
     image_path: Path = typer.Argument(..., help="Path to spritesheet image"),
     output_format: str = typer.Option("json", "--format", "-f", help="Output format: json or table"),
+    save: bool = typer.Option(False, "--save", help="Save frames to database"),
+    db: Optional[Path] = typer.Option(None, "--db", help="Database path (required with --save)"),
 ):
     """Analyze a spritesheet and output frame data."""
     if not image_path.exists():
@@ -736,6 +738,36 @@ def analyze(
     from sprite_analyzer import analyze_spritesheet
 
     result = analyze_spritesheet(image_path)
+
+    if save:
+        if not db:
+            console.print("[red]--db required when using --save[/red]")
+            raise typer.Exit(1)
+        if not db.exists():
+            console.print(f"[red]Database not found: {db}[/red]")
+            raise typer.Exit(1)
+
+        conn = sqlite3.connect(db)
+        conn.row_factory = sqlite3.Row
+        # Find asset by path
+        asset = conn.execute(
+            "SELECT id FROM assets WHERE path = ?", [str(image_path)]
+        ).fetchone()
+
+        if not asset:
+            conn.close()
+            console.print(f"[red]Asset not found in database: {image_path}[/red]")
+            raise typer.Exit(1)
+
+        store_sprite_frames(conn, asset["id"], result["frames"])
+        # Update animation_type
+        conn.execute(
+            "UPDATE assets SET animation_type = ?, analysis_method = ? WHERE id = ?",
+            [result.get("animation_type"), "ai", asset["id"]]
+        )
+        conn.commit()
+        conn.close()
+        console.print(f"[green]Saved {len(result['frames'])} frames for asset {asset['id']}[/green]")
 
     if output_format == "json":
         console.print(json.dumps(result, indent=2))
