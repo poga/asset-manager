@@ -442,7 +442,6 @@ def index_asset(
     conn: sqlite3.Connection,
     file_path: Path,
     asset_root: Path,
-    analyze_sprites: bool = True,
 ) -> int:
     """Index a single asset file. Returns asset ID."""
     rel_path = str(file_path.relative_to(asset_root))
@@ -467,16 +466,18 @@ def index_asset(
     # Category
     category = get_category(file_path, pack_path) if pack_name else ""
 
-    # Analyze sprites if image
-    frames = []
+    # Check for animation info
+    anim_info = {}
+    for info_name in ["_AnimationInfo.txt", "AnimationInfo.txt"]:
+        info_path = file_path.parent / info_name
+        if info_path.exists():
+            anim_info = parse_animation_info(info_path)
+            break
 
-    if analyze_sprites and file_path.suffix.lower() in IMAGE_EXTENSIONS:
-        try:
-            from sprite_analyzer import analyze_spritesheet
-            result = analyze_spritesheet(file_path)
-            frames = result.get("frames", [])
-        except Exception:
-            pass
+    # Detect frames
+    frames = []
+    if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+        frames = detect_frames(file_path, anim_info)
 
     # Insert or update asset
     conn.execute(
@@ -504,13 +505,17 @@ def index_asset(
 
     asset_id = conn.execute("SELECT id FROM assets WHERE path = ?", [rel_path]).fetchone()[0]
 
-    # Store sprite frames
-    if frames and len(frames) > 1:
+    # Store sprite frames (if more than 1 frame)
+    if len(frames) > 1:
         store_sprite_frames(conn, asset_id, frames)
 
     # Extract and add tags
     tags = extract_tags_from_path(file_path, asset_root)
     add_tags(conn, asset_id, tags, "path")
+
+    # Add frame size as tag if found in metadata
+    if anim_info.get("frame_size"):
+        add_tags(conn, asset_id, [anim_info["frame_size"]], "metadata")
 
     # Extract colors
     if file_path.suffix.lower() in IMAGE_EXTENSIONS:
