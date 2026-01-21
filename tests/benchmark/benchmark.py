@@ -102,3 +102,56 @@ def compare_frames(expected: list[dict], actual: list[dict]) -> tuple[bool, list
             )
 
     return len(errors) == 0, errors
+
+
+def main(benchmark_dir: Path = None, db_path: Path = None) -> int:
+    """Run benchmark and print results."""
+    if benchmark_dir is None:
+        benchmark_dir = Path(__file__).parent
+    if db_path is None:
+        db_path = Path(__file__).parent.parent.parent / "assets.db"
+
+    manifests = load_manifests(benchmark_dir)
+
+    if not manifests:
+        print("Benchmark Results")
+        print("=================")
+        print("No benchmarks configured.")
+        print("\nSummary: 0/0 passed")
+        return 0
+
+    passed_count = 0
+    failed_count = 0
+    failed_assets = []
+
+    print("Benchmark Results")
+    print("=================")
+
+    for asset_path, spec in manifests.items():
+        expected = get_expected_frames(spec)
+        actual = get_actual_frames(db_path, asset_path)
+        passed, errors = compare_frames(expected, actual)
+
+        if passed:
+            print(f"PASS  {asset_path}")
+            passed_count += 1
+        else:
+            print(f"FAIL  {asset_path}")
+            for error in errors:
+                print(f"      {error}")
+            failed_count += 1
+            failed_assets.append(asset_path)
+
+    total = passed_count + failed_count
+    print(f"\nSummary: {passed_count}/{total} passed", end="")
+    if failed_count > 0:
+        print(f" ({failed_count} failed)")
+    else:
+        print()
+
+    return 0 if failed_count == 0 else 1
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())

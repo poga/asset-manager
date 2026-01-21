@@ -204,6 +204,61 @@ class TestGetActualFrames:
         assert result[2]["index"] == 2
 
 
+class TestMain:
+    """Tests for main CLI function."""
+
+    def test_exits_zero_when_all_pass(self, tmp_path, test_db):
+        """main exits 0 when all benchmarks pass."""
+        from benchmark import main
+
+        # Set up ground truth that matches database
+        regular_dir = tmp_path / "ground_truth" / "regular"
+        irregular_dir = tmp_path / "ground_truth" / "irregular"
+        regular_dir.mkdir(parents=True)
+        irregular_dir.mkdir(parents=True)
+        (regular_dir / "manifest.json").write_text(json.dumps({
+            "assets/test.png": {"cols": 2, "rows": 1, "frame_width": 32, "frame_height": 32}
+        }))
+        (irregular_dir / "manifest.json").write_text("{}")
+
+        exit_code = main(benchmark_dir=tmp_path, db_path=test_db)
+
+        assert exit_code == 0
+
+    def test_exits_one_when_any_fail(self, tmp_path, test_db):
+        """main exits 1 when any benchmark fails."""
+        from benchmark import main
+
+        # Set up ground truth that does NOT match database
+        regular_dir = tmp_path / "ground_truth" / "regular"
+        irregular_dir = tmp_path / "ground_truth" / "irregular"
+        regular_dir.mkdir(parents=True)
+        irregular_dir.mkdir(parents=True)
+        (regular_dir / "manifest.json").write_text(json.dumps({
+            "assets/test.png": {"cols": 4, "rows": 1, "frame_width": 32, "frame_height": 32}
+        }))
+        (irregular_dir / "manifest.json").write_text("{}")
+
+        exit_code = main(benchmark_dir=tmp_path, db_path=test_db)
+
+        assert exit_code == 1
+
+    def test_exits_zero_for_empty_manifests(self, tmp_path, test_db):
+        """main exits 0 when no benchmarks to run."""
+        from benchmark import main
+
+        regular_dir = tmp_path / "ground_truth" / "regular"
+        irregular_dir = tmp_path / "ground_truth" / "irregular"
+        regular_dir.mkdir(parents=True)
+        irregular_dir.mkdir(parents=True)
+        (regular_dir / "manifest.json").write_text("{}")
+        (irregular_dir / "manifest.json").write_text("{}")
+
+        exit_code = main(benchmark_dir=tmp_path, db_path=test_db)
+
+        assert exit_code == 0
+
+
 class TestCompareFrames:
     """Tests for compare_frames function."""
 
