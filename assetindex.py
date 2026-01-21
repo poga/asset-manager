@@ -366,6 +366,19 @@ def get_category(path: Path, pack_path: Path) -> str:
 
 def store_sprite_frames(conn: sqlite3.Connection, asset_id: int, frames: list[dict]):
     """Store sprite frame data for an asset."""
+    # Ensure table exists
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sprite_frames (
+            id INTEGER PRIMARY KEY,
+            asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+            frame_index INTEGER NOT NULL,
+            x INTEGER NOT NULL,
+            y INTEGER NOT NULL,
+            width INTEGER NOT NULL,
+            height INTEGER NOT NULL,
+            UNIQUE(asset_id, frame_index)
+        )
+    """)
     # Clear existing frames
     conn.execute("DELETE FROM sprite_frames WHERE asset_id = ?", [asset_id])
 
@@ -755,10 +768,22 @@ def analyze(
 
         conn = sqlite3.connect(db)
         conn.row_factory = sqlite3.Row
+
+        # Normalize path - strip "assets/" prefix if present
+        search_path = str(image_path)
+        if search_path.startswith("assets/"):
+            search_path = search_path[7:]  # len("assets/") = 7
+
         # Find asset by path
         asset = conn.execute(
-            "SELECT id FROM assets WHERE path = ?", [str(image_path)]
+            "SELECT id FROM assets WHERE path = ?", [search_path]
         ).fetchone()
+
+        # Fallback: try matching by filename
+        if not asset:
+            asset = conn.execute(
+                "SELECT id FROM assets WHERE filename = ?", [image_path.name]
+            ).fetchone()
 
         if not asset:
             conn.close()
@@ -766,6 +791,17 @@ def analyze(
             raise typer.Exit(1)
 
         store_sprite_frames(conn, asset["id"], result["frames"])
+
+        # Ensure columns exist (migration for older databases)
+        try:
+            conn.execute("ALTER TABLE assets ADD COLUMN animation_type TEXT")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            conn.execute("ALTER TABLE assets ADD COLUMN analysis_method TEXT")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         # Update animation_type
         conn.execute(
             "UPDATE assets SET animation_type = ?, analysis_method = ? WHERE id = ?",
