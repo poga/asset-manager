@@ -798,6 +798,47 @@ class TestSpriteCLI:
 
         assert len(frames) == 2  # 64x32 = 2 frames of 32x32
 
+    def test_analyze_all_processes_assets(self, temp_dir):
+        """Test analyze-all processes all PNG assets."""
+        from typer.testing import CliRunner
+
+        # Create test assets folder with spritesheets
+        assets_dir = temp_dir / "assets"
+        assets_dir.mkdir()
+        img1 = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
+        img1.save(assets_dir / "sprite1.png")
+        img2 = Image.new("RGBA", (32, 64), (100, 100, 100, 255))
+        img2.save(assets_dir / "sprite2.png")
+
+        # Create database with assets
+        db_path = temp_dir / "assets.db"
+        conn = sqlite3.connect(db_path)
+        conn.executescript(assetindex.SCHEMA)
+        conn.execute(
+            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
+            [1, "sprite1.png", "sprite1.png", "png", "abc123"]
+        )
+        conn.execute(
+            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
+            [2, "sprite2.png", "sprite2.png", "png", "def456"]
+        )
+        conn.commit()
+        conn.close()
+
+        runner = CliRunner()
+        result = runner.invoke(assetindex.app, ["analyze-all", "--db", str(db_path), "--assets", str(assets_dir)])
+
+        assert result.exit_code == 0
+
+        # Verify frames stored for both assets
+        conn = sqlite3.connect(db_path)
+        frames1 = conn.execute("SELECT * FROM sprite_frames WHERE asset_id = 1").fetchall()
+        frames2 = conn.execute("SELECT * FROM sprite_frames WHERE asset_id = 2").fetchall()
+        conn.close()
+
+        assert len(frames1) >= 2  # Multiple frames detected
+        assert len(frames2) >= 2  # Multiple frames detected
+
 
 # =============================================================================
 # Entry point

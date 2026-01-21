@@ -851,5 +851,111 @@ def extract(
     console.print(f"[green]Extracted {len(frames)} frames to {output_dir}[/green]")
 
 
+@app.command("analyze-all")
+def analyze_all(
+    db: Path = typer.Option(..., "--db", help="Database path"),
+    assets: Path = typer.Option(..., "--assets", help="Assets folder path"),
+    skip_existing: bool = typer.Option(True, "--skip-existing/--reanalyze", help="Skip assets with existing frames"),
+):
+    """Analyze all PNG assets and store sprite frames."""
+    if not db.exists():
+        console.print(f"[red]Database not found: {db}[/red]")
+        raise typer.Exit(1)
+    if not assets.exists():
+        console.print(f"[red]Assets folder not found: {assets}[/red]")
+        raise typer.Exit(1)
+
+    from sprite_analyzer import analyze_spritesheet
+
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+
+    # Get all PNG assets
+    query = "SELECT id, path, filename FROM assets WHERE filetype = 'png'"
+    if skip_existing:
+        # Ensure table exists first
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sprite_frames (
+                id INTEGER PRIMARY KEY,
+                asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+                frame_index INTEGER NOT NULL,
+                x INTEGER NOT NULL,
+                y INTEGER NOT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                UNIQUE(asset_id, frame_index)
+            )
+        """)
+        query += " AND id NOT IN (SELECT DISTINCT asset_id FROM sprite_frames)"
+
+    rows = conn.execute(query).fetchall()
+    total = len(rows)
+
+    if total == 0:
+        console.print("[yellow]No assets to analyze[/yellow]")
+        conn.close()
+        return
+
+    console.print(f"Analyzing {total} assets...")
+
+    success = 0
+    errors = 0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Analyzing...", total=total)
+
+        for row in rows:
+            asset_id = row["id"]
+            asset_path = row["path"]
+            filename = row["filename"]
+
+            image_path = assets / asset_path
+            if not image_path.exists():
+                progress.update(task, advance=1, description=f"[red]Missing: {filename}[/red]")
+                errors += 1
+                continue
+
+            try:
+                progress.update(task, description=f"Analyzing: {filename}")
+                result = analyze_spritesheet(image_path)
+                frames = result.get("frames", [])
+
+                if len(frames) > 1:
+                    store_sprite_frames(conn, asset_id, frames)
+
+                    # Ensure columns exist
+                    try:
+                        conn.execute("ALTER TABLE assets ADD COLUMN animation_type TEXT")
+                    except sqlite3.OperationalError:
+                        pass
+                    try:
+                        conn.execute("ALTER TABLE assets ADD COLUMN analysis_method TEXT")
+                    except sqlite3.OperationalError:
+                        pass
+
+                    conn.execute(
+                        "UPDATE assets SET animation_type = ?, analysis_method = ? WHERE id = ?",
+                        [result.get("animation_type"), "ai", asset_id]
+                    )
+                    conn.commit()
+                    success += 1
+
+                progress.update(task, advance=1)
+
+            except Exception as e:
+                progress.update(task, advance=1, description=f"[red]Error: {filename}[/red]")
+                errors += 1
+                console.print(f"[red]Error analyzing {filename}: {e}[/red]")
+
+    conn.close()
+    console.print(f"[green]Done. Analyzed {success} assets, {errors} errors.[/green]")
+
+
 if __name__ == "__main__":
     app()
