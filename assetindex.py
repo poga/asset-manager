@@ -899,7 +899,6 @@ def analyze_all(
     console.print(f"Analyzing {total} assets...")
 
     success = 0
-    errors = 0
 
     with Progress(
         SpinnerColumn(),
@@ -917,9 +916,9 @@ def analyze_all(
 
             image_path = assets / asset_path
             if not image_path.exists():
-                progress.update(task, advance=1, description=f"[red]Missing: {filename}[/red]")
-                errors += 1
-                continue
+                console.print(f"[red]Missing file: {image_path}[/red]")
+                conn.close()
+                raise typer.Exit(1)
 
             try:
                 progress.update(task, description=f"Analyzing: {filename}")
@@ -949,12 +948,12 @@ def analyze_all(
                 progress.update(task, advance=1)
 
             except Exception as e:
-                progress.update(task, advance=1, description=f"[red]Error: {filename}[/red]")
-                errors += 1
                 console.print(f"[red]Error analyzing {filename}: {e}[/red]")
+                conn.close()
+                raise typer.Exit(1)
 
     conn.close()
-    console.print(f"[green]Done. Analyzed {success} assets, {errors} errors.[/green]")
+    console.print(f"[green]Done. Analyzed {success} assets.[/green]")
 
 
 if __name__ == "__main__":
