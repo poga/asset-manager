@@ -204,5 +204,86 @@ class TestGetActualFrames:
         assert result[2]["index"] == 2
 
 
+class TestCompareFrames:
+    """Tests for compare_frames function."""
+
+    def test_passes_when_frames_match_exactly(self):
+        """compare_frames returns True when frames match."""
+        from benchmark import compare_frames
+
+        expected = [
+            {"index": 0, "x": 0, "y": 0, "width": 32, "height": 32},
+            {"index": 1, "x": 32, "y": 0, "width": 32, "height": 32}
+        ]
+        actual = [
+            {"index": 0, "x": 0, "y": 0, "width": 32, "height": 32},
+            {"index": 1, "x": 32, "y": 0, "width": 32, "height": 32}
+        ]
+
+        passed, errors = compare_frames(expected, actual)
+
+        assert passed is True
+        assert errors == []
+
+    def test_fails_when_frame_count_differs(self):
+        """compare_frames fails when frame counts don't match."""
+        from benchmark import compare_frames
+
+        expected = [
+            {"index": 0, "x": 0, "y": 0, "width": 32, "height": 32},
+            {"index": 1, "x": 32, "y": 0, "width": 32, "height": 32}
+        ]
+        actual = [
+            {"index": 0, "x": 0, "y": 0, "width": 32, "height": 32}
+        ]
+
+        passed, errors = compare_frames(expected, actual)
+
+        assert passed is False
+        assert "Expected 2 frames, got 1" in errors[0]
+
+    def test_fails_when_coordinates_differ(self):
+        """compare_frames fails when frame coordinates don't match."""
+        from benchmark import compare_frames
+
+        expected = [{"index": 0, "x": 0, "y": 0, "width": 32, "height": 32}]
+        actual = [{"index": 0, "x": 1, "y": 0, "width": 32, "height": 32}]
+
+        passed, errors = compare_frames(expected, actual)
+
+        assert passed is False
+        assert "Frame 0" in errors[0]
+
+    def test_fails_when_dimensions_differ(self):
+        """compare_frames fails when frame dimensions don't match."""
+        from benchmark import compare_frames
+
+        expected = [{"index": 0, "x": 0, "y": 0, "width": 32, "height": 32}]
+        actual = [{"index": 0, "x": 0, "y": 0, "width": 31, "height": 32}]
+
+        passed, errors = compare_frames(expected, actual)
+
+        assert passed is False
+        assert "Frame 0" in errors[0]
+
+    def test_reports_all_mismatched_frames(self):
+        """compare_frames reports all frame mismatches."""
+        from benchmark import compare_frames
+
+        expected = [
+            {"index": 0, "x": 0, "y": 0, "width": 32, "height": 32},
+            {"index": 1, "x": 32, "y": 0, "width": 32, "height": 32}
+        ]
+        actual = [
+            {"index": 0, "x": 1, "y": 0, "width": 32, "height": 32},
+            {"index": 1, "x": 33, "y": 0, "width": 32, "height": 32}
+        ]
+
+        passed, errors = compare_frames(expected, actual)
+
+        assert passed is False
+        assert len(errors) == 2
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

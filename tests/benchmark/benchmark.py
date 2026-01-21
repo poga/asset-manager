@@ -81,3 +81,24 @@ def get_actual_frames(db_path: Path, asset_path: str) -> list[dict]:
 
     conn.close()
     return frames
+
+
+def compare_frames(expected: list[dict], actual: list[dict]) -> tuple[bool, list[str]]:
+    """Compare frame lists. Returns (passed, error_messages)."""
+    errors = []
+
+    # Check frame count
+    if len(expected) != len(actual):
+        errors.append(f"Expected {len(expected)} frames, got {len(actual)}")
+        return False, errors
+
+    # Compare each frame
+    for i, (exp, act) in enumerate(zip(expected, actual)):
+        if (exp["x"] != act["x"] or exp["y"] != act["y"] or
+            exp["width"] != act["width"] or exp["height"] != act["height"]):
+            errors.append(
+                f"Frame {i}: expected ({exp['x']}, {exp['y']}, {exp['width']}, {exp['height']}), "
+                f"got ({act['x']}, {act['y']}, {act['width']}, {act['height']})"
+            )
+
+    return len(errors) == 0, errors
