@@ -6,6 +6,8 @@
 #     "imagehash>=4.3",
 #     "rich>=13.0",
 #     "typer>=0.9",
+#     "python-dotenv>=1.0",
+#     "anthropic>=0.40",
 # ]
 # ///
 """Build and update the game asset index."""
@@ -17,6 +19,10 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import imagehash
 import typer

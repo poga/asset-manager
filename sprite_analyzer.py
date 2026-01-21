@@ -4,6 +4,7 @@
 # dependencies = [
 #     "pillow>=10.0",
 #     "anthropic>=0.40",
+#     "python-dotenv>=1.0",
 # ]
 # ///
 """Sprite analyzer using Claude Vision API."""
@@ -14,7 +15,11 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
 from PIL import Image
+
+# Load .env file
+load_dotenv()
 
 
 def analyze_spritesheet(

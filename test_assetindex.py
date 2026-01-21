@@ -7,6 +7,8 @@
 #     "imagehash>=4.3",
 #     "rich>=13.0",
 #     "typer>=0.9",
+#     "python-dotenv>=1.0",
+#     "anthropic>=0.40",
 # ]
 # ///
 """Test suite for asset index system."""
