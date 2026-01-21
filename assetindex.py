@@ -695,6 +695,12 @@ def index(
             if anim_info.get("frame_size"):
                 add_tags(conn, asset_id, [anim_info["frame_size"]], "metadata")
 
+            # Detect and store frames
+            if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+                frames = detect_frames(file_path, anim_info)
+                if len(frames) > 1:
+                    store_sprite_frames(conn, asset_id, frames)
+
             # Extract colors for images
             if file_path.suffix.lower() in IMAGE_EXTENSIONS:
                 colors = extract_colors(file_path)
