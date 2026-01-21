@@ -65,7 +65,8 @@ def test_db():
             x INTEGER,
             y INTEGER,
             width INTEGER,
-            height INTEGER
+            height INTEGER,
+            duration_ms INTEGER
         );
 
         INSERT INTO packs (id, name, path) VALUES (1, 'creatures', '/assets/creatures');
@@ -286,10 +287,10 @@ def test_asset_frames_returns_frame_data(test_db):
     import sqlite3
     conn = sqlite3.connect(test_db)
     conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 0, 0, 0, 32, 32)"
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (1, 0, 0, 0, 32, 32, 100)"
     )
     conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 1, 32, 0, 32, 32)"
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (1, 1, 32, 0, 32, 32, 100)"
     )
     conn.commit()
     conn.close()
@@ -332,10 +333,10 @@ def test_search_includes_frames(test_db):
     import sqlite3
     conn = sqlite3.connect(test_db)
     conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 0, 0, 0, 32, 32)"
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (1, 0, 0, 0, 32, 32, 100)"
     )
     conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (1, 1, 32, 0, 32, 32)"
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (1, 1, 32, 0, 32, 32, 100)"
     )
     conn.commit()
     conn.close()
@@ -382,10 +383,10 @@ def test_asset_frame_serves_cropped_image(test_db, tmp_path):
         "VALUES (20, 1, 'testpack/spritesheet.png', 'spritesheet.png', 'png', 'xyz', 64, 32)"
     )
     conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (20, 0, 0, 0, 32, 32)"
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (20, 0, 0, 0, 32, 32, 100)"
     )
     conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height) VALUES (20, 1, 32, 0, 32, 32)"
+        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (20, 1, 32, 0, 32, 32, 100)"
     )
     conn.commit()
     conn.close()
@@ -433,8 +434,8 @@ def test_asset_animation_generates_gif(test_db, tmp_path):
         "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
         "VALUES (30, 1, 'testpack/anim.png', 'anim.png', 'png', 'anim123', 64, 32)"
     )
-    conn.execute("INSERT INTO sprite_frames VALUES (NULL, 30, 0, 0, 0, 32, 32)")
-    conn.execute("INSERT INTO sprite_frames VALUES (NULL, 30, 1, 32, 0, 32, 32)")
+    conn.execute("INSERT INTO sprite_frames VALUES (NULL, 30, 0, 0, 0, 32, 32, 100)")
+    conn.execute("INSERT INTO sprite_frames VALUES (NULL, 30, 1, 32, 0, 32, 32, 100)")
     conn.commit()
     conn.close()
 

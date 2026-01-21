@@ -378,7 +378,7 @@ def asset_frames(asset_id: int):
 
     # Verify asset exists
     asset = conn.execute(
-        "SELECT id, animation_type FROM assets WHERE id = ?", [asset_id]
+        "SELECT id FROM assets WHERE id = ?", [asset_id]
     ).fetchone()
 
     if not asset:
@@ -387,7 +387,7 @@ def asset_frames(asset_id: int):
 
     # Get frames
     frames = conn.execute("""
-        SELECT frame_index, x, y, width, height
+        SELECT frame_index, x, y, width, height, duration_ms
         FROM sprite_frames
         WHERE asset_id = ?
         ORDER BY frame_index
@@ -403,10 +403,10 @@ def asset_frames(asset_id: int):
                 "y": f["y"],
                 "width": f["width"],
                 "height": f["height"],
+                "duration_ms": f["duration_ms"],
             }
             for f in frames
         ],
-        "animation_type": asset["animation_type"],
     }
 
 
