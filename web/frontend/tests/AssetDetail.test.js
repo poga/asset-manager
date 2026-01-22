@@ -84,4 +84,14 @@ describe('AssetDetail', () => {
     const swatches = wrapper.findAll('.color-swatch')
     expect(swatches.length).toBe(2)
   })
+
+  it('has minimum image size of 300x300', () => {
+    const wrapper = mount(AssetDetail, {
+      props: { asset: mockAsset }
+    })
+    const img = wrapper.find('.asset-image')
+    const style = window.getComputedStyle(img.element)
+    expect(style.minWidth).toBe('300px')
+    expect(style.minHeight).toBe('300px')
+  })
 })

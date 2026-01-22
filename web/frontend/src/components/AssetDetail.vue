@@ -6,10 +6,12 @@
     </button>
 
     <div class="detail-content">
+      <!-- inline style needed for jsdom test compatibility (scoped CSS not processed) -->
       <img
         :src="`/api/image/${asset.id}`"
         :alt="asset.filename"
         class="asset-image"
+        :style="{ minWidth: '300px', minHeight: '300px' }"
       />
 
       <div class="asset-info">
@@ -96,6 +98,8 @@ defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack'])
 .asset-image {
   max-width: 100%;
   max-height: 400px;
+  min-width: 300px;
+  min-height: 300px;
   object-fit: contain;
   image-rendering: pixelated;
   background: var(--color-bg-elevated);
