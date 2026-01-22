@@ -393,6 +393,29 @@ def image(asset_id: int):
     return FileResponse(image_path)
 
 
+@app.get("/api/pack-preview/{pack_name:path}")
+def pack_preview(pack_name: str):
+    """Serve pack preview image."""
+    # Find previews directory (in .assetindex/previews/)
+    db_path = find_db()
+    previews_dir = db_path.parent / ".assetindex" / "previews"
+
+    # URL decode the pack name
+    from urllib.parse import unquote
+    pack_name = unquote(pack_name)
+
+    # Check for both .gif and .png
+    gif_path = previews_dir / f"{pack_name}.gif"
+    png_path = previews_dir / f"{pack_name}.png"
+
+    if gif_path.exists():
+        return FileResponse(gif_path, media_type="image/gif")
+    elif png_path.exists():
+        return FileResponse(png_path, media_type="image/png")
+    else:
+        raise HTTPException(status_code=404, detail="Pack preview not found")
+
+
 class DownloadCartRequest(BaseModel):
     asset_ids: list[int]
 

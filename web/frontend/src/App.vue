@@ -65,7 +65,8 @@ async function fetchFilters() {
   const res = await fetch('/api/filters')
   const data = await res.json()
   filters.value = data
-  selectedPacks.value = data.packs.map(p => p.name)
+  // Default to no selection (which means "all packs")
+  selectedPacks.value = []
 }
 
 async function search(params) {
@@ -75,8 +76,11 @@ async function search(params) {
   for (const t of params.tag || []) {
     query.append('tag', t)
   }
-  for (const p of selectedPacks.value) {
-    query.append('pack', p)
+  // Only filter by packs if some are selected (empty = all packs)
+  if (selectedPacks.value.length > 0) {
+    for (const p of selectedPacks.value) {
+      query.append('pack', p)
+    }
   }
 
   const res = await fetch(`/api/search?${query}`)
@@ -170,7 +174,7 @@ function handlePopState(event) {
   skipNextPush = true
   if (route.name === 'home') {
     selectedAsset.value = null
-    selectedPacks.value = []
+    selectedPacks.value = []  // Empty = all packs
     search({ q: null, tag: [], color: null, type: null })
   } else if (route.name === 'asset') {
     selectAssetFromUrl(route.params.id)
@@ -249,7 +253,7 @@ body {
 }
 
 .left-panel {
-  width: 240px;
+  width: 320px;
   flex-shrink: 0;
   overflow-y: auto;
 }

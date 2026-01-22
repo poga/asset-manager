@@ -18,32 +18,30 @@ describe('PackList', () => {
     expect(wrapper.text()).toContain('sprites')
   })
 
-  it('shows checkbox checked for selected packs', () => {
+  it('shows selected class for selected packs', () => {
     const wrapper = mount(PackList, {
       props: { packs: mockPacks, selectedPacks: ['icons'] }
     })
-    const checkboxes = wrapper.findAll('input[type="checkbox"]')
-    const iconCheckbox = checkboxes.find(cb =>
-      cb.element.closest('.pack-item')?.textContent?.includes('icons')
-    )
-    expect(iconCheckbox.element.checked).toBe(true)
+    const cards = wrapper.findAll('.pack-card')
+    const iconCard = cards.find(card => card.text().includes('icons'))
+    expect(iconCard.classes()).toContain('selected')
   })
 
-  it('emits update:selectedPacks when checkbox clicked', async () => {
+  it('emits update:selectedPacks when card clicked', async () => {
     const wrapper = mount(PackList, {
       props: { packs: mockPacks, selectedPacks: [] }
     })
-    const checkbox = wrapper.find('input[type="checkbox"]')
-    await checkbox.setValue(true)
+    const card = wrapper.find('.pack-card')
+    await card.trigger('click')
     expect(wrapper.emitted('update:selectedPacks')).toBeTruthy()
   })
 
-  it('select all checkbox selects all packs', async () => {
+  it('select all button selects all packs', async () => {
     const wrapper = mount(PackList, {
       props: { packs: mockPacks, selectedPacks: [] }
     })
-    const selectAll = wrapper.find('.select-all input')
-    await selectAll.setValue(true)
+    const selectAllBtn = wrapper.findAll('.action-btn').find(btn => btn.text() === 'Select all')
+    await selectAllBtn.trigger('click')
     const emitted = wrapper.emitted('update:selectedPacks')
     expect(emitted[0][0]).toEqual(['icons', 'sprites', 'monsters'])
   })

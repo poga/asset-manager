@@ -15,30 +15,32 @@
       placeholder="Filter packs..."
     />
 
-    <label class="select-all">
-      <input
-        type="checkbox"
-        :checked="allSelected"
-        :indeterminate="someSelected && !allSelected"
-        @change="toggleAll"
-      />
-      <span>Select all packs</span>
-    </label>
+    <div class="pack-actions">
+      <button class="action-btn" @click="selectAll" :disabled="allSelected">Select all</button>
+      <button class="action-btn" @click="clearAll" :disabled="noneSelected">Clear</button>
+    </div>
 
-    <div class="pack-items">
-      <label
+    <div class="pack-grid">
+      <div
         v-for="pack in filteredPacks"
         :key="pack.name"
-        class="pack-item"
+        class="pack-card"
+        :class="{ selected: selectedPacks.includes(pack.name) }"
+        @click="togglePack(pack.name)"
       >
-        <input
-          type="checkbox"
-          :checked="selectedPacks.includes(pack.name)"
-          @change="togglePack(pack.name)"
-        />
-        <span class="pack-name">{{ pack.name }}</span>
-        <span class="pack-count">{{ pack.count }}</span>
-      </label>
+        <div class="pack-preview-container">
+          <img
+            :src="getPreviewUrl(pack.name)"
+            :alt="pack.name"
+            class="pack-preview"
+            loading="lazy"
+          />
+        </div>
+        <div class="pack-info">
+          <span class="pack-name">{{ formatPackName(pack.name) }}</span>
+          <span class="pack-count">{{ pack.count }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -66,9 +68,7 @@ const allSelected = computed(() =>
   props.packs.length > 0 && props.packs.every(p => props.selectedPacks.includes(p.name))
 )
 
-const someSelected = computed(() =>
-  props.packs.some(p => props.selectedPacks.includes(p.name))
-)
+const noneSelected = computed(() => props.selectedPacks.length === 0)
 
 function togglePack(name) {
   const newSelected = props.selectedPacks.includes(name)
@@ -77,12 +77,24 @@ function togglePack(name) {
   emit('update:selectedPacks', newSelected)
 }
 
-function toggleAll(event) {
-  if (event.target.checked) {
-    emit('update:selectedPacks', props.packs.map(p => p.name))
-  } else {
-    emit('update:selectedPacks', [])
-  }
+function selectAll() {
+  emit('update:selectedPacks', props.packs.map(p => p.name))
+}
+
+function clearAll() {
+  emit('update:selectedPacks', [])
+}
+
+function getPreviewUrl(packName) {
+  return `/api/pack-preview/${encodeURIComponent(packName)}`
+}
+
+function formatPackName(name) {
+  let formatted = name
+    .replace(/^Minifantasy_/, '')
+    .replace(/_v\.?\d+\.?\d*(_Commercial_Version)?$/, '')
+    .replace(/_/g, ' ')
+  return formatted
 }
 </script>
 
@@ -101,6 +113,7 @@ function toggleAll(event) {
   align-items: center;
   padding: 1rem;
   border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
 .pack-title {
@@ -118,49 +131,105 @@ function toggleAll(event) {
 }
 
 .pack-search {
-  margin: 0.5rem 1rem;
+  margin: 0.5rem;
   padding: 0.5rem;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 0.875rem;
+  flex-shrink: 0;
 }
 
-.select-all {
+.pack-actions {
   display: flex;
-  align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  color: #666;
+  padding: 0.5rem;
   border-bottom: 1px solid #e0e0e0;
-  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.pack-items {
+.action-btn {
   flex: 1;
-  overflow-y: auto;
-}
-
-.pack-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   cursor: pointer;
 }
 
-.pack-item:hover {
+.action-btn:hover:not(:disabled) {
   background: #f0f0f0;
 }
 
-.pack-name {
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pack-grid {
   flex: 1;
-  font-size: 0.875rem;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.pack-card {
+  background: #fff;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pack-card:hover {
+  border-color: #999;
+}
+
+.pack-card.selected {
+  border-color: #2196f3;
+  box-shadow: 0 0 0 1px #2196f3;
+}
+
+.pack-preview-container {
+  width: 100%;
+  height: 150px;
+  background: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pack-preview {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.pack-info {
+  padding: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+}
+
+.pack-name {
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: #333;
+  line-height: 1.3;
+  flex: 1;
 }
 
 .pack-count {
   font-size: 0.75rem;
-  color: #888;
+  color: #666;
+  background: #f0f0f0;
+  padding: 0.125rem 0.5rem;
+  border-radius: 10px;
+  flex-shrink: 0;
 }
 </style>
