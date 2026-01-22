@@ -74,20 +74,50 @@ function removeTag(tag) {
   min-width: 200px;
   padding: 0.5rem;
   font-size: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.search-bar input[type="text"]:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-light);
+}
+
+.search-bar input[type="text"]::placeholder {
+  color: var(--color-text-muted);
 }
 
 .search-bar select {
   padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: border-color 150ms;
+}
+
+.search-bar select:focus {
+  outline: none;
+  border-color: var(--color-accent);
 }
 
 .tag {
-  background: #e0e0e0;
+  background: var(--color-accent-light);
+  color: var(--color-accent-hover);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 150ms;
 }
 
 .tag:hover {
-  background: #ccc;
+  background: var(--color-accent);
+  color: white;
 }
 </style>
