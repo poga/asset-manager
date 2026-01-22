@@ -196,7 +196,7 @@ def search(
         LEFT JOIN tags tg ON at.tag_id = tg.id
         WHERE {where}
         GROUP BY a.id
-        ORDER BY a.filename
+        ORDER BY a.path
         LIMIT ?
     """
     params.append(limit)

@@ -83,6 +83,7 @@ async function loadPack(packName) {
 }
 
 function viewPack(packName) {
+  skipNextPush = true
   selectedAsset.value = null
   window.history.pushState({ route: 'pack', name: packName }, '', `/pack/${packName}`)
   loadPack(packName)
