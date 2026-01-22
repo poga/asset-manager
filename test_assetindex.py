@@ -232,6 +232,38 @@ class TestExtractColors:
 class TestDetectFirstSpriteBounds:
     """Tests for detect_first_sprite_bounds function."""
 
+    def test_detects_first_frame_in_grid_spritesheet(self, temp_dir):
+        """Detects first frame in a grid-based spritesheet with transparent gaps."""
+        img_path = temp_dir / "grid.png"
+        # Create 65x33 image: 2x2 grid of 32x16 frames with 1px transparent gap between
+        # Frame layout: [32px frame][1px gap][32px frame] x [16px frame][1px gap][16px frame]
+        img = Image.new("RGBA", (65, 33), (0, 0, 0, 0))
+
+        # Fill first frame cell (0-31, 0-15) with red sprite at (2,2) to (29,13)
+        for x in range(2, 30):
+            for y in range(2, 14):
+                img.putpixel((x, y), (255, 0, 0, 255))
+
+        # Column 32 is transparent gap (already transparent)
+
+        # Fill second frame cell (33-64, 0-15) with blue sprite
+        for x in range(35, 60):
+            for y in range(2, 14):
+                img.putpixel((x, y), (0, 0, 255, 255))
+
+        # Row 16 is transparent gap (already transparent)
+
+        # Fill third frame cell (0-31, 17-32) with green sprite
+        for x in range(2, 30):
+            for y in range(19, 31):
+                img.putpixel((x, y), (0, 255, 0, 255))
+
+        img.save(img_path)
+
+        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        # Should return bounds of content in FIRST frame cell only: (2, 2, 28, 12)
+        assert bounds == (2, 2, 28, 12)
+
     def test_finds_first_sprite_in_horizontal_strip(self, temp_dir):
         """Detects first sprite in a horizontal spritesheet."""
         img_path = temp_dir / "strip.png"
@@ -289,6 +321,24 @@ class TestDetectFirstSpriteBounds:
 
         bounds = assetindex.detect_first_sprite_bounds(img_path)
         assert bounds == (16, 16, 20, 20)
+
+    def test_fallback_for_image_without_gaps(self, temp_dir):
+        """Falls back to full content bounds when no transparent gaps exist."""
+        img_path = temp_dir / "no_gaps.png"
+        # Create image where all columns/rows have some content (no full gaps)
+        img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        # Draw diagonal line so no column or row is fully transparent
+        for i in range(64):
+            img.putpixel((i, i), (255, 0, 0, 255))
+        # Add a blob
+        for x in range(10, 30):
+            for y in range(10, 30):
+                img.putpixel((x, y), (0, 255, 0, 255))
+        img.save(img_path)
+
+        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        # Should return bounding box of all content (the diagonal + blob)
+        assert bounds == (0, 0, 64, 64)
 
 
 class TestComputePhash:

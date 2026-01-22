@@ -176,25 +176,55 @@ def compute_phash(path: Path) -> Optional[bytes]:
 
 def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]]:
     """
-    Find the bounding box of non-transparent content in an image.
+    Find the bounding box of the first frame in a spritesheet.
+
+    Detects grid layout by finding transparent column/row gaps,
+    then returns content bounds within the first frame cell.
 
     Returns (x, y, width, height) or None if no content found or no alpha channel.
-    Uses PIL's getbbox() which is implemented in C for speed.
     """
     try:
         with Image.open(path) as img:
             if img.mode != "RGBA":
                 return None
 
-            # Get bounding box of non-zero alpha content (very fast, implemented in C)
             alpha = img.split()[3]
-            bbox = alpha.getbbox()
+            width, height = img.size
+
+            # Convert to bytes for fast column/row scanning
+            alpha_data = alpha.tobytes()
+
+            # Find first fully transparent column AFTER some content (frame boundary)
+            first_gap_col = width
+            found_content_col = False
+            for x in range(width):
+                col_empty = all(alpha_data[y * width + x] == 0 for y in range(height))
+                if not col_empty:
+                    found_content_col = True
+                elif found_content_col:
+                    first_gap_col = x
+                    break
+
+            # Find first fully transparent row AFTER some content (frame boundary)
+            first_gap_row = height
+            found_content_row = False
+            for y in range(height):
+                row_start = y * width
+                row_empty = all(alpha_data[row_start + x] == 0 for x in range(width))
+                if not row_empty:
+                    found_content_row = True
+                elif found_content_row:
+                    first_gap_row = y
+                    break
+
+            # Crop to first frame, get content bounds
+            first_frame = img.crop((0, 0, first_gap_col, first_gap_row))
+            bbox = first_frame.split()[3].getbbox()
+
             if bbox is None:
                 return None
 
-            # bbox is (left, upper, right, lower), convert to (x, y, width, height)
-            x, y, right, lower = bbox
-            return (x, y, right - x, lower - y)
+            return (bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1])
     except Exception:
         return None
 
