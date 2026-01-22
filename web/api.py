@@ -13,11 +13,9 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from io import BytesIO
-
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 
 app = FastAPI(title="Asset Search API")
 
@@ -163,7 +161,7 @@ def search(
 
     sql = f"""
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
-               a.frame_count, p.name as pack_name,
+               p.name as pack_name,
                GROUP_CONCAT(DISTINCT tg.name) as tags
         FROM assets a
         LEFT JOIN packs p ON a.pack_id = p.id
@@ -177,34 +175,9 @@ def search(
     params.append(limit)
 
     rows = conn.execute(sql, params).fetchall()
-
-    assets = []
-    asset_ids = [row["id"] for row in rows]
-
-    # Fetch frames for all assets in one query
-    frames_by_asset = {}
-    if asset_ids:
-        placeholders = ",".join("?" * len(asset_ids))
-        frame_rows = conn.execute(f"""
-            SELECT asset_id, frame_index, x, y, width, height
-            FROM sprite_frames
-            WHERE asset_id IN ({placeholders})
-            ORDER BY asset_id, frame_index
-        """, asset_ids).fetchall()
-
-        for f in frame_rows:
-            aid = f["asset_id"]
-            if aid not in frames_by_asset:
-                frames_by_asset[aid] = []
-            frames_by_asset[aid].append({
-                "x": f["x"],
-                "y": f["y"],
-                "width": f["width"],
-                "height": f["height"],
-            })
-
     conn.close()
 
+    assets = []
     for row in rows:
         assets.append({
             "id": row["id"],
@@ -214,7 +187,6 @@ def search(
             "tags": row["tags"].split(",") if row["tags"] else [],
             "width": row["width"],
             "height": row["height"],
-            "frames": frames_by_asset.get(row["id"], []),
         })
 
     return {"assets": assets, "total": len(assets)}
@@ -320,9 +292,6 @@ def asset_detail(asset_id: int):
         "pack": row["pack_name"],
         "width": row["width"],
         "height": row["height"],
-        "frame_count": row["frame_count"],
-        "frame_width": row["frame_width"],
-        "frame_height": row["frame_height"],
         "tags": [t["name"] for t in tags],
         "colors": [{"hex": c["color_hex"], "percentage": c["percentage"]} for c in colors],
     }
@@ -369,180 +338,6 @@ def image(asset_id: int):
         raise HTTPException(status_code=404, detail="Image file not found")
 
     return FileResponse(image_path)
-
-
-@app.get("/api/asset/{asset_id}/frames")
-def asset_frames(asset_id: int):
-    """Get sprite frame metadata for an asset."""
-    conn = get_db()
-
-    # Verify asset exists
-    asset = conn.execute(
-        "SELECT id FROM assets WHERE id = ?", [asset_id]
-    ).fetchone()
-
-    if not asset:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Asset not found")
-
-    # Get frames
-    frames = conn.execute("""
-        SELECT frame_index, x, y, width, height, duration_ms
-        FROM sprite_frames
-        WHERE asset_id = ?
-        ORDER BY frame_index
-    """, [asset_id]).fetchall()
-
-    conn.close()
-
-    return {
-        "frames": [
-            {
-                "index": f["frame_index"],
-                "x": f["x"],
-                "y": f["y"],
-                "width": f["width"],
-                "height": f["height"],
-                "duration_ms": f["duration_ms"],
-            }
-            for f in frames
-        ],
-    }
-
-
-@app.get("/api/asset/{asset_id}/frame/{frame_index}")
-def asset_frame(asset_id: int, frame_index: int, scale: int = 1):
-    """Serve a single extracted frame as PNG."""
-    conn = get_db()
-
-    # Get asset path
-    asset = conn.execute(
-        "SELECT path FROM assets WHERE id = ?", [asset_id]
-    ).fetchone()
-
-    if not asset:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Asset not found")
-
-    # Get frame info
-    frame = conn.execute("""
-        SELECT x, y, width, height FROM sprite_frames
-        WHERE asset_id = ? AND frame_index = ?
-    """, [asset_id, frame_index]).fetchone()
-
-    conn.close()
-
-    if not frame:
-        raise HTTPException(status_code=404, detail="Frame not found")
-
-    # Extract frame
-    from PIL import Image
-
-    assets_dir = get_assets_path()
-    image_path = assets_dir / asset["path"]
-
-    if not image_path.exists():
-        raise HTTPException(status_code=404, detail="Image file not found")
-
-    with Image.open(image_path) as img:
-        box = (frame["x"], frame["y"], frame["x"] + frame["width"], frame["y"] + frame["height"])
-        cropped = img.crop(box)
-
-        if scale > 1:
-            new_size = (cropped.width * scale, cropped.height * scale)
-            cropped = cropped.resize(new_size, Image.Resampling.NEAREST)
-
-        # Save to buffer
-        buffer = BytesIO()
-        cropped.save(buffer, format="PNG")
-        buffer.seek(0)
-
-    return StreamingResponse(buffer, media_type="image/png")
-
-
-@app.get("/api/asset/{asset_id}/animation")
-def asset_animation(
-    asset_id: int,
-    fps: int = 10,
-    scale: int = 1,
-    format: str = "gif",
-):
-    """Generate animated GIF/WebP from spritesheet frames."""
-    conn = get_db()
-
-    asset = conn.execute(
-        "SELECT path FROM assets WHERE id = ?", [asset_id]
-    ).fetchone()
-
-    if not asset:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Asset not found")
-
-    frames_data = conn.execute("""
-        SELECT x, y, width, height FROM sprite_frames
-        WHERE asset_id = ? ORDER BY frame_index
-    """, [asset_id]).fetchall()
-
-    conn.close()
-
-    if not frames_data:
-        raise HTTPException(status_code=404, detail="No frames found")
-
-    from PIL import Image
-
-    assets_dir = get_assets_path()
-    image_path = assets_dir / asset["path"]
-
-    if not image_path.exists():
-        raise HTTPException(status_code=404, detail="Image file not found")
-
-    # Extract frames
-    pil_frames = []
-    with Image.open(image_path) as img:
-        for f in frames_data:
-            box = (f["x"], f["y"], f["x"] + f["width"], f["y"] + f["height"])
-            frame = img.crop(box)
-
-            if scale > 1:
-                new_size = (frame.width * scale, frame.height * scale)
-                frame = frame.resize(new_size, Image.Resampling.NEAREST)
-
-            # Convert to RGBA for consistency
-            if frame.mode != "RGBA":
-                frame = frame.convert("RGBA")
-
-            pil_frames.append(frame)
-
-    # Create animated image
-    buffer = BytesIO()
-    duration = int(1000 / fps)  # ms per frame
-
-    if format == "webp":
-        pil_frames[0].save(
-            buffer,
-            format="WEBP",
-            save_all=True,
-            append_images=pil_frames[1:],
-            duration=duration,
-            loop=0,
-        )
-        media_type = "image/webp"
-    else:
-        # GIF requires palette mode
-        gif_frames = [f.convert("P", palette=Image.Palette.ADAPTIVE) for f in pil_frames]
-        gif_frames[0].save(
-            buffer,
-            format="GIF",
-            save_all=True,
-            append_images=gif_frames[1:],
-            duration=duration,
-            loop=0,
-            disposal=2,
-        )
-        media_type = "image/gif"
-
-    buffer.seek(0)
-    return StreamingResponse(buffer, media_type=media_type)
 
 
 if __name__ == "__main__":

@@ -48,26 +48,16 @@ def test_db():
             file_size INTEGER,
             width INTEGER,
             height INTEGER,
-            frame_count INTEGER,
-            frame_width INTEGER,
-            frame_height INTEGER,
-            analysis_method TEXT,
-            animation_type TEXT
+            preview_x INTEGER,
+            preview_y INTEGER,
+            preview_width INTEGER,
+            preview_height INTEGER,
+            category TEXT
         );
         CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
-        CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, PRIMARY KEY (asset_id, tag_id));
+        CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, source TEXT, PRIMARY KEY (asset_id, tag_id));
         CREATE TABLE asset_colors (asset_id INTEGER, color_hex TEXT, percentage REAL, PRIMARY KEY (asset_id, color_hex));
         CREATE TABLE asset_phash (asset_id INTEGER PRIMARY KEY, phash BLOB);
-        CREATE TABLE sprite_frames (
-            id INTEGER PRIMARY KEY,
-            asset_id INTEGER,
-            frame_index INTEGER,
-            x INTEGER,
-            y INTEGER,
-            width INTEGER,
-            height INTEGER,
-            duration_ms INTEGER
-        );
 
         INSERT INTO packs (id, name, path) VALUES (1, 'creatures', '/assets/creatures');
         INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height)
@@ -75,7 +65,7 @@ def test_db():
         INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height)
             VALUES (2, 1, '/assets/creatures/orc.png', 'orc.png', 'png', 'def456', 128, 128);
         INSERT INTO tags (id, name) VALUES (1, 'creature'), (2, 'goblin'), (3, 'orc');
-        INSERT INTO asset_tags VALUES (1, 1), (1, 2), (2, 1), (2, 3);
+        INSERT INTO asset_tags VALUES (1, 1, 'path'), (1, 2, 'path'), (2, 1, 'path'), (2, 3, 'path');
         INSERT INTO asset_colors VALUES (1, '#00ff00', 0.5), (2, '#ff0000', 0.6);
         INSERT INTO asset_phash VALUES (1, X'0000000000000000'), (2, X'0000000000000001');
     """)
@@ -276,172 +266,6 @@ def test_image_serves_file(test_db, tmp_path):
     response = client.get("/api/image/10")
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
-
-
-def test_asset_frames_returns_frame_data(test_db):
-    """Get asset frames returns frame metadata."""
-    from api import set_db_path
-    set_db_path(test_db)
-
-    # Add sprite frames for asset 1
-    import sqlite3
-    conn = sqlite3.connect(test_db)
-    conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (1, 0, 0, 0, 32, 32, 100)"
-    )
-    conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (1, 1, 32, 0, 32, 32, 100)"
-    )
-    conn.commit()
-    conn.close()
-
-    response = client.get("/api/asset/1/frames")
-    assert response.status_code == 200
-    data = response.json()
-    assert "frames" in data
-    assert len(data["frames"]) == 2
-    assert data["frames"][0]["x"] == 0
-    assert data["frames"][1]["x"] == 32
-
-
-def test_asset_frames_not_found(test_db):
-    """Get asset frames returns 404 for unknown asset."""
-    from api import set_db_path
-    set_db_path(test_db)
-
-    response = client.get("/api/asset/999/frames")
-    assert response.status_code == 404
-
-
-def test_asset_frames_empty_for_non_spritesheet(test_db):
-    """Get asset frames returns empty list for non-spritesheet."""
-    from api import set_db_path
-    set_db_path(test_db)
-
-    response = client.get("/api/asset/1/frames")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["frames"] == []
-
-
-def test_search_includes_frames(test_db):
-    """Search results include frame data for spritesheets."""
-    from api import set_db_path
-    set_db_path(test_db)
-
-    # Add sprite frames for asset 1
-    import sqlite3
-    conn = sqlite3.connect(test_db)
-    conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (1, 0, 0, 0, 32, 32, 100)"
-    )
-    conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (1, 1, 32, 0, 32, 32, 100)"
-    )
-    conn.commit()
-    conn.close()
-
-    response = client.get("/api/search?q=goblin")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data["assets"]) == 1
-    asset = data["assets"][0]
-    assert "frames" in asset
-    assert len(asset["frames"]) == 2
-
-
-def test_asset_frame_serves_cropped_image(test_db, tmp_path):
-    """Get single frame serves cropped image."""
-    from api import set_db_path, set_assets_path
-    set_db_path(test_db)
-
-    # Create a 64x32 spritesheet (2 frames of 32x32)
-    assets_dir = tmp_path / "assets"
-    assets_dir.mkdir()
-    pack_dir = assets_dir / "testpack"
-    pack_dir.mkdir()
-
-    from PIL import Image
-    img = Image.new("RGBA", (64, 32), (0, 0, 0, 0))
-    # First frame: red
-    for x in range(32):
-        for y in range(32):
-            img.putpixel((x, y), (255, 0, 0, 255))
-    # Second frame: blue
-    for x in range(32, 64):
-        for y in range(32):
-            img.putpixel((x, y), (0, 0, 255, 255))
-    img.save(pack_dir / "spritesheet.png")
-
-    set_assets_path(assets_dir)
-
-    # Add asset and frames to DB
-    import sqlite3
-    conn = sqlite3.connect(test_db)
-    conn.execute(
-        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
-        "VALUES (20, 1, 'testpack/spritesheet.png', 'spritesheet.png', 'png', 'xyz', 64, 32)"
-    )
-    conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (20, 0, 0, 0, 32, 32, 100)"
-    )
-    conn.execute(
-        "INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms) VALUES (20, 1, 32, 0, 32, 32, 100)"
-    )
-    conn.commit()
-    conn.close()
-
-    response = client.get("/api/asset/20/frame/0")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "image/png"
-
-
-def test_asset_frame_not_found(test_db):
-    """Get frame returns 404 for unknown frame index."""
-    from api import set_db_path
-    set_db_path(test_db)
-
-    response = client.get("/api/asset/1/frame/99")
-    assert response.status_code == 404
-
-
-def test_asset_animation_generates_gif(test_db, tmp_path):
-    """Animation endpoint generates animated GIF."""
-    from api import set_db_path, set_assets_path
-    set_db_path(test_db)
-
-    # Create a 64x32 spritesheet (2 frames of 32x32)
-    assets_dir = tmp_path / "assets"
-    assets_dir.mkdir()
-    pack_dir = assets_dir / "testpack"
-    pack_dir.mkdir()
-
-    from PIL import Image
-    img = Image.new("RGBA", (64, 32), (0, 0, 0, 0))
-    for x in range(32):
-        for y in range(32):
-            img.putpixel((x, y), (255, 0, 0, 255))
-    for x in range(32, 64):
-        for y in range(32):
-            img.putpixel((x, y), (0, 0, 255, 255))
-    img.save(pack_dir / "anim.png")
-
-    set_assets_path(assets_dir)
-
-    import sqlite3
-    conn = sqlite3.connect(test_db)
-    conn.execute(
-        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
-        "VALUES (30, 1, 'testpack/anim.png', 'anim.png', 'png', 'anim123', 64, 32)"
-    )
-    conn.execute("INSERT INTO sprite_frames VALUES (NULL, 30, 0, 0, 0, 32, 32, 100)")
-    conn.execute("INSERT INTO sprite_frames VALUES (NULL, 30, 1, 32, 0, 32, 32, 100)")
-    conn.commit()
-    conn.close()
-
-    response = client.get("/api/asset/30/animation")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "image/gif"
 
 
 if __name__ == "__main__":
