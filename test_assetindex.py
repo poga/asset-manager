@@ -697,6 +697,56 @@ class TestCLI:
 # =============================================================================
 
 
+class TestIndexAssetPreviewBounds:
+    """Tests for preview bounds storage during indexing."""
+
+    def test_stores_preview_bounds_for_spritesheet(self, temp_dir):
+        """Indexing stores preview bounds for image with alpha."""
+        img_path = temp_dir / "TestPack" / "sprite.png"
+        img_path.parent.mkdir(parents=True)
+        # Create 64x32 spritesheet with first sprite at (0,0) size 32x32
+        img = Image.new("RGBA", (64, 32), (0, 0, 0, 0))
+        for x in range(32):
+            for y in range(32):
+                img.putpixel((x, y), (255, 0, 0, 255))
+        img.save(img_path)
+
+        db_path = temp_dir / "test.db"
+        conn = assetindex.get_db(db_path)
+        assetindex.index_asset(conn, img_path, temp_dir)
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT preview_x, preview_y, preview_width, preview_height FROM assets WHERE filename = 'sprite.png'"
+        ).fetchone()
+
+        assert row["preview_x"] == 0
+        assert row["preview_y"] == 0
+        assert row["preview_width"] == 32
+        assert row["preview_height"] == 32
+        conn.close()
+
+    def test_stores_null_for_no_alpha(self, temp_dir):
+        """Indexing stores NULL preview bounds for RGB image."""
+        img_path = temp_dir / "TestPack" / "solid.png"
+        img_path.parent.mkdir(parents=True)
+        img = Image.new("RGB", (64, 64), (255, 0, 0))
+        img.save(img_path)
+
+        db_path = temp_dir / "test.db"
+        conn = assetindex.get_db(db_path)
+        assetindex.index_asset(conn, img_path, temp_dir)
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT preview_x, preview_y, preview_width, preview_height FROM assets WHERE filename = 'solid.png'"
+        ).fetchone()
+
+        assert row["preview_x"] is None
+        assert row["preview_y"] is None
+        conn.close()
+
+
 class TestPreviewBoundsSchema:
     """Tests for preview bounds columns in assets table."""
 
