@@ -1,5 +1,5 @@
 # Asset index cache
-.index/
+.assetindex/
 assets.db
 
 # Python
