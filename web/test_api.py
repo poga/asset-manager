@@ -19,7 +19,15 @@ from fastapi.testclient import TestClient
 
 from api import app
 
-client = TestClient(app)
+# Global client for existing tests
+_client = TestClient(app)
+client = _client
+
+
+@pytest.fixture
+def test_client():
+    """Create test client fixture."""
+    return _client
 
 
 @pytest.fixture
@@ -399,6 +407,57 @@ def test_spa_static_files_served(test_db, tmp_path):
     response = client.get("/assets/main.js")
     assert response.status_code == 200
     assert "console.log" in response.text
+
+
+@pytest.fixture
+def sample_db(test_db, tmp_path):
+    """Create test database with actual files for download tests."""
+    from api import set_db_path, set_assets_path
+
+    set_db_path(test_db)
+
+    # Create assets folder structure with actual files
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    creatures_dir = assets_dir / "creatures"
+    creatures_dir.mkdir()
+
+    # Create test image files
+    (creatures_dir / "goblin.png").write_bytes(b"fake png data 1")
+    (creatures_dir / "orc.png").write_bytes(b"fake png data 2")
+
+    # Update database paths to be relative to assets folder
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    conn.execute("UPDATE assets SET path = 'creatures/goblin.png' WHERE id = 1")
+    conn.execute("UPDATE assets SET path = 'creatures/orc.png' WHERE id = 2")
+    conn.commit()
+    conn.close()
+
+    set_assets_path(assets_dir)
+
+    return test_db
+
+
+def test_download_cart_returns_zip(test_client, sample_db):
+    """Test download cart returns a zip file."""
+    response = test_client.post("/api/download-cart", json={"asset_ids": [1, 2]})
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    assert "attachment" in response.headers["content-disposition"]
+
+
+def test_download_cart_empty_returns_400(test_client, sample_db):
+    """Test download cart with empty list returns 400."""
+    response = test_client.post("/api/download-cart", json={"asset_ids": []})
+    assert response.status_code == 400
+
+
+def test_download_cart_invalid_ids_skipped(test_client, sample_db):
+    """Test download cart skips invalid asset IDs."""
+    response = test_client.post("/api/download-cart", json={"asset_ids": [1, 9999]})
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
 
 
 if __name__ == "__main__":

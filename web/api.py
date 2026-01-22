@@ -12,12 +12,15 @@
 import io
 import sqlite3
 import sys
+import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel
 
 # Add parent directory to path for aseprite_parser import
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -380,6 +383,52 @@ def image(asset_id: int):
         return Response(content=buffer.getvalue(), media_type="image/png")
 
     return FileResponse(image_path)
+
+
+class DownloadCartRequest(BaseModel):
+    asset_ids: list[int]
+
+
+@app.post("/api/download-cart")
+def download_cart(request: DownloadCartRequest):
+    """Download selected assets as a ZIP file."""
+    if not request.asset_ids:
+        raise HTTPException(status_code=400, detail="No assets selected")
+
+    conn = get_db()
+
+    # Get asset paths
+    placeholders = ",".join("?" * len(request.asset_ids))
+    rows = conn.execute(
+        f"SELECT id, path, filename FROM assets WHERE id IN ({placeholders})",
+        request.asset_ids
+    ).fetchall()
+    conn.close()
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="No valid assets found")
+
+    assets_dir = get_assets_path()
+
+    # Create ZIP in memory
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for row in rows:
+            file_path = assets_dir / row["path"]
+            if file_path.exists():
+                # Use filename to avoid path issues
+                zf.write(file_path, row["filename"])
+
+    buffer.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="assets-{timestamp}.zip"'
+        }
+    )
 
 
 @app.get("/{full_path:path}")
