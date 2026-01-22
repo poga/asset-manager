@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import App from '../src/App.vue'
+import PackList from '../src/components/PackList.vue'
+import Cart from '../src/components/Cart.vue'
+import AssetDetail from '../src/components/AssetDetail.vue'
+import AssetGrid from '../src/components/AssetGrid.vue'
 
 // Mock fetch globally
 const mockFetch = vi.fn()
@@ -272,14 +276,14 @@ describe('App URL routing', () => {
     expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('pack=sci-fi-pack'))
   })
 
-  it('resets currentPack when navigating back to home from pack', async () => {
+  it('resets selectedPacks when navigating back to home from pack', async () => {
     // Start at /pack/test-pack
     window.history.replaceState({}, '', '/pack/test-pack')
 
     const wrapper = mount(App)
     await flushPromises()
 
-    expect(wrapper.vm.currentPack).toBe('test-pack')
+    expect(wrapper.vm.selectedPacks).toContain('test-pack')
     mockFetch.mockClear()
 
     // Navigate back to home
@@ -289,6 +293,88 @@ describe('App URL routing', () => {
     }))
     await flushPromises()
 
-    expect(wrapper.vm.currentPack).toBeNull()
+    // Should select all packs (from filters)
+    expect(wrapper.vm.selectedPacks).toEqual([])
+  })
+})
+
+describe('App 3-column layout', () => {
+  let pushStateSpy
+  let originalLocation
+
+  beforeEach(() => {
+    pushStateSpy = vi.spyOn(window.history, 'pushState')
+    originalLocation = window.location.pathname
+
+    // Default fetch responses
+    mockFetch.mockImplementation((url) => {
+      if (url === '/api/filters') {
+        return Promise.resolve({
+          json: () => Promise.resolve({ packs: [{ name: 'pack1', count: 10 }], tags: [], colors: [] })
+        })
+      }
+      if (url.startsWith('/api/search')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({ assets: [] })
+        })
+      }
+      if (url.startsWith('/api/asset/')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({
+            id: 123,
+            filename: 'test.png',
+            path: '/test.png',
+            pack: 'test',
+            width: 32,
+            height: 32,
+            tags: [],
+            colors: [],
+            related: []
+          })
+        })
+      }
+      return Promise.resolve({ json: () => Promise.resolve({}) })
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    mockFetch.mockReset()
+    window.history.replaceState({}, '', originalLocation)
+  })
+
+  it('renders 3-column layout', () => {
+    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    expect(wrapper.find('.left-panel').exists()).toBe(true)
+    expect(wrapper.find('.middle-panel').exists()).toBe(true)
+    expect(wrapper.find('.right-panel').exists()).toBe(true)
+  })
+
+  it('renders PackList in left panel', () => {
+    const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    expect(wrapper.findComponent(PackList).exists()).toBe(true)
+  })
+
+  it('renders Cart in right panel', () => {
+    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'AssetDetail'] } })
+    expect(wrapper.findComponent(Cart).exists()).toBe(true)
+  })
+
+  it('shows AssetDetail when asset selected', async () => {
+    const wrapper = mount(App, {
+      global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart'] }
+    })
+    wrapper.vm.selectedAsset = { id: 1, filename: 'test.png' }
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findComponent(AssetDetail).exists()).toBe(true)
+  })
+
+  it('hides AssetGrid when asset selected', async () => {
+    const wrapper = mount(App, {
+      global: { stubs: ['PackList', 'SearchBar', 'Cart', 'AssetDetail'] }
+    })
+    wrapper.vm.selectedAsset = { id: 1, filename: 'test.png' }
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findComponent(AssetGrid).exists()).toBe(false)
   })
 })
