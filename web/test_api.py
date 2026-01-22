@@ -349,5 +349,57 @@ def test_image_serves_aseprite_as_png(test_db, tmp_path):
     assert img.getpixel((2, 2)) == (255, 0, 0, 255)
 
 
+def test_spa_fallback_serves_index_html(test_db, tmp_path):
+    """Non-API routes serve index.html for SPA routing."""
+    from api import set_db_path, set_static_path
+
+    set_db_path(test_db)
+
+    # Create a mock dist folder with index.html
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    index_html = dist_dir / "index.html"
+    index_html.write_text("<!DOCTYPE html><html><body>SPA</body></html>")
+
+    set_static_path(dist_dir)
+
+    # Test root path
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "SPA" in response.text
+
+    # Test asset route (SPA direct link)
+    response = client.get("/asset/123")
+    assert response.status_code == 200
+    assert "SPA" in response.text
+
+    # Test nested route
+    response = client.get("/some/nested/route")
+    assert response.status_code == 200
+    assert "SPA" in response.text
+
+
+def test_spa_static_files_served(test_db, tmp_path):
+    """Static files from dist folder are served correctly."""
+    from api import set_db_path, set_static_path
+
+    set_db_path(test_db)
+
+    # Create a mock dist folder with assets
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    (dist_dir / "index.html").write_text("<!DOCTYPE html><html></html>")
+
+    assets_dir = dist_dir / "assets"
+    assets_dir.mkdir()
+    (assets_dir / "main.js").write_text("console.log('test')")
+
+    set_static_path(dist_dir)
+
+    response = client.get("/assets/main.js")
+    assert response.status_code == 200
+    assert "console.log" in response.text
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

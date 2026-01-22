@@ -16,16 +16,18 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import SearchBar from './components/SearchBar.vue'
 import AssetGrid from './components/AssetGrid.vue'
 import AssetModal from './components/AssetModal.vue'
+import { parseRoute } from './router.js'
 
 const filters = ref({ packs: [], tags: [], colors: [] })
 const assets = ref([])
 const selectedAsset = ref(null)
 
 let debounceTimer = null
+let skipNextPush = false
 
 async function fetchFilters() {
   const res = await fetch('/api/filters')
@@ -55,18 +57,67 @@ function handleSearch(params) {
 async function selectAsset(id) {
   const res = await fetch(`/api/asset/${id}`)
   selectedAsset.value = await res.json()
+  window.history.pushState({ route: 'asset', id }, '', `/asset/${id}`)
 }
 
 async function findSimilar(id) {
+  skipNextPush = true
   selectedAsset.value = null
+  const res = await fetch(`/api/similar/${id}`)
+  const data = await res.json()
+  assets.value = data.assets
+  window.history.pushState({ route: 'similar', id }, '', `/similar/${id}`)
+}
+
+async function loadSimilarFromUrl(id) {
   const res = await fetch(`/api/similar/${id}`)
   const data = await res.json()
   assets.value = data.assets
 }
 
+watch(selectedAsset, (newVal, oldVal) => {
+  if (oldVal !== null && newVal === null && !skipNextPush) {
+    window.history.pushState({ route: 'home' }, '', '/')
+  }
+  skipNextPush = false
+})
+
+function handlePopState(event) {
+  const route = parseRoute(window.location.pathname)
+  skipNextPush = true
+  if (route.name === 'home') {
+    selectedAsset.value = null
+  } else if (route.name === 'asset') {
+    selectAssetFromUrl(route.params.id)
+  } else if (route.name === 'similar') {
+    selectedAsset.value = null
+    loadSimilarFromUrl(route.params.id)
+  }
+}
+
+async function selectAssetFromUrl(id) {
+  const res = await fetch(`/api/asset/${id}`)
+  selectedAsset.value = await res.json()
+}
+
+function handleInitialRoute() {
+  const route = parseRoute(window.location.pathname)
+  if (route.name === 'asset') {
+    selectAssetFromUrl(route.params.id)
+  } else if (route.name === 'similar') {
+    loadSimilarFromUrl(route.params.id)
+  }
+}
+
 onMounted(() => {
   fetchFilters()
   search({ q: null, tag: [], color: null, pack: null, type: null })
+  handleInitialRoute()
+  window.addEventListener('popstate', handlePopState)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('popstate', handlePopState)
 })
 </script>
 

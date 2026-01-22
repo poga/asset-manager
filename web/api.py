@@ -36,6 +36,8 @@ app.add_middleware(
 _db_path: Optional[Path] = None
 # Assets path - can be overridden for testing
 _assets_path: Optional[Path] = None
+# Static files path (frontend dist) - can be overridden for testing
+_static_path: Optional[Path] = None
 
 COLOR_NAMES = {
     "red": ("#ff0000", "#cc0000", "#990000", "#ff3333", "#cc3333"),
@@ -62,6 +64,24 @@ def set_assets_path(path: Path):
     """Set assets path (for testing)."""
     global _assets_path
     _assets_path = path
+
+
+def set_static_path(path: Path):
+    """Set static files path (for testing)."""
+    global _static_path
+    _static_path = path
+
+
+def get_static_path() -> Optional[Path]:
+    """Get static files directory path."""
+    if _static_path:
+        return _static_path
+    # Look for frontend dist folder
+    current = Path(__file__).parent
+    dist_path = current / "frontend" / "dist"
+    if dist_path.exists():
+        return dist_path
+    return None
 
 
 def get_db() -> sqlite3.Connection:
@@ -360,6 +380,26 @@ def image(asset_id: int):
         return Response(content=buffer.getvalue(), media_type="image/png")
 
     return FileResponse(image_path)
+
+
+@app.get("/{full_path:path}")
+def spa_fallback(full_path: str):
+    """Serve static files or fallback to index.html for SPA routing."""
+    static_path = get_static_path()
+    if not static_path:
+        raise HTTPException(status_code=404, detail="Frontend not built")
+
+    # Try to serve the exact file first
+    file_path = static_path / full_path
+    if file_path.is_file():
+        return FileResponse(file_path)
+
+    # Fallback to index.html for SPA routing
+    index_path = static_path / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+
+    raise HTTPException(status_code=404, detail="Not found")
 
 
 if __name__ == "__main__":
