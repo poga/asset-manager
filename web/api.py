@@ -131,7 +131,7 @@ def search(
     q: Optional[str] = None,
     tag: list[str] = Query(default=[]),
     color: Optional[str] = None,
-    pack: Optional[str] = None,
+    pack: list[str] = Query(default=[]),
     type: Optional[str] = None,
     limit: int = 100,
 ):
@@ -146,8 +146,12 @@ def search(
         params.extend([f"%{q}%", f"%{q}%"])
 
     if pack:
-        conditions.append("p.name LIKE ?")
-        params.append(f"%{pack}%")
+        # Support multiple packs with OR
+        pack_conditions = []
+        for p in pack:
+            pack_conditions.append("p.name LIKE ?")
+            params.append(f"%{p}%")
+        conditions.append(f"({' OR '.join(pack_conditions)})")
 
     if type:
         conditions.append("a.filetype = ?")

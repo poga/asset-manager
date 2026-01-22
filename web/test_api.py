@@ -460,5 +460,27 @@ def test_download_cart_invalid_ids_skipped(test_client, sample_db):
     assert response.headers["content-type"] == "application/zip"
 
 
+def test_search_multiple_packs(test_client, sample_db):
+    """Test search with multiple pack filters."""
+    # Add a second pack with assets
+    import sqlite3
+    conn = sqlite3.connect(sample_db)
+    conn.execute("INSERT INTO packs (id, name, path) VALUES (2, 'icons', '/assets/icons')")
+    conn.execute(
+        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
+        "VALUES (3, 2, 'icons/star.png', 'star.png', 'png', 'icon123', 32, 32)"
+    )
+    conn.commit()
+    conn.close()
+
+    response = test_client.get("/api/search?pack=icons&pack=creatures")
+    assert response.status_code == 200
+    data = response.json()
+    packs = {a["pack"] for a in data["assets"]}
+    # Should have assets from both packs
+    assert "icons" in packs or "creatures" in packs
+    assert len(data["assets"]) >= 2  # At least one from each pack
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
