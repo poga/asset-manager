@@ -235,14 +235,7 @@ def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]
 
             while stack:
                 cx, cy = stack.pop()
-                if (cx, cy) in visited:
-                    continue
-                if cx < 0 or cx >= width or cy < 0 or cy >= height:
-                    continue
-                if pixels[cx, cy][3] == 0:
-                    continue
 
-                visited.add((cx, cy))
                 min_x = min(min_x, cx)
                 min_y = min(min_y, cy)
                 max_x = max(max_x, cx)
@@ -252,7 +245,11 @@ def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]
                     for dy in [-1, 0, 1]:
                         if dx == 0 and dy == 0:
                             continue
-                        stack.append((cx + dx, cy + dy))
+                        nx, ny = cx + dx, cy + dy
+                        if (nx, ny) not in visited and 0 <= nx < width and 0 <= ny < height:
+                            if pixels[nx, ny][3] > 0:
+                                visited.add((nx, ny))
+                                stack.append((nx, ny))
 
             return (min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
     except Exception:
