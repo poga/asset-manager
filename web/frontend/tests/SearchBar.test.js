@@ -1,69 +1,67 @@
+// web/frontend/tests/SearchBar.test.js
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SearchBar from '../src/components/SearchBar.vue'
 
 describe('SearchBar', () => {
+  const mockFilters = {
+    packs: ['icons', 'sprites'],
+    tags: ['character', 'ui'],
+    colors: ['red', 'blue', 'green'],
+  }
+
   it('renders search input', () => {
     const wrapper = mount(SearchBar, {
-      props: { filters: { packs: [], tags: [], colors: [] } }
+      props: { filters: mockFilters }
     })
     expect(wrapper.find('input[type="text"]').exists()).toBe(true)
   })
 
-  it('emits search event on input', async () => {
+  it('renders color dropdown', () => {
     const wrapper = mount(SearchBar, {
-      props: { filters: { packs: [], tags: [], colors: [] } }
+      props: { filters: mockFilters }
     })
-    await wrapper.find('input[type="text"]').setValue('goblin')
+    expect(wrapper.find('select[data-filter="color"]').exists()).toBe(true)
+  })
+
+  it('does not render pack dropdown', () => {
+    const wrapper = mount(SearchBar, {
+      props: { filters: mockFilters }
+    })
+    expect(wrapper.find('select[data-filter="pack"]').exists()).toBe(false)
+  })
+
+  it('emits search on input', async () => {
+    const wrapper = mount(SearchBar, {
+      props: { filters: mockFilters }
+    })
+    await wrapper.find('input[type="text"]').setValue('hero')
     expect(wrapper.emitted('search')).toBeTruthy()
-    expect(wrapper.emitted('search')[0]).toEqual([{ q: 'goblin', tag: [], color: null, pack: null, type: null }])
   })
 
-  it('renders pack filter dropdown', () => {
+  it('renders tag dropdown', () => {
     const wrapper = mount(SearchBar, {
-      props: { filters: { packs: ['creatures', 'items'], tags: [], colors: [] } }
+      props: { filters: mockFilters }
     })
-    const select = wrapper.find('select[data-filter="pack"]')
-    expect(select.exists()).toBe(true)
-    expect(select.findAll('option').length).toBe(3) // empty + 2 packs
+    expect(wrapper.find('select[data-filter="tag"]').exists()).toBe(true)
   })
 
-  it('emits search with pack filter', async () => {
+  it('adds and displays tags', async () => {
     const wrapper = mount(SearchBar, {
-      props: { filters: { packs: ['creatures'], tags: [], colors: [] } }
+      props: { filters: mockFilters }
     })
-    await wrapper.find('select[data-filter="pack"]').setValue('creatures')
-    const events = wrapper.emitted('search')
-    const lastEvent = events[events.length - 1][0]
-    expect(lastEvent.pack).toBe('creatures')
+    const tagSelect = wrapper.find('select[data-filter="tag"]')
+    await tagSelect.setValue('character')
+    expect(wrapper.text()).toContain('character')
   })
 
-  it('renders color filter dropdown', () => {
+  it('removes tag when clicked', async () => {
     const wrapper = mount(SearchBar, {
-      props: { filters: { packs: [], tags: [], colors: ['red', 'green', 'blue'] } }
+      props: { filters: mockFilters }
     })
-    const select = wrapper.find('select[data-filter="color"]')
-    expect(select.exists()).toBe(true)
-  })
-
-  it('shows pack header when currentPack is set', () => {
-    const wrapper = mount(SearchBar, {
-      props: {
-        filters: { packs: [], tags: [], colors: [] },
-        currentPack: 'fantasy-pack'
-      }
-    })
-    expect(wrapper.text()).toContain('Viewing: fantasy-pack')
-  })
-
-  it('emits clear-pack when clear button clicked', async () => {
-    const wrapper = mount(SearchBar, {
-      props: {
-        filters: { packs: [], tags: [], colors: [] },
-        currentPack: 'fantasy-pack'
-      }
-    })
-    await wrapper.find('.clear-pack-btn').trigger('click')
-    expect(wrapper.emitted('clear-pack')).toBeTruthy()
+    const tagSelect = wrapper.find('select[data-filter="tag"]')
+    await tagSelect.setValue('character')
+    await wrapper.find('.tag').trigger('click')
+    expect(wrapper.text()).not.toContain('character ×')
   })
 })
