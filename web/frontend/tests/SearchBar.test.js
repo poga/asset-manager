@@ -21,14 +21,15 @@ describe('SearchBar', () => {
     const wrapper = mount(SearchBar, {
       props: { filters: mockFilters }
     })
-    expect(wrapper.find('select[data-filter="color"]').exists()).toBe(true)
+    expect(wrapper.find('[data-filter="color"]').exists()).toBe(true)
+    expect(wrapper.find('[data-filter="color"]').text()).toContain('Any color')
   })
 
   it('does not render pack dropdown', () => {
     const wrapper = mount(SearchBar, {
       props: { filters: mockFilters }
     })
-    expect(wrapper.find('select[data-filter="pack"]').exists()).toBe(false)
+    expect(wrapper.find('[data-filter="pack"]').exists()).toBe(false)
   })
 
   it('emits search on input', async () => {
@@ -43,26 +44,47 @@ describe('SearchBar', () => {
     const wrapper = mount(SearchBar, {
       props: { filters: mockFilters }
     })
-    expect(wrapper.find('select[data-filter="tag"]').exists()).toBe(true)
+    expect(wrapper.find('[data-filter="tag"]').exists()).toBe(true)
+    expect(wrapper.find('[data-filter="tag"]').text()).toContain('Add tag')
   })
 
   it('adds and displays tags', async () => {
     const wrapper = mount(SearchBar, {
       props: { filters: mockFilters }
     })
-    const tagSelect = wrapper.find('select[data-filter="tag"]')
-    await tagSelect.setValue('character')
-    expect(wrapper.text()).toContain('character')
+    // Open tag dropdown
+    await wrapper.find('[data-filter="tag"]').trigger('click')
+    // Click first tag option
+    await wrapper.find('[data-filter="tag"] .dropdown-option').trigger('click')
+    expect(wrapper.find('.tag').exists()).toBe(true)
   })
 
   it('removes tag when clicked', async () => {
     const wrapper = mount(SearchBar, {
       props: { filters: mockFilters }
     })
-    const tagSelect = wrapper.find('select[data-filter="tag"]')
-    await tagSelect.setValue('character')
+    // Add a tag via exposed method
+    wrapper.vm.addTagExternal('character')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.tag').exists()).toBe(true)
+    // Click the tag to remove
     await wrapper.find('.tag').trigger('click')
-    expect(wrapper.text()).not.toContain('character ×')
+    expect(wrapper.find('.tag').exists()).toBe(false)
+  })
+
+  it('opens and closes dropdown on click', async () => {
+    const wrapper = mount(SearchBar, {
+      props: { filters: mockFilters }
+    })
+    const dropdown = wrapper.find('[data-filter="color"]')
+    // Initially closed
+    expect(wrapper.find('[data-filter="color"] .dropdown-panel').exists()).toBe(false)
+    // Click to open
+    await dropdown.trigger('click')
+    expect(wrapper.find('.dropdown-panel').exists()).toBe(true)
+    // Click again to close
+    await dropdown.trigger('click')
+    expect(wrapper.find('[data-filter="color"] .dropdown-panel').exists()).toBe(false)
   })
 
   it('exposes addTagExternal method', () => {
