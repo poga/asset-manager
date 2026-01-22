@@ -78,7 +78,7 @@ const hoveredId = ref(null)
 <style scoped>
 .result-count {
   margin-bottom: 0.5rem;
-  color: #666;
+  color: var(--color-text-muted);
 }
 
 .asset-grid {
@@ -89,14 +89,16 @@ const hoveredId = ref(null)
 .asset-item {
   break-inside: avoid;
   margin-bottom: 0.75rem;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
   overflow: hidden;
+  transition: box-shadow 150ms, border-color 150ms;
 }
 
 .asset-item:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-card);
+  border-color: var(--color-border-emphasis);
 }
 
 .asset-image-container {
@@ -105,7 +107,7 @@ const hoveredId = ref(null)
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f8f8f8;
+  background: var(--color-bg-elevated);
   position: relative;
 }
 
@@ -117,17 +119,18 @@ const hoveredId = ref(null)
   height: 24px;
   border-radius: 50%;
   border: none;
-  background: #007bff;
+  background: var(--color-accent);
   color: white;
   font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 150ms;
 }
 
 .add-cart-btn:hover {
-  background: #0056b3;
+  background: var(--color-accent-hover);
 }
 
 .cart-indicator {
@@ -137,7 +140,7 @@ const hoveredId = ref(null)
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #28a745;
+  background: var(--color-success);
   color: white;
   font-size: 12px;
   display: flex;
@@ -146,7 +149,7 @@ const hoveredId = ref(null)
 }
 
 .in-cart {
-  border-color: #28a745;
+  border-color: var(--color-success);
 }
 
 .asset-image-container img {
@@ -164,26 +167,28 @@ const hoveredId = ref(null)
 .asset-pack {
   display: block;
   font-size: 0.65rem;
-  color: #666;
+  color: var(--color-text-muted);
   cursor: pointer;
   margin-bottom: 0.25rem;
+  transition: color 150ms;
 }
 
 .asset-pack:hover {
   text-decoration: underline;
-  color: #007bff;
+  color: var(--color-accent);
 }
 
 .filename {
   display: block;
   font-size: 0.75rem;
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .no-results {
-  color: #666;
+  color: var(--color-text-muted);
   text-align: center;
   padding: 2rem;
 }
