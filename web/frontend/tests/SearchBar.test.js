@@ -64,4 +64,32 @@ describe('SearchBar', () => {
     await wrapper.find('.tag').trigger('click')
     expect(wrapper.text()).not.toContain('character ×')
   })
+
+  it('exposes addTagExternal method', () => {
+    const wrapper = mount(SearchBar, {
+      props: { filters: mockFilters }
+    })
+    expect(typeof wrapper.vm.addTagExternal).toBe('function')
+  })
+
+  it('addTagExternal adds tag and emits search', async () => {
+    const wrapper = mount(SearchBar, {
+      props: { filters: mockFilters }
+    })
+    wrapper.vm.addTagExternal('sword')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('search')).toBeTruthy()
+    expect(wrapper.emitted('search')[0][0].tag).toContain('sword')
+  })
+
+  it('addTagExternal does not add duplicate tags', async () => {
+    const wrapper = mount(SearchBar, {
+      props: { filters: mockFilters }
+    })
+    wrapper.vm.addTagExternal('sword')
+    wrapper.vm.addTagExternal('sword')
+    await wrapper.vm.$nextTick()
+    const lastEmit = wrapper.emitted('search').slice(-1)[0][0]
+    expect(lastEmit.tag.filter(t => t === 'sword').length).toBe(1)
+  })
 })

@@ -58,6 +58,15 @@ function removeTag(tag) {
   tags.value = tags.value.filter(t => t !== tag)
   emitSearch()
 }
+
+function addTagExternal(tag) {
+  if (tag && !tags.value.includes(tag)) {
+    tags.value.push(tag)
+    emitSearch()
+  }
+}
+
+defineExpose({ addTagExternal })
 </script>
 
 <style scoped>
