@@ -1,11 +1,17 @@
 <template>
   <div class="search-bar">
-    <input
-      type="text"
-      v-model="query"
-      placeholder="Search assets..."
-      @input="emitSearch"
-    />
+    <div class="search-input-wrapper">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input
+        type="text"
+        v-model="query"
+        placeholder="Search assets..."
+        @input="emitSearch"
+      />
+    </div>
     <select data-filter="color" v-model="color" @change="emitSearch">
       <option value="">Any color</option>
       <option v-for="c in filters.colors" :key="c" :value="c">{{ c }}</option>
@@ -78,25 +84,40 @@ defineExpose({ addTagExternal })
   margin-bottom: 1rem;
 }
 
-.search-bar input[type="text"] {
+.search-input-wrapper {
+  position: relative;
   flex: 1;
   min-width: 200px;
-  padding: 0.5rem;
-  font-size: 1rem;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.search-input-wrapper input {
+  width: 100%;
+  height: 36px;
+  padding: 0 0.75rem 0 36px;
+  font-size: 0.875rem;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
-  transition: border-color 150ms, box-shadow 150ms;
 }
 
-.search-bar input[type="text"]:focus {
+.search-input-wrapper input:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-light);
 }
 
-.search-bar input[type="text"]::placeholder {
+.search-input-wrapper input::placeholder {
   color: var(--color-text-muted);
 }
 
