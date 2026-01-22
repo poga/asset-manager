@@ -29,12 +29,14 @@ from PIL import Image
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
+import aseprite_parser
+
 app = typer.Typer(help="Build and update the game asset index")
 console = Console()
 
-# Supported asset types
+# Supported image types for indexing
 IMAGE_EXTENSIONS = {".png", ".gif", ".jpg", ".jpeg", ".webp"}
-ASSET_EXTENSIONS = IMAGE_EXTENSIONS | {".aseprite", ".ase"}
+ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
 
 # Noise words to skip in tag extraction
 NOISE_WORDS = {
@@ -363,13 +365,17 @@ def index_asset(
         )
         pack_id = conn.execute("SELECT id FROM packs WHERE path = ?", [pack_rel]).fetchone()[0]
 
-    # Get image info
-    img_info = get_image_info(file_path) if file_path.suffix.lower() in IMAGE_EXTENSIONS else {}
-
-    # Detect preview bounds for spritesheets
+    # Get image/asset info based on file type
+    img_info = {}
+    ase_info = None
     preview_bounds = None
+
     if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+        img_info = get_image_info(file_path)
         preview_bounds = detect_first_sprite_bounds(file_path)
+    elif file_path.suffix.lower() in ASEPRITE_EXTENSIONS:
+        ase_info = aseprite_parser.parse_aseprite(file_path)
+        img_info = {"width": ase_info["width"], "height": ase_info["height"]}
 
     # Category
     category = get_category(file_path, pack_path) if pack_name else ""
@@ -401,9 +407,13 @@ def index_asset(
 
     asset_id = conn.execute("SELECT id FROM assets WHERE path = ?", [rel_path]).fetchone()[0]
 
-    # Extract and add tags
+    # Extract and add tags from path
     tags = extract_tags_from_path(file_path, asset_root)
     add_tags(conn, asset_id, tags, "path")
+
+    # Extract and add tags from Aseprite file
+    if ase_info and ase_info.get("tags"):
+        add_tags(conn, asset_id, ase_info["tags"], "aseprite")
 
     # Extract colors
     if file_path.suffix.lower() in IMAGE_EXTENSIONS:
@@ -441,9 +451,9 @@ def add_tags(conn: sqlite3.Connection, asset_id: int, tags: list[str], source: s
 
 
 def scan_assets(asset_root: Path) -> list[Path]:
-    """Scan directory for asset files."""
+    """Scan directory for image and Aseprite files."""
     assets = []
-    for ext in ASSET_EXTENSIONS:
+    for ext in IMAGE_EXTENSIONS | ASEPRITE_EXTENSIONS:
         assets.extend(asset_root.rglob(f"*{ext}"))
     return sorted(assets)
 

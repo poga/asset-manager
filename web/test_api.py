@@ -305,5 +305,49 @@ def test_search_preview_bounds_null_when_not_set(test_db):
     assert asset["preview_x"] is None
 
 
+def test_image_serves_aseprite_as_png(test_db, tmp_path):
+    """Image endpoint renders Aseprite files as PNG."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from test_aseprite_parser import create_minimal_aseprite
+    from api import set_db_path, set_assets_path
+
+    set_db_path(test_db)
+
+    # Create assets folder structure
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    pack_dir = assets_dir / "testpack"
+    pack_dir.mkdir()
+
+    # Create a test Aseprite file (red 4x4)
+    ase_file = pack_dir / "sprite.aseprite"
+    ase_file.write_bytes(create_minimal_aseprite(4, 4, (255, 0, 0, 255)))
+
+    # Add to database
+    conn = sqlite3.connect(test_db)
+    conn.execute(
+        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
+        "VALUES (20, 1, 'testpack/sprite.aseprite', 'sprite.aseprite', 'aseprite', 'ase123', 4, 4)"
+    )
+    conn.commit()
+    conn.close()
+
+    set_assets_path(assets_dir)
+
+    response = client.get("/api/image/20")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+
+    # Verify it's a valid PNG by checking the content
+    from PIL import Image
+    import io
+    img = Image.open(io.BytesIO(response.content))
+    assert img.size == (4, 4)
+    assert img.mode == "RGBA"
+    # Check the pixel is red
+    assert img.getpixel((2, 2)) == (255, 0, 0, 255)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -9,13 +9,19 @@
 # ///
 """Web API for asset search."""
 
+import io
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+
+# Add parent directory to path for aseprite_parser import
+sys.path.insert(0, str(Path(__file__).parent.parent))
+import aseprite_parser
 
 app = FastAPI(title="Asset Search API")
 
@@ -326,9 +332,12 @@ def filters():
     }
 
 
+ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
+
+
 @app.get("/api/image/{asset_id}")
 def image(asset_id: int):
-    """Serve asset image file."""
+    """Serve asset image file. Renders Aseprite files as PNG."""
     conn = get_db()
     row = conn.execute("SELECT path FROM assets WHERE id = ?", [asset_id]).fetchone()
     conn.close()
@@ -341,6 +350,14 @@ def image(asset_id: int):
     image_path = assets_dir / row["path"]
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image file not found")
+
+    # Render Aseprite files as PNG
+    if image_path.suffix.lower() in ASEPRITE_EXTENSIONS:
+        img = aseprite_parser.render_first_frame(image_path)
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        return Response(content=buffer.getvalue(), media_type="image/png")
 
     return FileResponse(image_path)
 

@@ -337,6 +337,31 @@ class TestDetectPack:
         assert path == temp_dir / "MyPack_v1.0"
 
 
+class TestScanAssets:
+    """Tests for scan_assets function."""
+
+    def test_scans_image_and_aseprite_files(self, temp_dir):
+        """scan_assets should return both image and aseprite files."""
+        pack_dir = temp_dir / "TestPack"
+        pack_dir.mkdir()
+
+        # Create various files
+        (pack_dir / "sprite.png").touch()
+        (pack_dir / "animation.gif").touch()
+        (pack_dir / "source.aseprite").touch()
+        (pack_dir / "source2.ase").touch()
+        (pack_dir / "readme.txt").touch()
+
+        files = assetindex.scan_assets(temp_dir)
+        filenames = {f.name for f in files}
+
+        assert "sprite.png" in filenames
+        assert "animation.gif" in filenames
+        assert "source.aseprite" in filenames
+        assert "source2.ase" in filenames
+        assert "readme.txt" not in filenames
+
+
 # =============================================================================
 # Unit Tests: assetsearch.py
 # =============================================================================
@@ -744,6 +769,83 @@ class TestIndexAssetPreviewBounds:
 
         assert row["preview_x"] is None
         assert row["preview_y"] is None
+        conn.close()
+
+
+class TestAsepriteIndexing:
+    """Tests for indexing Aseprite files."""
+
+    def test_indexes_aseprite_dimensions(self, temp_dir):
+        """Indexing stores width/height from Aseprite file."""
+        from test_aseprite_parser import create_minimal_aseprite
+
+        ase_path = temp_dir / "TestPack" / "sprite.aseprite"
+        ase_path.parent.mkdir(parents=True)
+        ase_path.write_bytes(create_minimal_aseprite(48, 32))
+
+        db_path = temp_dir / "test.db"
+        conn = assetindex.get_db(db_path)
+        assetindex.index_asset(conn, ase_path, temp_dir)
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT width, height, filetype FROM assets WHERE filename = 'sprite.aseprite'"
+        ).fetchone()
+
+        assert row["width"] == 48
+        assert row["height"] == 32
+        assert row["filetype"] == "aseprite"
+        conn.close()
+
+    def test_indexes_aseprite_tags(self, temp_dir):
+        """Indexing extracts animation tags from Aseprite file."""
+        from test_aseprite_parser import create_minimal_aseprite
+
+        ase_path = temp_dir / "TestPack" / "character.aseprite"
+        ase_path.parent.mkdir(parents=True)
+        ase_path.write_bytes(create_minimal_aseprite(
+            32, 32,
+            tags=[("idle", 0, 0), ("walk", 0, 0)]
+        ))
+
+        db_path = temp_dir / "test.db"
+        conn = assetindex.get_db(db_path)
+        assetindex.index_asset(conn, ase_path, temp_dir)
+        conn.commit()
+
+        # Check tags were added
+        tags = conn.execute("""
+            SELECT t.name FROM tags t
+            JOIN asset_tags at ON t.id = at.tag_id
+            JOIN assets a ON a.id = at.asset_id
+            WHERE a.filename = 'character.aseprite' AND at.source = 'aseprite'
+        """).fetchall()
+        tag_names = {row[0] for row in tags}
+
+        assert "idle" in tag_names
+        assert "walk" in tag_names
+        conn.close()
+
+    def test_indexes_ase_extension(self, temp_dir):
+        """Indexing works with .ase extension too."""
+        from test_aseprite_parser import create_minimal_aseprite
+
+        ase_path = temp_dir / "TestPack" / "sprite.ase"
+        ase_path.parent.mkdir(parents=True)
+        ase_path.write_bytes(create_minimal_aseprite(16, 16))
+
+        db_path = temp_dir / "test.db"
+        conn = assetindex.get_db(db_path)
+        assetindex.index_asset(conn, ase_path, temp_dir)
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT width, height, filetype FROM assets WHERE filename = 'sprite.ase'"
+        ).fetchone()
+
+        assert row["width"] == 16
+        assert row["height"] == 16
+        assert row["filetype"] == "ase"
         conn.close()
 
 
