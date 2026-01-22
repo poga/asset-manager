@@ -3,8 +3,8 @@ import { mount } from '@vue/test-utils'
 import AssetGrid from '../src/components/AssetGrid.vue'
 
 const mockAssets = [
-  { id: 1, filename: 'goblin.png', path: '/assets/goblin.png', width: 64, height: 64 },
-  { id: 2, filename: 'orc.png', path: '/assets/orc.png', width: 128, height: 128 },
+  { id: 1, filename: 'goblin.png', path: '/assets/goblin.png', width: 64, height: 64, pack: 'fantasy-pack' },
+  { id: 2, filename: 'orc.png', path: '/assets/orc.png', width: 128, height: 128, pack: 'monster-pack' },
 ]
 
 describe('AssetGrid', () => {
@@ -33,7 +33,7 @@ describe('AssetGrid', () => {
     const wrapper = mount(AssetGrid, {
       props: { assets: mockAssets }
     })
-    await wrapper.find('.asset-item').trigger('click')
+    await wrapper.find('.asset-image-container').trigger('click')
     expect(wrapper.emitted('select')).toBeTruthy()
     expect(wrapper.emitted('select')[0]).toEqual([1])
   })
@@ -43,5 +43,22 @@ describe('AssetGrid', () => {
       props: { assets: [] }
     })
     expect(wrapper.text()).toContain('No results')
+  })
+
+  it('shows pack name on asset cards', () => {
+    const wrapper = mount(AssetGrid, {
+      props: { assets: mockAssets }
+    })
+    expect(wrapper.text()).toContain('fantasy-pack')
+    expect(wrapper.text()).toContain('monster-pack')
+  })
+
+  it('emits view-pack event when pack name clicked', async () => {
+    const wrapper = mount(AssetGrid, {
+      props: { assets: mockAssets }
+    })
+    await wrapper.find('.asset-pack').trigger('click')
+    expect(wrapper.emitted('view-pack')).toBeTruthy()
+    expect(wrapper.emitted('view-pack')[0]).toEqual(['fantasy-pack'])
   })
 })
