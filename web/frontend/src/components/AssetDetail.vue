@@ -73,14 +73,16 @@ defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack'])
 .back-btn {
   background: none;
   border: none;
-  color: #007bff;
+  color: var(--color-accent);
   cursor: pointer;
   padding: 0.5rem 0;
   font-size: 0.875rem;
   margin-bottom: 1rem;
+  transition: color 150ms;
 }
 
 .back-btn:hover {
+  color: var(--color-accent-hover);
   text-decoration: underline;
 }
 
@@ -96,9 +98,10 @@ defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack'])
   max-height: 400px;
   object-fit: contain;
   image-rendering: pixelated;
-  background: #f8f8f8;
-  border: 1px solid #e0e0e0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
+  box-shadow: var(--shadow-card);
 }
 
 .asset-info {
@@ -109,10 +112,11 @@ defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack'])
 h2 {
   margin: 0 0 0.5rem;
   font-size: 1.25rem;
+  color: var(--color-text-primary);
 }
 
 .path {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.875rem;
   word-break: break-all;
   margin: 0 0 1rem;
@@ -120,6 +124,7 @@ h2 {
 
 .metadata {
   margin-bottom: 1rem;
+  color: var(--color-text-secondary);
 }
 
 .metadata div {
@@ -128,11 +133,13 @@ h2 {
 
 .tags {
   margin-bottom: 1rem;
+  color: var(--color-text-secondary);
 }
 
 .tag {
   display: inline-block;
-  background: #e0e0e0;
+  background: var(--color-accent-light);
+  color: var(--color-accent-hover);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   margin-left: 0.25rem;
@@ -141,6 +148,7 @@ h2 {
 
 .colors {
   margin-bottom: 1rem;
+  color: var(--color-text-secondary);
 }
 
 .color-swatch {
@@ -149,7 +157,7 @@ h2 {
   height: 24px;
   border-radius: 4px;
   margin-left: 0.25rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border);
   vertical-align: middle;
 }
 
@@ -165,32 +173,34 @@ h2 {
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.875rem;
+  transition: background-color 150ms;
 }
 
 .add-cart-btn {
-  background: #007bff;
+  background: var(--color-accent);
   color: white;
 }
 
 .add-cart-btn:hover {
-  background: #0056b3;
+  background: var(--color-accent-hover);
 }
 
 .similar-btn {
-  background: #6c757d;
-  color: white;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
 }
 
 .similar-btn:hover {
-  background: #545b62;
+  background: var(--color-border);
 }
 
 .pack-btn {
-  background: #28a745;
+  background: var(--color-success);
   color: white;
 }
 
 .pack-btn:hover {
-  background: #218838;
+  background: #0a9b6e;
 }
 </style>
