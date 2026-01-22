@@ -162,12 +162,6 @@ class TestGetImageInfo:
         assert info["width"] == 64
         assert info["height"] == 32
 
-    def test_detects_horizontal_spritesheet(self, sample_image):
-        info = assetindex.get_image_info(sample_image)
-        assert info["frame_count"] == 2
-        assert info["frame_width"] == 32
-        assert info["frame_height"] == 32
-
     def test_handles_invalid_file(self, temp_dir):
         bad_file = temp_dir / "not_an_image.txt"
         bad_file.write_text("not an image")
@@ -327,29 +321,6 @@ class TestComputePhash:
 
         phash = assetindex.compute_phash(bad_file)
         assert phash is None
-
-
-class TestParseAnimationInfo:
-    """Tests for parse_animation_info function."""
-
-    def test_parses_frame_size(self, temp_dir):
-        info_file = temp_dir / "_AnimationInfo.txt"
-        info_file.write_text("Frame size: 32x32px")
-
-        info = assetindex.parse_animation_info(info_file)
-        assert info["frame_size"] == "32x32"
-
-    def test_parses_different_sizes(self, temp_dir):
-        info_file = temp_dir / "_AnimationInfo.txt"
-        info_file.write_text("- 64x64px: For all animations")
-
-        info = assetindex.parse_animation_info(info_file)
-        assert info["frame_size"] == "64x64"
-
-    def test_handles_missing_file(self, temp_dir):
-        missing = temp_dir / "nonexistent.txt"
-        info = assetindex.parse_animation_info(missing)
-        assert info == {}
 
 
 class TestDetectPack:
@@ -724,76 +695,6 @@ class TestCLI:
 # =============================================================================
 # Sprite Frames Schema Tests
 # =============================================================================
-
-
-class TestSpriteAnalysisIntegration:
-    """Tests for sprite analysis during indexing."""
-
-    def test_stores_sprite_frames(self, temp_dir):
-        """Indexing stores sprite frames for detected spritesheets."""
-        # Create a simple 64x32 spritesheet (2 frames)
-        img_path = temp_dir / "TestPack" / "sprite.png"
-        img_path.parent.mkdir(parents=True)
-        img = Image.new("RGBA", (64, 32), (100, 100, 100, 255))
-        img.save(img_path)
-
-        db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
-
-        # Index the file
-        assetindex.index_asset(conn, img_path, temp_dir)
-        conn.commit()
-
-        # Check frames were stored
-        asset_id = conn.execute(
-            "SELECT id FROM assets WHERE filename = 'sprite.png'"
-        ).fetchone()[0]
-
-        frames = conn.execute(
-            "SELECT * FROM sprite_frames WHERE asset_id = ? ORDER BY frame_index",
-            [asset_id]
-        ).fetchall()
-
-        assert len(frames) == 2
-        assert frames[0]["width"] == 32
-        assert frames[1]["x"] == 32
-
-        conn.close()
-
-    def test_uses_animation_info_for_frame_detection(self, temp_dir):
-        """Frame detection uses _AnimationInfo.txt when available."""
-        # Create a 128x64 image (could be 4x2 grid of 32x32 or 2x1 of 64x64)
-        pack_dir = temp_dir / "TestPack"
-        pack_dir.mkdir()
-        img_path = pack_dir / "sprite.png"
-        img = Image.new("RGBA", (128, 64), (100, 100, 100, 255))
-        img.save(img_path)
-
-        # Create animation info specifying 32x32 frames
-        info_path = pack_dir / "_AnimationInfo.txt"
-        info_path.write_text("Frame size: 32x32px")
-
-        db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
-
-        assetindex.index_asset(conn, img_path, temp_dir)
-        conn.commit()
-
-        asset_id = conn.execute(
-            "SELECT id FROM assets WHERE filename = 'sprite.png'"
-        ).fetchone()[0]
-
-        frames = conn.execute(
-            "SELECT * FROM sprite_frames WHERE asset_id = ? ORDER BY frame_index",
-            [asset_id]
-        ).fetchall()
-
-        # Should detect 4x2 = 8 frames of 32x32
-        assert len(frames) == 8
-        assert frames[0]["width"] == 32
-        assert frames[0]["height"] == 32
-
-        conn.close()
 
 
 class TestPreviewBoundsSchema:

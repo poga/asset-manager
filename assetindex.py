@@ -153,27 +153,11 @@ def extract_version(name: str) -> Optional[str]:
 
 
 def get_image_info(path: Path) -> dict:
-    """Extract image dimensions and frame info."""
+    """Extract image dimensions."""
     try:
         with Image.open(path) as img:
             width, height = img.size
-            # Detect spritesheet frames (assume square frames if width > height)
-            frame_count = 1
-            frame_width = width
-            frame_height = height
-            if width > height and height > 0 and width % height == 0:
-                frame_count = width // height
-                frame_width = height
-            elif height > width and width > 0 and height % width == 0:
-                frame_count = height // width
-                frame_height = width
-            return {
-                "width": width,
-                "height": height,
-                "frame_count": frame_count,
-                "frame_width": frame_width,
-                "frame_height": frame_height,
-            }
+            return {"width": width, "height": height}
     except Exception:
         return {}
 
@@ -330,80 +314,6 @@ def extract_colors(path: Path, num_colors: int = 5) -> list[tuple[str, float]]:
         return []
 
 
-def parse_animation_info(path: Path) -> dict:
-    """Parse _AnimationInfo.txt file."""
-    info = {}
-    try:
-        text = path.read_text()
-        # Parse frame size
-        match = re.search(r"(\d+)x(\d+)px", text)
-        if match:
-            info["frame_size"] = f"{match.group(1)}x{match.group(2)}"
-
-        # Parse frame durations
-        durations = re.findall(r"(\d+)ms:\s*([^.]+)", text)
-        if durations:
-            info["durations"] = {anim.strip().lower(): int(ms) for ms, anim in durations}
-    except Exception:
-        pass
-    return info
-
-
-def detect_frames(image_path: Path, anim_info: dict) -> list[dict]:
-    """
-    Detect frames using animation info or heuristics.
-
-    Priority:
-    1. Use _AnimationInfo.txt frame size if available
-    2. Fall back to dimension-based heuristics
-    """
-    try:
-        with Image.open(image_path) as img:
-            width, height = img.size
-    except Exception:
-        return []
-
-    # Get frame size from animation info
-    frame_size = anim_info.get("frame_size")
-    if frame_size:
-        match = re.match(r"(\d+)x(\d+)", frame_size)
-        if match:
-            fw, fh = int(match.group(1)), int(match.group(2))
-            if width % fw == 0 and height % fh == 0:
-                cols = width // fw
-                rows = height // fh
-                frames = []
-                for row in range(rows):
-                    for col in range(cols):
-                        frames.append({
-                            "index": row * cols + col,
-                            "x": col * fw,
-                            "y": row * fh,
-                            "width": fw,
-                            "height": fh,
-                        })
-                return frames
-
-    # Heuristic: horizontal strip of square frames
-    if width > height and height > 0 and width % height == 0:
-        frame_count = width // height
-        return [
-            {"index": i, "x": i * height, "y": 0, "width": height, "height": height}
-            for i in range(frame_count)
-        ]
-
-    # Heuristic: vertical strip of square frames
-    if height > width and width > 0 and height % width == 0:
-        frame_count = height // width
-        return [
-            {"index": i, "x": 0, "y": i * width, "width": width, "height": width}
-            for i in range(frame_count)
-        ]
-
-    # Single frame
-    return [{"index": 0, "x": 0, "y": 0, "width": width, "height": height}]
-
-
 def extract_tags_from_path(path: Path, asset_root: Path) -> list[str]:
     """Extract tags from file path."""
     rel_path = path.relative_to(asset_root)
@@ -459,27 +369,6 @@ def get_category(path: Path, pack_path: Path) -> str:
     return ""
 
 
-def store_sprite_frames(conn: sqlite3.Connection, asset_id: int, frames: list[dict]):
-    """Store sprite frame data for an asset."""
-    # Clear existing frames
-    conn.execute("DELETE FROM sprite_frames WHERE asset_id = ?", [asset_id])
-
-    # Insert new frames
-    for frame in frames:
-        conn.execute("""
-            INSERT INTO sprite_frames (asset_id, frame_index, x, y, width, height, duration_ms)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, [
-            asset_id,
-            frame["index"],
-            frame["x"],
-            frame["y"],
-            frame["width"],
-            frame["height"],
-            frame.get("duration_ms"),
-        ])
-
-
 def index_asset(
     conn: sqlite3.Connection,
     file_path: Path,
@@ -508,26 +397,12 @@ def index_asset(
     # Category
     category = get_category(file_path, pack_path) if pack_name else ""
 
-    # Check for animation info
-    anim_info = {}
-    for info_name in ["_AnimationInfo.txt", "AnimationInfo.txt"]:
-        info_path = file_path.parent / info_name
-        if info_path.exists():
-            anim_info = parse_animation_info(info_path)
-            break
-
-    # Detect frames
-    frames = []
-    if file_path.suffix.lower() in IMAGE_EXTENSIONS:
-        frames = detect_frames(file_path, anim_info)
-
     # Insert or update asset
     conn.execute(
         """INSERT OR REPLACE INTO assets
            (pack_id, path, filename, filetype, file_hash, file_size,
-            width, height, frame_count, frame_width, frame_height,
-            category, indexed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            width, height, category, indexed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             pack_id,
             rel_path,
@@ -537,9 +412,6 @@ def index_asset(
             file_path.stat().st_size,
             img_info.get("width"),
             img_info.get("height"),
-            len(frames) if frames else img_info.get("frame_count"),
-            frames[0]["width"] if frames else img_info.get("frame_width"),
-            frames[0]["height"] if frames else img_info.get("frame_height"),
             category,
             datetime.now(),
         ]
@@ -547,17 +419,9 @@ def index_asset(
 
     asset_id = conn.execute("SELECT id FROM assets WHERE path = ?", [rel_path]).fetchone()[0]
 
-    # Store sprite frames (if more than 1 frame)
-    if len(frames) > 1:
-        store_sprite_frames(conn, asset_id, frames)
-
     # Extract and add tags
     tags = extract_tags_from_path(file_path, asset_root)
     add_tags(conn, asset_id, tags, "path")
-
-    # Add frame size as tag if found in metadata
-    if anim_info.get("frame_size"):
-        add_tags(conn, asset_id, [anim_info["frame_size"]], "metadata")
 
     # Extract colors
     if file_path.suffix.lower() in IMAGE_EXTENSIONS:
@@ -701,8 +565,8 @@ def index(
             conn.execute(
                 """INSERT OR REPLACE INTO assets
                    (pack_id, path, filename, filetype, file_hash, file_size,
-                    width, height, frame_count, frame_width, frame_height, category, indexed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    width, height, category, indexed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [
                     pack_id,
                     rel_path,
@@ -712,9 +576,6 @@ def index(
                     file_path.stat().st_size,
                     img_info.get("width"),
                     img_info.get("height"),
-                    img_info.get("frame_count"),
-                    img_info.get("frame_width"),
-                    img_info.get("frame_height"),
                     category,
                     datetime.now(),
                 ]
@@ -724,24 +585,6 @@ def index(
             # Extract and add tags
             tags = extract_tags_from_path(file_path, asset_root)
             add_tags(conn, asset_id, tags, "path")
-
-            # Check for animation info in same or parent directory
-            anim_info = {}
-            for info_name in ["_AnimationInfo.txt", "AnimationInfo.txt"]:
-                info_path = file_path.parent / info_name
-                if info_path.exists():
-                    anim_info = parse_animation_info(info_path)
-                    break
-
-            # Add frame size as tag if found in metadata
-            if anim_info.get("frame_size"):
-                add_tags(conn, asset_id, [anim_info["frame_size"]], "metadata")
-
-            # Detect and store frames
-            if file_path.suffix.lower() in IMAGE_EXTENSIONS:
-                frames = detect_frames(file_path, anim_info)
-                if len(frames) > 1:
-                    store_sprite_frames(conn, asset_id, frames)
 
             # Extract colors for images
             if file_path.suffix.lower() in IMAGE_EXTENSIONS:
