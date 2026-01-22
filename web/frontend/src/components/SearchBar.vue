@@ -88,12 +88,21 @@ function handleClickOutside(event) {
   }
 }
 
+function handleKeydown(event) {
+  if (event.key === 'Escape') {
+    colorDropdownOpen.value = false
+    tagDropdownOpen.value = false
+  }
+}
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('keydown', handleKeydown)
 })
 
 function emitSearch() {
