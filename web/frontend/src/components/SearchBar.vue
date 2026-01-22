@@ -61,7 +61,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
   filters: {
@@ -77,6 +77,24 @@ const color = ref('')
 const tags = ref([])
 const colorDropdownOpen = ref(false)
 const tagDropdownOpen = ref(false)
+
+function handleClickOutside(event) {
+  const target = event.target
+  if (!target.closest('[data-filter="color"]')) {
+    colorDropdownOpen.value = false
+  }
+  if (!target.closest('[data-filter="tag"]')) {
+    tagDropdownOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 function emitSearch() {
   emit('search', {
