@@ -289,6 +289,7 @@ onUnmounted(() => {
   --color-accent-hover: #0f766e;
   --color-accent-light: #ccfbf1;
   --color-success: #10b981;
+  --color-success-hover: #0a9b6e;
   --color-danger: #ef4444;
 
   /* Shadows */

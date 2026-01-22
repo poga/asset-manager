@@ -201,6 +201,6 @@ h2 {
 }
 
 .pack-btn:hover {
-  background: #0a9b6e;
+  background: var(--color-success-hover);
 }
 </style>
