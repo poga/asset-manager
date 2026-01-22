@@ -1,5 +1,9 @@
 <template>
   <div class="search-bar">
+    <div class="pack-header" v-if="currentPack">
+      <span>Viewing: {{ currentPack }}</span>
+      <button class="clear-pack-btn" @click="$emit('clear-pack')">&times; Clear</button>
+    </div>
     <input
       type="text"
       v-model="query"
@@ -31,10 +35,14 @@ const props = defineProps({
   filters: {
     type: Object,
     required: true
+  },
+  currentPack: {
+    type: String,
+    default: null
   }
 })
 
-const emit = defineEmits(['search'])
+const emit = defineEmits(['search', 'clear-pack'])
 
 const query = ref('')
 const pack = ref('')
@@ -95,5 +103,31 @@ function removeTag(tag) {
 
 .tag:hover {
   background: #ccc;
+}
+
+.pack-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #e8f4fd;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.clear-pack-btn {
+  background: none;
+  border: 1px solid #007bff;
+  color: #007bff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.clear-pack-btn:hover {
+  background: #007bff;
+  color: white;
 }
 </style>

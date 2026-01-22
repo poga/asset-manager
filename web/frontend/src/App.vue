@@ -2,7 +2,7 @@
   <div class="app">
     <h1>Asset Search</h1>
 
-    <SearchBar :filters="filters" @search="handleSearch" />
+    <SearchBar :filters="filters" :current-pack="currentPack" @search="handleSearch" @clear-pack="clearPack" />
 
     <AssetGrid :assets="assets" @select="selectAsset" />
 
@@ -86,6 +86,12 @@ function viewPack(packName) {
   selectedAsset.value = null
   window.history.pushState({ route: 'pack', name: packName }, '', `/pack/${packName}`)
   loadPack(packName)
+}
+
+function clearPack() {
+  currentPack.value = null
+  window.history.pushState({ route: 'home' }, '', '/')
+  search({ q: null, tag: [], color: null, pack: null, type: null })
 }
 
 watch(selectedAsset, (newVal, oldVal) => {
