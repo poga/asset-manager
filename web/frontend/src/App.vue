@@ -4,7 +4,7 @@
 
     <SearchBar :filters="filters" :current-pack="currentPack" @search="handleSearch" @clear-pack="clearPack" />
 
-    <AssetGrid :assets="assets" @select="selectAsset" />
+    <AssetGrid :assets="assets" @select="selectAsset" @view-pack="viewPack" />
 
     <AssetModal
       v-if="selectedAsset"
