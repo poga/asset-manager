@@ -192,6 +192,10 @@ def search(
 
     where = " AND ".join(conditions) if conditions else "1=1"
 
+    # Random order for empty search (discoverability), deterministic for filtered
+    is_empty_search = not q and not tag and not color and not pack and not type
+    order_by = "RANDOM()" if is_empty_search else "a.path"
+
     sql = f"""
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
                a.preview_x, a.preview_y, a.preview_width, a.preview_height,
@@ -203,7 +207,7 @@ def search(
         LEFT JOIN tags tg ON at.tag_id = tg.id
         WHERE {where}
         GROUP BY a.id
-        ORDER BY a.path
+        ORDER BY {order_by}
         LIMIT ?
     """
     params.append(limit)

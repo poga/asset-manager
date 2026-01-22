@@ -524,5 +524,65 @@ def test_filters_returns_pack_counts(test_client, sample_db):
     assert "count" in data["packs"][0]
 
 
+def test_empty_search_returns_random_order(test_db):
+    """Empty search (no filters) returns randomly ordered results."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # Add more assets to make randomness detectable
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    for i in range(3, 20):
+        conn.execute(
+            "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
+            f"VALUES ({i}, 1, '/assets/creatures/asset{i}.png', 'asset{i}.png', 'png', 'hash{i}', 64, 64)"
+        )
+    conn.commit()
+    conn.close()
+
+    # Make multiple requests and check if order varies
+    orders = []
+    for _ in range(5):
+        response = client.get("/api/search")
+        assert response.status_code == 200
+        data = response.json()
+        order = [a["id"] for a in data["assets"]]
+        orders.append(tuple(order))
+
+    # At least one pair should have different order (random)
+    unique_orders = set(orders)
+    assert len(unique_orders) > 1, "Empty search should return randomly ordered results"
+
+
+def test_filtered_search_returns_deterministic_order(test_db):
+    """Search with filters returns deterministic (path-based) order."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # Add more assets to make ordering detectable
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    for i in range(3, 10):
+        conn.execute(
+            "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height) "
+            f"VALUES ({i}, 1, '/assets/creatures/asset{i:02d}.png', 'asset{i:02d}.png', 'png', 'hash{i}', 64, 64)"
+        )
+    conn.commit()
+    conn.close()
+
+    # Make multiple requests with a filter - should always get same order
+    orders = []
+    for _ in range(3):
+        response = client.get("/api/search?pack=creatures")
+        assert response.status_code == 200
+        data = response.json()
+        order = [a["id"] for a in data["assets"]]
+        orders.append(tuple(order))
+
+    # All orders should be the same (deterministic)
+    unique_orders = set(orders)
+    assert len(unique_orders) == 1, "Filtered search should return deterministic order"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
