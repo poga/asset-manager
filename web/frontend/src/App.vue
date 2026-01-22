@@ -24,7 +24,7 @@
       </aside>
 
       <main class="middle-panel">
-        <SearchBar :filters="filters" @search="handleSearch" />
+        <SearchBar ref="searchBarRef" :filters="filters" @search="handleSearch" />
 
         <AssetDetail
           v-if="selectedAsset"
@@ -33,6 +33,7 @@
           @add-to-cart="addToCart"
           @find-similar="findSimilar"
           @view-pack="viewPack"
+          @tag-click="handleTagClick"
         />
 
         <AssetGrid
@@ -64,6 +65,7 @@ import { parseRoute } from './router.js'
 const filters = ref({ packs: [], tags: [], colors: [] })
 const assets = ref([])
 const selectedAsset = ref(null)
+const searchBarRef = ref(null)
 const selectedPacks = ref([])
 const cartItems = ref([])
 const currentSearchParams = ref({})
@@ -141,6 +143,13 @@ function handleSearch(params) {
   currentSearchParams.value = params
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => search(params), 150)
+}
+
+function handleTagClick(tag) {
+  selectedAsset.value = null
+  if (searchBarRef.value) {
+    searchBarRef.value.addTagExternal(tag)
+  }
 }
 
 async function selectAsset(id) {
