@@ -51,12 +51,14 @@
         </button>
       </div>
     </div>
-    <span v-for="t in tags" :key="t" class="tag" :title="t" @click="removeTag(t)">
-      <span class="tag-text">{{ t }}</span>
-      <svg class="tag-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M18 6L6 18M6 6l12 12"/>
-      </svg>
-    </span>
+    <div v-if="tags.length" class="tags-row">
+      <span v-for="t in tags" :key="t" class="tag" :title="t" @click="removeTag(t)">
+        <span class="tag-text">{{ t }}</span>
+        <svg class="tag-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </span>
+    </div>
   </div>
 </template>
 
@@ -189,6 +191,13 @@ defineExpose({ addTagExternal })
   color: var(--color-text-muted);
 }
 
+.tags-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .tag {
   display: inline-flex;
   align-items: center;
@@ -213,12 +222,7 @@ defineExpose({ addTagExternal })
   width: 12px;
   height: 12px;
   flex-shrink: 0;
-  opacity: 0;
   color: var(--color-text-muted);
-}
-
-.tag:hover .tag-close {
-  opacity: 1;
 }
 
 .tag:hover {
