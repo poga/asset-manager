@@ -285,7 +285,7 @@ describe('App URL routing', () => {
     expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/search'))
   })
 
-  it('reloads default search when navigating back to home from asset', async () => {
+  it('reloads default search when navigating back to home from asset that was accessed from similar view', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
@@ -309,6 +309,67 @@ describe('App URL routing', () => {
 
     // Should have called search API to reload default results
     expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/search'))
+  })
+
+  it('preserves assets when navigating back from asset to home (no prior similar/pack view)', async () => {
+    // Mock search to return specific assets
+    const homeAssets = [
+      { id: 1, filename: 'home1.png', path: '/home1.png', pack: 'test', tags: [], width: 32, height: 32 },
+      { id: 2, filename: 'home2.png', path: '/home2.png', pack: 'test', tags: [], width: 32, height: 32 }
+    ]
+    mockFetch.mockImplementation((url) => {
+      if (url === '/api/filters') {
+        return Promise.resolve({
+          json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
+        })
+      }
+      if (url.startsWith('/api/search')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({ assets: homeAssets })
+        })
+      }
+      if (url.startsWith('/api/asset/')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({
+            id: 1,
+            filename: 'home1.png',
+            path: '/home1.png',
+            pack: 'test',
+            width: 32,
+            height: 32,
+            tags: [],
+            colors: [],
+            related: []
+          })
+        })
+      }
+      return Promise.resolve({ json: () => Promise.resolve({}) })
+    })
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    // Verify initial assets loaded
+    expect(wrapper.vm.assets.length).toBe(2)
+    mockFetch.mockClear()
+
+    // Open an asset from home view
+    wrapper.vm.selectAsset(1)
+    await flushPromises()
+    mockFetch.mockClear()
+
+    // Navigate back to home via popstate (browser back button)
+    window.history.replaceState({}, '', '/')
+    window.dispatchEvent(new PopStateEvent('popstate', {
+      state: { route: 'home' }
+    }))
+    await flushPromises()
+
+    // Should NOT have called search API - assets should be preserved
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/search'))
+    // Assets should still be the same
+    expect(wrapper.vm.assets.length).toBe(2)
+    expect(wrapper.vm.assets[0].filename).toBe('home1.png')
   })
 
   it('loads pack assets when navigating to /pack/:name', async () => {

@@ -68,6 +68,7 @@ const selectedPacks = ref([])
 const cartItems = ref([])
 const currentSearchParams = ref({})
 const isDark = ref(false)
+const isDefaultHomeView = ref(true)
 
 let debounceTimer = null
 let skipNextPush = false
@@ -151,6 +152,7 @@ async function selectAsset(id) {
 async function findSimilar(id) {
   skipNextPush = true
   selectedAsset.value = null
+  isDefaultHomeView.value = false
   const res = await fetch(`/api/similar/${id}`)
   const data = await res.json()
   assets.value = data.assets
@@ -158,12 +160,14 @@ async function findSimilar(id) {
 }
 
 async function loadSimilarFromUrl(id) {
+  isDefaultHomeView.value = false
   const res = await fetch(`/api/similar/${id}`)
   const data = await res.json()
   assets.value = data.assets
 }
 
 async function loadPack(packName) {
+  isDefaultHomeView.value = false
   selectedPacks.value = [packName]
   await search(currentSearchParams.value)
 }
@@ -171,6 +175,7 @@ async function loadPack(packName) {
 function viewPack(packName) {
   skipNextPush = true
   selectedAsset.value = null
+  isDefaultHomeView.value = false
   selectedPacks.value = [packName]
   window.history.pushState({ route: 'pack', name: packName }, '', `/pack/${packName}`)
 }
@@ -221,8 +226,14 @@ function handlePopState(event) {
   skipNextPush = true
   if (route.name === 'home') {
     selectedAsset.value = null
-    selectedPacks.value = []  // Empty = all packs
-    search({ q: null, tag: [], color: null, type: null })
+    const hadPackFilter = selectedPacks.value.length > 0
+    // Only re-fetch if we were on a non-home view (similar/pack) or had pack filters
+    if (!isDefaultHomeView.value || hadPackFilter) {
+      selectedPacks.value = []  // Clear pack filter (triggers watcher, but we also call search)
+      search({ q: null, tag: [], color: null, type: null })
+      isDefaultHomeView.value = true
+    }
+    // Otherwise, keep existing assets - just close asset detail view
   } else if (route.name === 'asset') {
     selectAssetFromUrl(route.params.id)
   } else if (route.name === 'similar') {
