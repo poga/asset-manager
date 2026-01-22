@@ -461,6 +461,29 @@ def test_download_cart_invalid_ids_skipped(test_client, sample_db):
     assert response.headers["content-type"] == "application/zip"
 
 
+def test_download_cart_includes_metadata_txt(test_client, sample_db):
+    """Test download cart includes metadata.txt with asset info."""
+    import zipfile
+    import io
+
+    # Fixture already has: asset 1 with tags 'creature', 'goblin' and color '#00ff00'
+    response = test_client.post("/api/download-cart", json={"asset_ids": [1]})
+    assert response.status_code == 200
+
+    # Extract ZIP and check for metadata.txt
+    zip_buffer = io.BytesIO(response.content)
+    with zipfile.ZipFile(zip_buffer, "r") as zf:
+        assert "metadata.txt" in zf.namelist()
+        metadata = zf.read("metadata.txt").decode("utf-8")
+
+        # Check that asset info is included
+        assert "goblin.png" in metadata
+        assert "creature" in metadata
+        assert "goblin" in metadata
+        assert "#00ff00" in metadata
+        assert "64x64" in metadata or "64 x 64" in metadata
+
+
 def test_search_multiple_packs(test_client, sample_db):
     """Test search with multiple pack filters."""
     # Add a second pack with assets

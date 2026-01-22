@@ -428,18 +428,67 @@ def download_cart(request: DownloadCartRequest):
 
     conn = get_db()
 
-    # Get asset paths
+    # Get asset info with pack name
     placeholders = ",".join("?" * len(request.asset_ids))
     rows = conn.execute(
-        f"SELECT id, path, filename FROM assets WHERE id IN ({placeholders})",
+        f"""SELECT a.id, a.path, a.filename, a.width, a.height, p.name as pack_name
+            FROM assets a
+            LEFT JOIN packs p ON a.pack_id = p.id
+            WHERE a.id IN ({placeholders})""",
         request.asset_ids
     ).fetchall()
-    conn.close()
 
     if not rows:
+        conn.close()
         raise HTTPException(status_code=404, detail="No valid assets found")
 
+    # Get tags for all assets
+    asset_tags = {}
+    tag_rows = conn.execute(
+        f"""SELECT at.asset_id, t.name FROM asset_tags at
+            JOIN tags t ON at.tag_id = t.id
+            WHERE at.asset_id IN ({placeholders})""",
+        request.asset_ids
+    ).fetchall()
+    for tag_row in tag_rows:
+        asset_id = tag_row["asset_id"]
+        if asset_id not in asset_tags:
+            asset_tags[asset_id] = []
+        asset_tags[asset_id].append(tag_row["name"])
+
+    # Get colors for all assets
+    asset_colors = {}
+    color_rows = conn.execute(
+        f"""SELECT asset_id, color_hex, percentage FROM asset_colors
+            WHERE asset_id IN ({placeholders})
+            ORDER BY asset_id, percentage DESC""",
+        request.asset_ids
+    ).fetchall()
+    for color_row in color_rows:
+        asset_id = color_row["asset_id"]
+        if asset_id not in asset_colors:
+            asset_colors[asset_id] = []
+        asset_colors[asset_id].append(f"{color_row['color_hex']} ({color_row['percentage']:.0%})")
+
+    conn.close()
+
     assets_dir = get_assets_path()
+
+    # Build metadata.txt content
+    metadata_lines = ["Asset Metadata", "=" * 50, ""]
+    for row in rows:
+        metadata_lines.append(f"File: {row['filename']}")
+        if row["pack_name"]:
+            metadata_lines.append(f"Pack: {row['pack_name']}")
+        if row["width"] and row["height"]:
+            metadata_lines.append(f"Size: {row['width']}x{row['height']}")
+        tags = asset_tags.get(row["id"], [])
+        if tags:
+            metadata_lines.append(f"Tags: {', '.join(tags)}")
+        colors = asset_colors.get(row["id"], [])
+        if colors:
+            metadata_lines.append(f"Colors: {', '.join(colors)}")
+        metadata_lines.append("")
 
     # Create ZIP in memory
     buffer = io.BytesIO()
@@ -449,6 +498,8 @@ def download_cart(request: DownloadCartRequest):
             if file_path.exists():
                 # Use filename to avoid path issues
                 zf.write(file_path, row["filename"])
+        # Add metadata file
+        zf.writestr("metadata.txt", "\n".join(metadata_lines))
 
     buffer.seek(0)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
