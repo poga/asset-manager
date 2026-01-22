@@ -51,8 +51,11 @@
         </button>
       </div>
     </div>
-    <span v-for="t in tags" :key="t" class="tag" @click="removeTag(t)">
-      {{ t }} &times;
+    <span v-for="t in tags" :key="t" class="tag" :title="t" @click="removeTag(t)">
+      <span class="tag-text">{{ t }}</span>
+      <svg class="tag-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 6L6 18M6 6l12 12"/>
+      </svg>
     </span>
   </div>
 </template>
@@ -175,18 +178,39 @@ defineExpose({ addTagExternal })
 }
 
 .tag {
-  background: var(--color-accent-light);
-  color: var(--color-accent-hover);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  border-radius: 12px;
+  font-size: 0.8125rem;
   cursor: pointer;
-  font-size: 0.875rem;
-  transition: background-color 150ms;
+  max-width: 120px;
+}
+
+.tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-close {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--color-text-muted);
+}
+
+.tag:hover .tag-close {
+  opacity: 1;
 }
 
 .tag:hover {
-  background: var(--color-accent);
-  color: white;
+  background: var(--color-border);
 }
 
 .dropdown {
