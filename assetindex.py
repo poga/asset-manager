@@ -174,55 +174,25 @@ def compute_phash(path: Path) -> Optional[bytes]:
 
 def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]]:
     """
-    Find the bounding box of the first sprite in an image using flood-fill.
+    Find the bounding box of non-transparent content in an image.
 
-    Returns (x, y, width, height) or None if no sprite found or no alpha channel.
+    Returns (x, y, width, height) or None if no content found or no alpha channel.
+    Uses PIL's getbbox() which is implemented in C for speed.
     """
     try:
         with Image.open(path) as img:
-            # Only work with images that have an alpha channel
             if img.mode != "RGBA":
                 return None
 
-            width, height = img.size
-            pixels = img.load()
-
-            start_x, start_y = None, None
-            for y in range(height):
-                for x in range(width):
-                    if pixels[x, y][3] > 0:
-                        start_x, start_y = x, y
-                        break
-                if start_x is not None:
-                    break
-
-            if start_x is None:
+            # Get bounding box of non-zero alpha content (very fast, implemented in C)
+            alpha = img.split()[3]
+            bbox = alpha.getbbox()
+            if bbox is None:
                 return None
 
-            visited = set()
-            stack = [(start_x, start_y)]
-            min_x, min_y = start_x, start_y
-            max_x, max_y = start_x, start_y
-
-            while stack:
-                cx, cy = stack.pop()
-
-                min_x = min(min_x, cx)
-                min_y = min(min_y, cy)
-                max_x = max(max_x, cx)
-                max_y = max(max_y, cy)
-
-                for dx in [-1, 0, 1]:
-                    for dy in [-1, 0, 1]:
-                        if dx == 0 and dy == 0:
-                            continue
-                        nx, ny = cx + dx, cy + dy
-                        if (nx, ny) not in visited and 0 <= nx < width and 0 <= ny < height:
-                            if pixels[nx, ny][3] > 0:
-                                visited.add((nx, ny))
-                                stack.append((nx, ny))
-
-            return (min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+            # bbox is (left, upper, right, lower), convert to (x, y, width, height)
+            x, y, right, lower = bbox
+            return (x, y, right - x, lower - y)
     except Exception:
         return None
 
