@@ -45,7 +45,7 @@
             v-if="asset.pack"
             @click.stop="$emit('view-pack', asset.pack)"
           >{{ asset.pack }}</span>
-          <span class="filename">{{ asset.filename }}</span>
+          <span class="filename" :title="asset.filename">{{ asset.filename }}</span>
         </div>
       </div>
     </div>
@@ -82,13 +82,13 @@ const hoveredId = ref(null)
 }
 
 .asset-grid {
-  column-width: 220px;
+  column-width: 155px;
   column-gap: 1rem;
 }
 
 .asset-item {
   break-inside: avoid;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -111,15 +111,15 @@ const hoveredId = ref(null)
 
 .add-cart-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: none;
   background: #007bff;
   color: white;
-  font-size: 18px;
+  font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -132,14 +132,14 @@ const hoveredId = ref(null)
 
 .cart-indicator {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: #28a745;
   color: white;
-  font-size: 14px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -158,12 +158,12 @@ const hoveredId = ref(null)
 }
 
 .asset-info {
-  padding: 0.5rem;
+  padding: 0.375rem;
 }
 
 .asset-pack {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   color: #666;
   cursor: pointer;
   margin-bottom: 0.25rem;
@@ -176,8 +176,10 @@ const hoveredId = ref(null)
 
 .filename {
   display: block;
-  font-size: 0.875rem;
-  word-break: break-all;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .no-results {
