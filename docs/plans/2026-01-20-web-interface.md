@@ -4,7 +4,7 @@
 
 **Goal:** Vue 3 web interface with instant search for asset-manager, using FastAPI backend.
 
-**Architecture:** FastAPI wraps existing `assetsearch.py` query logic. Vue 3 SPA with composition API provides instant search with debouncing. Grid of thumbnails, modal for details, "Find Similar" action.
+**Architecture:** FastAPI wraps existing `search.py` query logic. Vue 3 SPA with composition API provides instant search with debouncing. Grid of thumbnails, modal for details, "Find Similar" action.
 
 **Tech Stack:** Python 3.11+, FastAPI, pytest. Vue 3, Vite, Vitest, Vue Test Utils.
 

@@ -4,7 +4,7 @@
 
 **Goal:** Build a SQLite-based game asset index with search, autotagging, and visual similarity features as single-file uv scripts.
 
-**Architecture:** Two standalone Python scripts with inline uv dependencies. `assetindex.py` handles indexing (heavier deps: pillow, imagehash). `assetsearch.py` handles queries (minimal deps: rich, typer). Both share the same SQLite database.
+**Architecture:** Two standalone Python scripts with inline uv dependencies. `index.py` handles indexing (heavier deps: pillow, imagehash). `search.py` handles queries (minimal deps: rich, typer). Both share the same SQLite database.
 
 **Tech Stack:** Python 3.11+, SQLite, uv (inline script dependencies), Pillow, imagehash, typer, rich
 
@@ -12,14 +12,14 @@
 
 ## Phase 1: Core Index (MVP)
 
-### Task 1: Create assetsearch.py with schema setup
+### Task 1: Create search.py with schema setup
 
 **Files:**
-- Create: `assetsearch.py`
+- Create: `search.py`
 
 **Step 1: Create the search script with schema**
 
-Create `assetsearch.py` with inline uv dependencies and database schema:
+Create `search.py` with inline uv dependencies and database schema:
 
 ```python
 #!/usr/bin/env -S uv run
@@ -140,7 +140,7 @@ def find_db() -> Path:
         db_path = parent / "assets.db"
         if db_path.exists():
             return db_path
-    raise typer.BadParameter("No assets.db found. Run assetindex.py first.")
+    raise typer.BadParameter("No assets.db found. Run index.py first.")
 
 
 @app.command()
@@ -409,8 +409,8 @@ if __name__ == "__main__":
 
 Run:
 ```bash
-chmod +x assetsearch.py
-uv run assetsearch.py --help
+chmod +x search.py
+uv run search.py --help
 ```
 
 Expected: Help output showing search, packs, tags, info, stats commands.
@@ -418,20 +418,20 @@ Expected: Help output showing search, packs, tags, info, stats commands.
 **Step 3: Commit**
 
 ```bash
-git add assetsearch.py
-git commit -m "feat: add assetsearch.py with schema and search commands"
+git add search.py
+git commit -m "feat: add search.py with schema and search commands"
 ```
 
 ---
 
-### Task 2: Create assetindex.py with file scanning
+### Task 2: Create index.py with file scanning
 
 **Files:**
-- Create: `assetindex.py`
+- Create: `index.py`
 
 **Step 1: Create the indexer script**
 
-Create `assetindex.py` with file scanning and basic metadata:
+Create `index.py` with file scanning and basic metadata:
 
 ```python
 #!/usr/bin/env -S uv run
@@ -481,7 +481,7 @@ TAG_ALIASES = {
     "anims": "animations",
 }
 
-# Schema (same as assetsearch.py)
+# Schema (same as search.py)
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS packs (
     id INTEGER PRIMARY KEY,
@@ -809,7 +809,7 @@ def update(
     """Update index (incremental, hash-based)."""
     if not db.exists():
         console.print(f"[red]Database not found: {db}[/red]")
-        console.print("Run 'assetindex.py index <path>' first.")
+        console.print("Run 'index.py index <path>' first.")
         raise typer.Exit(1)
 
     # Get asset root from first pack
@@ -839,8 +839,8 @@ if __name__ == "__main__":
 
 Run:
 ```bash
-chmod +x assetindex.py
-uv run assetindex.py --help
+chmod +x index.py
+uv run index.py --help
 ```
 
 Expected: Help output showing index and update commands.
@@ -849,7 +849,7 @@ Expected: Help output showing index and update commands.
 
 Run:
 ```bash
-uv run assetindex.py index assets/minifantasy --db assets.db
+uv run index.py index assets/minifantasy --db assets.db
 ```
 
 Expected: Progress bar, summary showing packs and assets indexed.
@@ -858,10 +858,10 @@ Expected: Progress bar, summary showing packs and assets indexed.
 
 Run:
 ```bash
-uv run assetsearch.py goblin
-uv run assetsearch.py --tag attack
-uv run assetsearch.py packs
-uv run assetsearch.py stats
+uv run search.py goblin
+uv run search.py --tag attack
+uv run search.py packs
+uv run search.py stats
 ```
 
 Expected: Results tables showing matching assets.
@@ -869,8 +869,8 @@ Expected: Results tables showing matching assets.
 **Step 5: Commit**
 
 ```bash
-git add assetindex.py
-git commit -m "feat: add assetindex.py with file scanning and autotagging"
+git add index.py
+git commit -m "feat: add index.py with file scanning and autotagging"
 ```
 
 ---
@@ -878,11 +878,11 @@ git commit -m "feat: add assetindex.py with file scanning and autotagging"
 ### Task 3: Add color extraction
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Add color extraction function**
 
-Add after the `get_image_info` function in `assetindex.py`:
+Add after the `get_image_info` function in `index.py`:
 
 ```python
 def extract_colors(path: Path, num_colors: int = 5) -> list[tuple[str, float]]:
@@ -932,8 +932,8 @@ In the `index` function, after `add_tags(conn, asset_id, tags, "path")`, add:
 
 Run:
 ```bash
-uv run assetindex.py index assets/minifantasy --db assets.db --force
-uv run assetsearch.py info 1
+uv run index.py index assets/minifantasy --db assets.db --force
+uv run search.py info 1
 ```
 
 Expected: Asset info shows colors.
@@ -941,20 +941,20 @@ Expected: Asset info shows colors.
 **Step 4: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "feat: add color extraction to indexer"
 ```
 
 ---
 
-### Task 4: Add color search to assetsearch.py
+### Task 4: Add color search to search.py
 
 **Files:**
-- Modify: `assetsearch.py`
+- Modify: `search.py`
 
 **Step 1: Add color option to search command**
 
-In `assetsearch.py`, update the `search` function signature to add:
+In `search.py`, update the `search` function signature to add:
 
 ```python
     color: Optional[str] = typer.Option(None, "--color", "-c", help="Filter by dominant color (hex or name)"),
@@ -1029,8 +1029,8 @@ In the `search` function, after the `if tag:` block, add:
 
 Run:
 ```bash
-uv run assetsearch.py --color green
-uv run assetsearch.py --color "#8b4513"
+uv run search.py --color green
+uv run search.py --color "#8b4513"
 ```
 
 Expected: Assets with matching dominant colors.
@@ -1038,8 +1038,8 @@ Expected: Assets with matching dominant colors.
 **Step 5: Commit**
 
 ```bash
-git add assetsearch.py
-git commit -m "feat: add color search to assetsearch.py"
+git add search.py
+git commit -m "feat: add color search to search.py"
 ```
 
 ---
@@ -1047,12 +1047,12 @@ git commit -m "feat: add color search to assetsearch.py"
 ### Task 5: Add perceptual hash and similarity search
 
 **Files:**
-- Modify: `assetindex.py`
-- Modify: `assetsearch.py`
+- Modify: `index.py`
+- Modify: `search.py`
 
-**Step 1: Add phash computation to assetindex.py**
+**Step 1: Add phash computation to index.py**
 
-Add import at top of `assetindex.py`:
+Add import at top of `index.py`:
 
 ```python
 import imagehash
@@ -1086,7 +1086,7 @@ After the color extraction block, add:
                     )
 ```
 
-**Step 3: Add similar command to assetsearch.py**
+**Step 3: Add similar command to search.py**
 
 Add import:
 
@@ -1192,8 +1192,8 @@ def similar(
 
 Run:
 ```bash
-uv run assetindex.py index assets/minifantasy --db assets.db --force
-uv run assetsearch.py similar 1
+uv run index.py index assets/minifantasy --db assets.db --force
+uv run search.py similar 1
 ```
 
 Expected: List of visually similar assets.
@@ -1201,7 +1201,7 @@ Expected: List of visually similar assets.
 **Step 5: Commit**
 
 ```bash
-git add assetindex.py assetsearch.py
+git add index.py search.py
 git commit -m "feat: add perceptual hash and similarity search"
 ```
 
@@ -1210,7 +1210,7 @@ git commit -m "feat: add perceptual hash and similarity search"
 ### Task 6: Add pack preview generation
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Add preview generation function**
 
@@ -1283,7 +1283,7 @@ At the end of the `index` function, before the final stats print, add:
 
 ```python
     # Generate pack previews
-    preview_dir = db.parent / ".assetindex" / "previews"
+    preview_dir = db.parent / ".index" / "previews"
     console.print("Generating pack previews...")
     for row in conn.execute("SELECT id, name, preview_path FROM packs"):
         if row["preview_path"]:
@@ -1301,8 +1301,8 @@ At the end of the `index` function, before the final stats print, add:
 
 Run:
 ```bash
-uv run assetindex.py index assets/minifantasy --db assets.db --force
-ls -la .assetindex/previews/
+uv run index.py index assets/minifantasy --db assets.db --force
+ls -la .index/previews/
 ```
 
 Expected: Preview images generated for each pack.
@@ -1310,7 +1310,7 @@ Expected: Preview images generated for each pack.
 **Step 4: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "feat: add pack preview generation"
 ```
 
@@ -1319,7 +1319,7 @@ git commit -m "feat: add pack preview generation"
 ### Task 7: Add metadata file parsing
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Add animation info parser**
 
@@ -1367,8 +1367,8 @@ In the index loop, after detecting the pack, add:
 
 Run:
 ```bash
-uv run assetindex.py index assets/minifantasy --db assets.db --force
-uv run assetsearch.py --tag 32x32
+uv run index.py index assets/minifantasy --db assets.db --force
+uv run search.py --tag 32x32
 ```
 
 Expected: Assets tagged with frame sizes from metadata.
@@ -1376,7 +1376,7 @@ Expected: Assets tagged with frame sizes from metadata.
 **Step 4: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "feat: add animation metadata parsing"
 ```
 
@@ -1385,7 +1385,7 @@ git commit -m "feat: add animation metadata parsing"
 ### Task 8: Add asset relationship linking
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Add relationship detection function**
 
@@ -1430,8 +1430,8 @@ At the end of the `index` function, after preview generation:
 
 Run:
 ```bash
-uv run assetindex.py index assets/minifantasy --db assets.db --force
-uv run assetsearch.py info 1
+uv run index.py index assets/minifantasy --db assets.db --force
+uv run search.py info 1
 ```
 
 Expected: Related assets shown in info output.
@@ -1439,7 +1439,7 @@ Expected: Related assets shown in info output.
 **Step 4: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "feat: add asset relationship detection"
 ```
 
@@ -1449,14 +1449,14 @@ git commit -m "feat: add asset relationship detection"
 
 After completing all tasks, you will have:
 
-1. `assetsearch.py` - Lightweight search script with:
+1. `search.py` - Lightweight search script with:
    - Filename/path search
    - Tag-based search
    - Color search
    - Similarity search (phash)
    - Pack listing, tag listing, stats, asset info
 
-2. `assetindex.py` - Indexer script with:
+2. `index.py` - Indexer script with:
    - File scanning with hash-based change detection
    - Image dimension and frame detection
    - Path-based autotagging
@@ -1468,4 +1468,4 @@ After completing all tasks, you will have:
 
 3. `assets.db` - SQLite database (single file, shareable)
 
-4. `.assetindex/previews/` - Generated pack preview images
+4. `.index/previews/` - Generated pack preview images

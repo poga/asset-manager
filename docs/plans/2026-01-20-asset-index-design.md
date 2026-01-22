@@ -23,7 +23,7 @@ A SQLite-based index for managing game development assets with search, autotaggi
         ┌─────────────────┼─────────────────┐
         ▼                                   ▼
 ┌───────────────────┐              ┌───────────────────┐
-│   assetindex.py   │              │  assetsearch.py   │
+│   index.py   │              │  search.py   │
 │  (build/update)   │              │  (query - daily)  │
 │                   │              │                   │
 │  pillow, imagehash│              │  rich, typer only │
@@ -183,30 +183,30 @@ db.semantic("medieval knight with sword")
 
 ```bash
 # Index your assets
-uv run assetindex.py ./assets --db assets.db
-uv run assetindex.py --update              # incremental update
+uv run index.py ./assets --db assets.db
+uv run index.py --update              # incremental update
 
 # Search
-uv run assetsearch.py goblin
-uv run assetsearch.py --tag creature --tag attack
-uv run assetsearch.py --pack creatures --color green
-uv run assetsearch.py --similar ./reference.png
+uv run search.py goblin
+uv run search.py --tag creature --tag attack
+uv run search.py --pack creatures --color green
+uv run search.py --similar ./reference.png
 
 # Utilities
-uv run assetsearch.py --packs              # list all packs
-uv run assetsearch.py --tags               # list all tags
-uv run assetsearch.py --info <id>          # asset details
+uv run search.py --packs              # list all packs
+uv run search.py --tags               # list all tags
+uv run search.py --info <id>          # asset details
 ```
 
 ## File Structure
 
 ```
-assetindex.py           # Indexer script (heavier deps)
-assetsearch.py          # Search script (minimal deps)
+index.py           # Indexer script (heavier deps)
+search.py          # Search script (minimal deps)
 
 your-assets-folder/
 ├── assets.db           # The index (shareable)
-├── .assetindex/
+├── .index/
 │   └── previews/       # Auto-generated pack previews
 └── assets/
     └── minifantasy/
@@ -215,11 +215,11 @@ your-assets-folder/
 
 ## Dependencies
 
-**assetsearch.py** (daily use):
+**search.py** (daily use):
 - rich
 - typer
 
-**assetindex.py** (indexing):
+**index.py** (indexing):
 - pillow
 - imagehash
 - rich

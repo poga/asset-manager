@@ -2,7 +2,7 @@
 
 ## Summary
 
-Convert `assetsearch.py` CLI output from Rich formatted tables to plain TSV (tab-separated values) for unix-style piping. Add a `help` subcommand for discoverability.
+Convert `search.py` CLI output from Rich formatted tables to plain TSV (tab-separated values) for unix-style piping. Add a `help` subcommand for discoverability.
 
 ## Output Format
 
@@ -79,9 +79,9 @@ Fields: distance, ID, path, pack
 Add `help` subcommand alongside existing `--help`:
 
 ```
-$ assetsearch.py help
+$ search.py help
 
-assetsearch - Search your game asset index
+search - Search your game asset index
 
 Commands:
   search    Search assets by name, tags, or filters
@@ -92,15 +92,15 @@ Commands:
   similar   Find visually similar assets
   help      Show help for a command
 
-Use 'assetsearch.py help <command>' for details.
+Use 'search.py help <command>' for details.
 ```
 
 ```
-$ assetsearch.py help search
+$ search.py help search
 
 search - Search assets by name, tags, or filters
 
-Usage: assetsearch.py search [QUERY] [OPTIONS]
+Usage: search.py search [QUERY] [OPTIONS]
 
 Arguments:
   QUERY    Search filename/path
@@ -131,4 +131,4 @@ Options:
 
 ### Files
 
-- `assetsearch.py` only
+- `search.py` only

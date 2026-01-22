@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Convert assetsearch.py from Rich formatted tables to plain TSV output and add help subcommand.
+**Goal:** Convert search.py from Rich formatted tables to plain TSV output and add help subcommand.
 
 **Architecture:** Remove Rich dependency, replace console.print() with print(), output tab-separated values. Add help command that prints usage info.
 
@@ -13,7 +13,7 @@
 ### Task 1: Remove Rich Dependency
 
 **Files:**
-- Modify: `assetsearch.py:1-18`
+- Modify: `search.py:1-18`
 
 **Step 1: Update script header to remove rich**
 
@@ -43,14 +43,14 @@ Delete line 49: `console = Console()`
 
 **Step 3: Verify script still parses**
 
-Run: `python -m py_compile assetsearch.py`
+Run: `python -m py_compile search.py`
 Expected: No output (success)
 
 **Step 4: Commit**
 
 ```bash
-git add assetsearch.py
-git commit -m "refactor: remove rich dependency from assetsearch"
+git add search.py
+git commit -m "refactor: remove rich dependency from search"
 ```
 
 ---
@@ -58,7 +58,7 @@ git commit -m "refactor: remove rich dependency from assetsearch"
 ### Task 2: Convert search Command to TSV
 
 **Files:**
-- Modify: `assetsearch.py:156-268`
+- Modify: `search.py:156-268`
 
 **Step 1: Update search to output TSV**
 
@@ -162,13 +162,13 @@ def search(
 
 **Step 2: Test manually**
 
-Run: `uv run assetsearch.py search --limit 5`
+Run: `uv run search.py search --limit 5`
 Expected: TSV output with 5 rows, tab-separated
 
 **Step 3: Commit**
 
 ```bash
-git add assetsearch.py
+git add search.py
 git commit -m "refactor: convert search command to TSV output"
 ```
 
@@ -177,7 +177,7 @@ git commit -m "refactor: convert search command to TSV output"
 ### Task 3: Convert packs Command to TSV
 
 **Files:**
-- Modify: `assetsearch.py:271-306`
+- Modify: `search.py:271-306`
 
 **Step 1: Update packs to output TSV**
 
@@ -209,13 +209,13 @@ def packs(
 
 **Step 2: Test manually**
 
-Run: `uv run assetsearch.py packs`
+Run: `uv run search.py packs`
 Expected: TSV output with pack info
 
 **Step 3: Commit**
 
 ```bash
-git add assetsearch.py
+git add search.py
 git commit -m "refactor: convert packs command to TSV output"
 ```
 
@@ -224,7 +224,7 @@ git commit -m "refactor: convert packs command to TSV output"
 ### Task 4: Convert tags Command to TSV
 
 **Files:**
-- Modify: `assetsearch.py:309-338`
+- Modify: `search.py:309-338`
 
 **Step 1: Update tags to output TSV**
 
@@ -259,13 +259,13 @@ def tags(
 
 **Step 2: Test manually**
 
-Run: `uv run assetsearch.py tags --limit 10`
+Run: `uv run search.py tags --limit 10`
 Expected: TSV output with tag names and counts
 
 **Step 3: Commit**
 
 ```bash
-git add assetsearch.py
+git add search.py
 git commit -m "refactor: convert tags command to TSV output"
 ```
 
@@ -274,7 +274,7 @@ git commit -m "refactor: convert tags command to TSV output"
 ### Task 5: Convert info Command to TSV
 
 **Files:**
-- Modify: `assetsearch.py:341-408`
+- Modify: `search.py:341-408`
 
 **Step 1: Update info to output TSV**
 
@@ -349,13 +349,13 @@ def info(
 
 **Step 2: Test manually**
 
-Run: `uv run assetsearch.py info 1`
+Run: `uv run search.py info 1`
 Expected: Key-value TSV output
 
 **Step 3: Commit**
 
 ```bash
-git add assetsearch.py
+git add search.py
 git commit -m "refactor: convert info command to TSV output"
 ```
 
@@ -364,7 +364,7 @@ git commit -m "refactor: convert info command to TSV output"
 ### Task 6: Convert stats Command to TSV
 
 **Files:**
-- Modify: `assetsearch.py:411-437`
+- Modify: `search.py:411-437`
 
 **Step 1: Update stats to output TSV**
 
@@ -399,13 +399,13 @@ def stats(
 
 **Step 2: Test manually**
 
-Run: `uv run assetsearch.py stats`
+Run: `uv run search.py stats`
 Expected: Key-value TSV output
 
 **Step 3: Commit**
 
 ```bash
-git add assetsearch.py
+git add search.py
 git commit -m "refactor: convert stats command to TSV output"
 ```
 
@@ -414,7 +414,7 @@ git commit -m "refactor: convert stats command to TSV output"
 ### Task 7: Convert similar Command to TSV
 
 **Files:**
-- Modify: `assetsearch.py:440-520`
+- Modify: `search.py:440-520`
 
 **Step 1: Update similar to output TSV**
 
@@ -490,13 +490,13 @@ def similar(
 
 **Step 2: Test manually**
 
-Run: `uv run assetsearch.py similar 1`
+Run: `uv run search.py similar 1`
 Expected: TSV output with distance, ID, path, pack
 
 **Step 3: Commit**
 
 ```bash
-git add assetsearch.py
+git add search.py
 git commit -m "refactor: convert similar command to TSV output"
 ```
 
@@ -505,7 +505,7 @@ git commit -m "refactor: convert similar command to TSV output"
 ### Task 8: Add help Command
 
 **Files:**
-- Modify: `assetsearch.py` (add before `if __name__ == "__main__":`)
+- Modify: `search.py` (add before `if __name__ == "__main__":`)
 
 **Step 1: Add help command**
 
@@ -515,7 +515,7 @@ Add this function before the `if __name__ == "__main__":` block:
 COMMAND_HELP = {
     "search": {
         "desc": "Search assets by name, tags, or filters",
-        "usage": "assetsearch.py search [QUERY] [OPTIONS]",
+        "usage": "search.py search [QUERY] [OPTIONS]",
         "args": [
             ("QUERY", "Search filename/path"),
         ],
@@ -530,7 +530,7 @@ COMMAND_HELP = {
     },
     "packs": {
         "desc": "List all indexed packs",
-        "usage": "assetsearch.py packs [OPTIONS]",
+        "usage": "search.py packs [OPTIONS]",
         "args": [],
         "opts": [
             ("--db PATH", "Path to assets.db"),
@@ -538,7 +538,7 @@ COMMAND_HELP = {
     },
     "tags": {
         "desc": "List all tags with counts",
-        "usage": "assetsearch.py tags [OPTIONS]",
+        "usage": "search.py tags [OPTIONS]",
         "args": [],
         "opts": [
             ("--db PATH", "Path to assets.db"),
@@ -547,7 +547,7 @@ COMMAND_HELP = {
     },
     "info": {
         "desc": "Show detailed info for an asset",
-        "usage": "assetsearch.py info ASSET_ID [OPTIONS]",
+        "usage": "search.py info ASSET_ID [OPTIONS]",
         "args": [
             ("ASSET_ID", "Asset ID"),
         ],
@@ -557,7 +557,7 @@ COMMAND_HELP = {
     },
     "stats": {
         "desc": "Show index statistics",
-        "usage": "assetsearch.py stats [OPTIONS]",
+        "usage": "search.py stats [OPTIONS]",
         "args": [],
         "opts": [
             ("--db PATH", "Path to assets.db"),
@@ -565,7 +565,7 @@ COMMAND_HELP = {
     },
     "similar": {
         "desc": "Find visually similar assets",
-        "usage": "assetsearch.py similar REFERENCE [OPTIONS]",
+        "usage": "search.py similar REFERENCE [OPTIONS]",
         "args": [
             ("REFERENCE", "Asset ID or path to image"),
         ],
@@ -577,7 +577,7 @@ COMMAND_HELP = {
     },
     "help": {
         "desc": "Show help for a command",
-        "usage": "assetsearch.py help [COMMAND]",
+        "usage": "search.py help [COMMAND]",
         "args": [
             ("COMMAND", "Command name"),
         ],
@@ -592,13 +592,13 @@ def help(
 ):
     """Show help for a command."""
     if command is None:
-        print("assetsearch - Search your game asset index")
+        print("search - Search your game asset index")
         print()
         print("Commands:")
         for name, info in COMMAND_HELP.items():
             print(f"  {name:10s} {info['desc']}")
         print()
-        print("Use 'assetsearch.py help <command>' for details.")
+        print("Use 'search.py help <command>' for details.")
         return
 
     if command not in COMMAND_HELP:
@@ -625,16 +625,16 @@ def help(
 
 **Step 2: Test help command**
 
-Run: `uv run assetsearch.py help`
+Run: `uv run search.py help`
 Expected: List of commands
 
-Run: `uv run assetsearch.py help search`
+Run: `uv run search.py help search`
 Expected: Detailed search help
 
 **Step 3: Commit**
 
 ```bash
-git add assetsearch.py
+git add search.py
 git commit -m "feat: add help subcommand"
 ```
 
@@ -647,19 +647,19 @@ git commit -m "feat: add help subcommand"
 Run each command and verify TSV output:
 
 ```bash
-uv run assetsearch.py search --limit 3
-uv run assetsearch.py packs
-uv run assetsearch.py tags --limit 5
-uv run assetsearch.py info 1
-uv run assetsearch.py stats
-uv run assetsearch.py help
-uv run assetsearch.py help search
+uv run search.py search --limit 3
+uv run search.py packs
+uv run search.py tags --limit 5
+uv run search.py info 1
+uv run search.py stats
+uv run search.py help
+uv run search.py help search
 ```
 
 **Step 2: Test piping**
 
 ```bash
-uv run assetsearch.py search --limit 3 | cut -f2
+uv run search.py search --limit 3 | cut -f2
 ```
 
 Expected: Just the paths, one per line
@@ -667,6 +667,6 @@ Expected: Just the paths, one per line
 **Step 3: Final commit if any fixes needed**
 
 ```bash
-git add assetsearch.py
+git add search.py
 git commit -m "fix: address any issues from final verification"
 ```

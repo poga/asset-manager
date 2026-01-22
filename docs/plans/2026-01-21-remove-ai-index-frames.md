@@ -39,10 +39,10 @@ git commit -m "chore: remove AI sprite analyzer and benchmark system"
 
 ---
 
-## Task 2: Remove AI Commands from assetindex.py
+## Task 2: Remove AI Commands from index.py
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Remove anthropic from dependencies (line 10)**
 
@@ -66,13 +66,13 @@ Delete the entire `@app.command("analyze-all") def analyze_all(...)` function.
 
 **Step 5: Verify removal**
 
-Run: `uv run assetindex.py --help`
+Run: `uv run index.py --help`
 Expected: No `analyze`, `extract`, or `analyze-all` commands listed
 
 **Step 6: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "feat: remove analyze, extract, analyze-all CLI commands"
 ```
 
@@ -81,7 +81,7 @@ git commit -m "feat: remove analyze, extract, analyze-all CLI commands"
 ## Task 3: Simplify Schema and Remove AI Columns
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Remove analysis_method and animation_type from assets table in SCHEMA (lines 83-84)**
 
@@ -136,7 +136,7 @@ def store_sprite_frames(conn: sqlite3.Connection, asset_id: int, frames: list[di
 **Step 4: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "feat: simplify schema, remove AI columns, add duration_ms"
 ```
 
@@ -145,7 +145,7 @@ git commit -m "feat: simplify schema, remove AI columns, add duration_ms"
 ## Task 4: Implement Frame Detection from Metadata
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Add detect_frames_from_info function after parse_animation_info**
 
@@ -209,7 +209,7 @@ def detect_frames(image_path: Path, anim_info: dict) -> list[dict]:
 **Step 2: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "feat: add detect_frames function using metadata and heuristics"
 ```
 
@@ -218,7 +218,7 @@ git commit -m "feat: add detect_frames function using metadata and heuristics"
 ## Task 5: Update index_asset to Use New Frame Detection
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Remove AI analysis from index_asset function (lines 400-500)**
 
@@ -334,13 +334,13 @@ def index_asset(
 
 **Step 3: Run tests to verify**
 
-Run: `uv run --script test_assetindex.py -k "not SpriteCLI and not test_stores_sprite_frames" -v 2>&1 | tail -20`
+Run: `uv run --script test_index.py -k "not SpriteCLI and not test_stores_sprite_frames" -v 2>&1 | tail -20`
 Expected: All tests pass
 
 **Step 4: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "feat: integrate frame detection into index_asset"
 ```
 
@@ -349,7 +349,7 @@ git commit -m "feat: integrate frame detection into index_asset"
 ## Task 6: Update index Command to Detect Frames
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Update the index command to store frames during indexing**
 
@@ -366,13 +366,13 @@ After line 640 (`asset_id = conn.execute(...).fetchone()[0]`), add:
 
 **Step 2: Run tests**
 
-Run: `uv run --script test_assetindex.py -v 2>&1 | tail -30`
+Run: `uv run --script test_index.py -v 2>&1 | tail -30`
 Expected: Tests pass (excluding removed CLI tests)
 
 **Step 3: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "feat: store frames during index command"
 ```
 
@@ -381,7 +381,7 @@ git commit -m "feat: store frames during index command"
 ## Task 7: Update Tests
 
 **Files:**
-- Modify: `test_assetindex.py`
+- Modify: `test_index.py`
 
 **Step 1: Remove anthropic from test dependencies (line 11)**
 
@@ -410,10 +410,10 @@ class TestSpriteAnalysisIntegration:
         img.save(img_path)
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
+        conn = index.get_db(db_path)
 
         # Index the file
-        assetindex.index_asset(conn, img_path, temp_dir)
+        index.index_asset(conn, img_path, temp_dir)
         conn.commit()
 
         # Check frames were stored
@@ -451,9 +451,9 @@ Add a new test after the existing one:
         info_path.write_text("Frame size: 32x32px")
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
+        conn = index.get_db(db_path)
 
-        assetindex.index_asset(conn, img_path, temp_dir)
+        index.index_asset(conn, img_path, temp_dir)
         conn.commit()
 
         asset_id = conn.execute(
@@ -475,13 +475,13 @@ Add a new test after the existing one:
 
 **Step 5: Run all tests**
 
-Run: `uv run --script test_assetindex.py -v`
+Run: `uv run --script test_index.py -v`
 Expected: All tests pass
 
 **Step 6: Commit**
 
 ```bash
-git add test_assetindex.py
+git add test_index.py
 git commit -m "test: update tests for metadata-based frame detection"
 ```
 
@@ -564,12 +564,12 @@ rm -f assets.db
 
 **Step 2: Run full test suite**
 
-Run: `uv run --script test_assetindex.py -v && uv run --script web/test_api.py -v`
+Run: `uv run --script test_index.py -v && uv run --script web/test_api.py -v`
 Expected: All tests pass
 
 **Step 3: Test indexing real assets**
 
-Run: `uv run assetindex.py index assets --db assets.db`
+Run: `uv run index.py index assets --db assets.db`
 Expected: Indexing completes without errors
 
 **Step 4: Verify frames were detected**

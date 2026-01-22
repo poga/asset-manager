@@ -28,7 +28,7 @@ Detect grid layout by finding fully transparent columns and rows, then extract c
 
 ## Implementation
 
-Replace `detect_first_sprite_bounds()` in `assetindex.py`:
+Replace `detect_first_sprite_bounds()` in `index.py`:
 
 ```python
 def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]]:

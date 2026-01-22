@@ -12,7 +12,7 @@ Remove all AI-powered sprite analysis features and replace with simpler frame de
 - `tests/test_sprite_analyzer.py` - Tests for removed module
 - `tests/test_benchmark.py` - Tests for removed benchmark
 
-**Code to remove from `assetindex.py`:**
+**Code to remove from `index.py`:**
 - `analyze` command
 - `extract` command
 - `analyze-all` command
@@ -68,7 +68,7 @@ Frame detection runs during the `index` command - no separate commands needed.
 
 1. Delete files: `sprite_analyzer.py`, `tests/benchmark/`, `tests/test_sprite_analyzer.py`, `tests/test_benchmark.py`
 
-2. Update `assetindex.py`:
+2. Update `index.py`:
    - Remove `analyze`, `extract`, `analyze-all` commands
    - Remove `sprite_analyzer` import and `anthropic` dependency
    - Update schema: drop `analysis_method` and `animation_type` columns
@@ -84,7 +84,7 @@ Frame detection runs during the `index` command - no separate commands needed.
 
 5. Delete and rebuild database:
    - Delete `assets.db`
-   - Run `uv run assetindex.py index`
+   - Run `uv run index.py index`
 
 6. Clean up:
    - Remove `anthropic` from inline dependencies

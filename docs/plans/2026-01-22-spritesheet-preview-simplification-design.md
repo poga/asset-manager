@@ -58,7 +58,7 @@ When `NULL`, the full image is used as preview.
 
 ## Code Removal
 
-### From `assetindex.py`
+### From `index.py`
 
 - Delete `sprite_frames` table from schema
 - Delete `detect_frames()` function
@@ -124,6 +124,6 @@ Asset objects include nullable preview bounds:
 
 ## Files Affected
 
-- `assetindex.py` - major simplification
+- `index.py` - major simplification
 - `web/api.py` - remove 3 endpoints, simplify responses
 - `web/frontend/src/components/SpritePreview.vue` - static display only

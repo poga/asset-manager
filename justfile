@@ -1,11 +1,11 @@
 # Run all tests
 test:
-    uv run --script test_assetindex.py
+    uv run --script test_index.py
     uv run --script web/test_api.py
 
-# Run assetindex tests only
+# Run index tests only
 test-index:
-    uv run --script test_assetindex.py
+    uv run --script test_index.py
 
 # Run API tests only
 test-api:
@@ -13,11 +13,11 @@ test-api:
 
 # Index all assets in assets/ directory (incremental)
 index-assets:
-    uv run --script assetindex.py index assets/
+    uv run --script index.py index assets/
 
 # Force full reindex of all assets
 reindex-assets:
-    uv run --script assetindex.py index assets/ --force
+    uv run --script index.py index assets/ --force
 
 # Start API server (port 8000)
 start-api:

@@ -13,12 +13,12 @@
 ## Task 1: Add First Sprite Detection Function
 
 **Files:**
-- Create: `test_assetindex.py` (add tests)
-- Modify: `assetindex.py`
+- Create: `test_index.py` (add tests)
+- Modify: `index.py`
 
 **Step 1: Write the failing test for detect_first_sprite_bounds**
 
-Add to `test_assetindex.py`:
+Add to `test_index.py`:
 
 ```python
 class TestDetectFirstSpriteBounds:
@@ -35,7 +35,7 @@ class TestDetectFirstSpriteBounds:
                 img.putpixel((x, y), (255, 0, 0, 255))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         assert bounds == (0, 0, 32, 32)
 
     def test_finds_sprite_with_internal_transparency(self, temp_dir):
@@ -50,7 +50,7 @@ class TestDetectFirstSpriteBounds:
                     img.putpixel((x, y), (0, 255, 0, 255))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         # Should encompass the entire ring
         assert bounds is not None
         x, y, w, h = bounds
@@ -62,7 +62,7 @@ class TestDetectFirstSpriteBounds:
         img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         assert bounds is None
 
     def test_returns_none_for_no_alpha_channel(self, temp_dir):
@@ -71,7 +71,7 @@ class TestDetectFirstSpriteBounds:
         img = Image.new("RGB", (32, 32), (255, 0, 0))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         assert bounds is None
 
     def test_handles_sprite_not_at_origin(self, temp_dir):
@@ -84,18 +84,18 @@ class TestDetectFirstSpriteBounds:
                 img.putpixel((x, y), (0, 0, 255, 255))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         assert bounds == (16, 16, 20, 20)
 ```
 
 **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest test_assetindex.py::TestDetectFirstSpriteBounds -v`
-Expected: FAIL with "AttributeError: module 'assetindex' has no attribute 'detect_first_sprite_bounds'"
+Run: `uv run pytest test_index.py::TestDetectFirstSpriteBounds -v`
+Expected: FAIL with "AttributeError: module 'index' has no attribute 'detect_first_sprite_bounds'"
 
 **Step 3: Write minimal implementation**
 
-Add to `assetindex.py` after the `compute_phash` function (around line 202):
+Add to `index.py` after the `compute_phash` function (around line 202):
 
 ```python
 def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]]:
@@ -164,13 +164,13 @@ def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]
 
 **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest test_assetindex.py::TestDetectFirstSpriteBounds -v`
+Run: `uv run pytest test_index.py::TestDetectFirstSpriteBounds -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add test_assetindex.py assetindex.py
+git add test_index.py index.py
 git commit -m "feat: add detect_first_sprite_bounds function
 
 Implements connected-component flood-fill to find first sprite bounding box.
@@ -184,12 +184,12 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 2: Update Database Schema
 
 **Files:**
-- Modify: `assetindex.py` (schema)
-- Modify: `test_assetindex.py` (add schema tests)
+- Modify: `index.py` (schema)
+- Modify: `test_index.py` (add schema tests)
 
 **Step 1: Write failing test for new schema**
 
-Add to `test_assetindex.py`:
+Add to `test_index.py`:
 
 ```python
 class TestPreviewBoundsSchema:
@@ -197,7 +197,7 @@ class TestPreviewBoundsSchema:
 
     def test_assets_table_has_preview_columns(self, temp_db):
         """Verify assets table has preview_x, preview_y, preview_width, preview_height."""
-        conn = assetindex.get_db(temp_db)
+        conn = index.get_db(temp_db)
         cursor = conn.execute("PRAGMA table_info(assets)")
         columns = {row[1] for row in cursor.fetchall()}
         assert "preview_x" in columns
@@ -208,7 +208,7 @@ class TestPreviewBoundsSchema:
 
     def test_sprite_frames_table_removed(self, temp_db):
         """Verify sprite_frames table no longer exists."""
-        conn = assetindex.get_db(temp_db)
+        conn = index.get_db(temp_db)
         cursor = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='sprite_frames'"
         )
@@ -218,10 +218,10 @@ class TestPreviewBoundsSchema:
 
 **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest test_assetindex.py::TestPreviewBoundsSchema -v`
+Run: `uv run pytest test_index.py::TestPreviewBoundsSchema -v`
 Expected: FAIL (preview columns missing, sprite_frames still exists)
 
-**Step 3: Update schema in assetindex.py**
+**Step 3: Update schema in index.py**
 
 Replace the SCHEMA constant (around line 56-142). Remove `sprite_frames` table and its index, add preview columns to assets:
 
@@ -304,13 +304,13 @@ CREATE INDEX IF NOT EXISTS idx_asset_colors_color ON asset_colors(color_hex);
 
 **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest test_assetindex.py::TestPreviewBoundsSchema -v`
+Run: `uv run pytest test_index.py::TestPreviewBoundsSchema -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add assetindex.py test_assetindex.py
+git add index.py test_index.py
 git commit -m "feat: update schema - add preview bounds, remove sprite_frames
 
 - Add preview_x, preview_y, preview_width, preview_height to assets
@@ -325,12 +325,12 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 3: Remove Frame Detection Functions
 
 **Files:**
-- Modify: `assetindex.py`
-- Modify: `test_assetindex.py`
+- Modify: `index.py`
+- Modify: `test_index.py`
 
 **Step 1: Remove old tests that reference removed functions**
 
-Delete these test classes from `test_assetindex.py`:
+Delete these test classes from `test_index.py`:
 - `TestParseAnimationInfo` (lines 270-290)
 - `TestSpriteAnalysisIntegration` (lines 667-734)
 - `TestSpriteFramesSchema` (lines 737-756)
@@ -342,23 +342,23 @@ class TestGetImageInfo:
     """Tests for get_image_info function."""
 
     def test_extracts_dimensions(self, sample_image):
-        info = assetindex.get_image_info(sample_image)
+        info = index.get_image_info(sample_image)
         assert info["width"] == 64
         assert info["height"] == 32
 
     def test_handles_invalid_file(self, temp_dir):
         bad_file = temp_dir / "not_an_image.txt"
         bad_file.write_text("not an image")
-        info = assetindex.get_image_info(bad_file)
+        info = index.get_image_info(bad_file)
         assert info == {}
 ```
 
 **Step 2: Run tests to see current state**
 
-Run: `uv run pytest test_assetindex.py -v`
+Run: `uv run pytest test_index.py -v`
 Expected: Some failures due to missing functions
 
-**Step 3: Remove functions from assetindex.py**
+**Step 3: Remove functions from index.py**
 
 Delete these functions:
 - `parse_animation_info` (lines 291-307)
@@ -380,13 +380,13 @@ def get_image_info(path: Path) -> dict:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `uv run pytest test_assetindex.py -v`
+Run: `uv run pytest test_index.py -v`
 Expected: PASS (after removing tests for deleted functions)
 
 **Step 5: Commit**
 
 ```bash
-git add assetindex.py test_assetindex.py
+git add index.py test_index.py
 git commit -m "refactor: remove frame detection functions
 
 - Remove parse_animation_info, detect_frames, store_sprite_frames
@@ -401,12 +401,12 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 4: Update index_asset to Store Preview Bounds
 
 **Files:**
-- Modify: `assetindex.py`
-- Modify: `test_assetindex.py`
+- Modify: `index.py`
+- Modify: `test_index.py`
 
 **Step 1: Write failing test**
 
-Add to `test_assetindex.py`:
+Add to `test_index.py`:
 
 ```python
 class TestIndexAssetPreviewBounds:
@@ -424,8 +424,8 @@ class TestIndexAssetPreviewBounds:
         img.save(img_path)
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
-        assetindex.index_asset(conn, img_path, temp_dir)
+        conn = index.get_db(db_path)
+        index.index_asset(conn, img_path, temp_dir)
         conn.commit()
 
         row = conn.execute(
@@ -446,8 +446,8 @@ class TestIndexAssetPreviewBounds:
         img.save(img_path)
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
-        assetindex.index_asset(conn, img_path, temp_dir)
+        conn = index.get_db(db_path)
+        index.index_asset(conn, img_path, temp_dir)
         conn.commit()
 
         row = conn.execute(
@@ -461,7 +461,7 @@ class TestIndexAssetPreviewBounds:
 
 **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest test_assetindex.py::TestIndexAssetPreviewBounds -v`
+Run: `uv run pytest test_index.py::TestIndexAssetPreviewBounds -v`
 Expected: FAIL (preview bounds not being stored)
 
 **Step 3: Update index_asset function**
@@ -562,13 +562,13 @@ def index_asset(
 
 **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest test_assetindex.py::TestIndexAssetPreviewBounds -v`
+Run: `uv run pytest test_index.py::TestIndexAssetPreviewBounds -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add assetindex.py test_assetindex.py
+git add index.py test_index.py
 git commit -m "feat: store preview bounds during indexing
 
 index_asset now calls detect_first_sprite_bounds and stores
@@ -582,7 +582,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 5: Update index Command
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Update the index command loop**
 
@@ -659,13 +659,13 @@ Also remove the animation info and frame detection code block (around lines 686-
 
 **Step 2: Run full test suite**
 
-Run: `uv run pytest test_assetindex.py -v`
+Run: `uv run pytest test_index.py -v`
 Expected: PASS
 
 **Step 3: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "refactor: update index command to store preview bounds
 
 - Remove frame detection from index loop
@@ -680,7 +680,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 6: Update generate_pack_preview
 
 **Files:**
-- Modify: `assetindex.py`
+- Modify: `index.py`
 
 **Step 1: Update the function to use preview bounds**
 
@@ -751,13 +751,13 @@ def generate_pack_preview(
 
 **Step 2: Run tests**
 
-Run: `uv run pytest test_assetindex.py -v`
+Run: `uv run pytest test_index.py -v`
 Expected: PASS
 
 **Step 3: Commit**
 
 ```bash
-git add assetindex.py
+git add index.py
 git commit -m "refactor: use preview bounds in generate_pack_preview
 
 Pack preview montage now uses stored preview bounds to crop sprites
@@ -1291,7 +1291,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
 **Step 1: Run all backend tests**
 
-Run: `uv run pytest test_assetindex.py -v`
+Run: `uv run pytest test_index.py -v`
 Expected: PASS
 
 **Step 2: Run all API tests**
@@ -1333,4 +1333,4 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
 **Migration notes:**
 - Existing databases need to be re-created (schema changed)
-- Run `uv run assetindex.py index <path> --force` to re-index assets
+- Run `uv run index.py index <path> --force` to re-index assets

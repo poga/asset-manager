@@ -20,8 +20,8 @@ import pytest
 from PIL import Image
 
 # Import modules under test
-import assetindex
-import assetsearch
+import index
+import search
 
 
 # =============================================================================
@@ -40,7 +40,7 @@ def temp_dir():
 def temp_db(temp_dir):
     """Create a temporary database."""
     db_path = temp_dir / "test.db"
-    conn = assetindex.get_db(db_path)
+    conn = index.get_db(db_path)
     conn.close()
     return db_path
 
@@ -112,7 +112,7 @@ def sample_asset_pack(temp_dir):
 
 
 # =============================================================================
-# Unit Tests: assetindex.py
+# Unit Tests: index.py
 # =============================================================================
 
 
@@ -120,13 +120,13 @@ class TestFileHash:
     """Tests for file_hash function."""
 
     def test_hash_produces_hex_string(self, sample_image):
-        result = assetindex.file_hash(sample_image)
+        result = index.file_hash(sample_image)
         assert isinstance(result, str)
         assert len(result) == 64  # SHA256 hex length
 
     def test_same_file_same_hash(self, sample_image):
-        hash1 = assetindex.file_hash(sample_image)
-        hash2 = assetindex.file_hash(sample_image)
+        hash1 = index.file_hash(sample_image)
+        hash2 = index.file_hash(sample_image)
         assert hash1 == hash2
 
     def test_different_files_different_hash(self, temp_dir):
@@ -135,37 +135,37 @@ class TestFileHash:
         file1.write_text("content1")
         file2.write_text("content2")
 
-        assert assetindex.file_hash(file1) != assetindex.file_hash(file2)
+        assert index.file_hash(file1) != index.file_hash(file2)
 
 
 class TestExtractVersion:
     """Tests for extract_version function."""
 
     def test_extracts_simple_version(self):
-        assert assetindex.extract_version("Pack_v1.0") == "1.0"
+        assert index.extract_version("Pack_v1.0") == "1.0"
 
     def test_extracts_complex_version(self):
-        assert assetindex.extract_version("Minifantasy_Creatures_v3.3_Commercial") == "3.3"
+        assert index.extract_version("Minifantasy_Creatures_v3.3_Commercial") == "3.3"
 
     def test_returns_none_for_no_version(self):
-        assert assetindex.extract_version("PackWithoutVersion") is None
+        assert index.extract_version("PackWithoutVersion") is None
 
     def test_case_insensitive(self):
-        assert assetindex.extract_version("Pack_V2.5") == "2.5"
+        assert index.extract_version("Pack_V2.5") == "2.5"
 
 
 class TestGetImageInfo:
     """Tests for get_image_info function."""
 
     def test_extracts_dimensions(self, sample_image):
-        info = assetindex.get_image_info(sample_image)
+        info = index.get_image_info(sample_image)
         assert info["width"] == 64
         assert info["height"] == 32
 
     def test_handles_invalid_file(self, temp_dir):
         bad_file = temp_dir / "not_an_image.txt"
         bad_file.write_text("not an image")
-        info = assetindex.get_image_info(bad_file)
+        info = index.get_image_info(bad_file)
         assert info == {}
 
 
@@ -177,7 +177,7 @@ class TestExtractTagsFromPath:
         asset_path.parent.mkdir(parents=True)
         asset_path.touch()
 
-        tags = assetindex.extract_tags_from_path(asset_path, temp_dir)
+        tags = index.extract_tags_from_path(asset_path, temp_dir)
 
         assert "pack" in tags
         assert "creatures" in tags
@@ -189,7 +189,7 @@ class TestExtractTagsFromPath:
         asset_path.parent.mkdir(parents=True)
         asset_path.touch()
 
-        tags = assetindex.extract_tags_from_path(asset_path, temp_dir)
+        tags = index.extract_tags_from_path(asset_path, temp_dir)
 
         assert "assets" not in tags
         assert "commercial" not in tags
@@ -199,7 +199,7 @@ class TestExtractTagsFromPath:
         asset_path = temp_dir / "Char_Dmg.png"  # Use underscore separator
         asset_path.touch()
 
-        tags = assetindex.extract_tags_from_path(asset_path, temp_dir)
+        tags = index.extract_tags_from_path(asset_path, temp_dir)
 
         # "dmg" should be aliased to "damage"
         assert "damage" in tags
@@ -215,7 +215,7 @@ class TestExtractColors:
         img = Image.new("RGB", (100, 100), (255, 0, 0))
         img.save(img_path)
 
-        colors = assetindex.extract_colors(img_path)
+        colors = index.extract_colors(img_path)
 
         assert len(colors) >= 1
         assert colors[0][0] == "#ff0000"
@@ -225,7 +225,7 @@ class TestExtractColors:
         bad_file = temp_dir / "not_an_image.txt"
         bad_file.write_text("not an image")
 
-        colors = assetindex.extract_colors(bad_file)
+        colors = index.extract_colors(bad_file)
         assert colors == []
 
 
@@ -260,7 +260,7 @@ class TestDetectFirstSpriteBounds:
 
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         # Should return bounds of content in FIRST frame cell only: (2, 2, 28, 12)
         assert bounds == (2, 2, 28, 12)
 
@@ -273,7 +273,7 @@ class TestDetectFirstSpriteBounds:
                 img.putpixel((x, y), (255, 0, 0, 255))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         assert bounds == (0, 0, 32, 32)
 
     def test_finds_sprite_with_internal_transparency(self, temp_dir):
@@ -287,7 +287,7 @@ class TestDetectFirstSpriteBounds:
                     img.putpixel((x, y), (0, 255, 0, 255))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         assert bounds is not None
         x, y, w, h = bounds
         assert w >= 28 and h >= 28
@@ -298,7 +298,7 @@ class TestDetectFirstSpriteBounds:
         img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         assert bounds is None
 
     def test_returns_none_for_no_alpha_channel(self, temp_dir):
@@ -307,7 +307,7 @@ class TestDetectFirstSpriteBounds:
         img = Image.new("RGB", (32, 32), (255, 0, 0))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         assert bounds is None
 
     def test_handles_sprite_not_at_origin(self, temp_dir):
@@ -319,7 +319,7 @@ class TestDetectFirstSpriteBounds:
                 img.putpixel((x, y), (0, 0, 255, 255))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         assert bounds == (16, 16, 20, 20)
 
     def test_fallback_for_image_without_gaps(self, temp_dir):
@@ -336,7 +336,7 @@ class TestDetectFirstSpriteBounds:
                 img.putpixel((x, y), (0, 255, 0, 255))
         img.save(img_path)
 
-        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        bounds = index.detect_first_sprite_bounds(img_path)
         # Should return bounding box of all content (the diagonal + blob)
         assert bounds == (0, 0, 64, 64)
 
@@ -345,7 +345,7 @@ class TestComputePhash:
     """Tests for compute_phash function."""
 
     def test_returns_bytes(self, sample_image):
-        phash = assetindex.compute_phash(sample_image)
+        phash = index.compute_phash(sample_image)
         assert isinstance(phash, bytes)
 
     def test_similar_images_similar_hash(self, temp_dir):
@@ -359,17 +359,17 @@ class TestComputePhash:
         img1.save(img1_path)
         img2.save(img2_path)
 
-        hash1 = assetindex.compute_phash(img1_path)
-        hash2 = assetindex.compute_phash(img2_path)
+        hash1 = index.compute_phash(img1_path)
+        hash2 = index.compute_phash(img2_path)
 
-        distance = assetsearch.hamming_distance(hash1, hash2)
+        distance = search.hamming_distance(hash1, hash2)
         assert distance < 5  # Very similar
 
     def test_handles_invalid_file(self, temp_dir):
         bad_file = temp_dir / "not_an_image.txt"
         bad_file.write_text("not an image")
 
-        phash = assetindex.compute_phash(bad_file)
+        phash = index.compute_phash(bad_file)
         assert phash is None
 
 
@@ -382,7 +382,7 @@ class TestDetectPack:
         asset = pack_dir / "sprite.png"
         asset.touch()
 
-        name, path = assetindex.detect_pack(asset, temp_dir)
+        name, path = index.detect_pack(asset, temp_dir)
         assert name == "MyPack_v1.0"
         assert path == temp_dir / "MyPack_v1.0"
 
@@ -402,7 +402,7 @@ class TestScanAssets:
         (pack_dir / "source2.ase").touch()
         (pack_dir / "readme.txt").touch()
 
-        files = assetindex.scan_assets(temp_dir)
+        files = index.scan_assets(temp_dir)
         filenames = {f.name for f in files}
 
         assert "sprite.png" in filenames
@@ -413,7 +413,7 @@ class TestScanAssets:
 
 
 # =============================================================================
-# Unit Tests: assetsearch.py
+# Unit Tests: search.py
 # =============================================================================
 
 
@@ -422,32 +422,32 @@ class TestHammingDistance:
 
     def test_identical_hashes(self):
         h = b"\x00\x00\x00\x00"
-        assert assetsearch.hamming_distance(h, h) == 0
+        assert search.hamming_distance(h, h) == 0
 
     def test_one_bit_difference(self):
         h1 = b"\x00"
         h2 = b"\x01"
-        assert assetsearch.hamming_distance(h1, h2) == 1
+        assert search.hamming_distance(h1, h2) == 1
 
     def test_all_bits_different(self):
         h1 = b"\x00"
         h2 = b"\xff"
-        assert assetsearch.hamming_distance(h1, h2) == 8
+        assert search.hamming_distance(h1, h2) == 8
 
 
 class TestHexToRgb:
     """Tests for hex_to_rgb function."""
 
     def test_parses_with_hash(self):
-        result = assetsearch.hex_to_rgb("#ff0000")
+        result = search.hex_to_rgb("#ff0000")
         assert result == (255, 0, 0)
 
     def test_parses_without_hash(self):
-        result = assetsearch.hex_to_rgb("00ff00")
+        result = search.hex_to_rgb("00ff00")
         assert result == (0, 255, 0)
 
     def test_mixed_case(self):
-        result = assetsearch.hex_to_rgb("#FfAa00")
+        result = search.hex_to_rgb("#FfAa00")
         assert result == (255, 170, 0)
 
 
@@ -455,10 +455,10 @@ class TestColorDistance:
     """Tests for color_distance function."""
 
     def test_same_color_zero_distance(self):
-        assert assetsearch.color_distance("#ff0000", "#ff0000") == 0
+        assert search.color_distance("#ff0000", "#ff0000") == 0
 
     def test_different_colors_positive_distance(self):
-        dist = assetsearch.color_distance("#ff0000", "#00ff00")
+        dist = search.color_distance("#ff0000", "#00ff00")
         assert dist > 0
 
 
@@ -475,19 +475,19 @@ class TestIndexingIntegration:
         db_path = temp_dir / "test.db"
 
         # Index the pack
-        conn = assetindex.get_db(db_path)
+        conn = index.get_db(db_path)
 
         # Scan assets
-        files = assetindex.scan_assets(sample_asset_pack)
+        files = index.scan_assets(sample_asset_pack)
         assert len(files) >= 3  # At least main, shadow, and gif
 
         # Index manually (simplified)
         for file_path in files:
-            if file_path.suffix.lower() not in assetindex.IMAGE_EXTENSIONS:
+            if file_path.suffix.lower() not in index.IMAGE_EXTENSIONS:
                 continue
 
             rel_path = str(file_path.relative_to(sample_asset_pack))
-            pack_name, pack_path = assetindex.detect_pack(file_path, sample_asset_pack)
+            pack_name, pack_path = index.detect_pack(file_path, sample_asset_pack)
 
             # Insert pack
             if pack_name:
@@ -497,7 +497,7 @@ class TestIndexingIntegration:
                 )
 
             # Get image info
-            img_info = assetindex.get_image_info(file_path)
+            img_info = index.get_image_info(file_path)
 
             # Insert asset
             conn.execute(
@@ -508,7 +508,7 @@ class TestIndexingIntegration:
                     rel_path,
                     file_path.name,
                     file_path.suffix.lower().lstrip("."),
-                    assetindex.file_hash(file_path),
+                    index.file_hash(file_path),
                     file_path.stat().st_size,
                     img_info.get("width"),
                     img_info.get("height"),
@@ -529,19 +529,19 @@ class TestIndexingIntegration:
     def test_incremental_update(self, sample_asset_pack, temp_dir):
         """Test that unchanged files are skipped on re-index."""
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
+        conn = index.get_db(db_path)
 
         # First index
-        files = assetindex.scan_assets(sample_asset_pack)
-        first_count = len([f for f in files if f.suffix.lower() in assetindex.IMAGE_EXTENSIONS])
+        files = index.scan_assets(sample_asset_pack)
+        first_count = len([f for f in files if f.suffix.lower() in index.IMAGE_EXTENSIONS])
 
         # Insert with hashes
         existing_hashes = {}
         for file_path in files:
-            if file_path.suffix.lower() not in assetindex.IMAGE_EXTENSIONS:
+            if file_path.suffix.lower() not in index.IMAGE_EXTENSIONS:
                 continue
             rel_path = str(file_path.relative_to(sample_asset_pack))
-            file_hash = assetindex.file_hash(file_path)
+            file_hash = index.file_hash(file_path)
             existing_hashes[rel_path] = file_hash
 
             conn.execute(
@@ -553,10 +553,10 @@ class TestIndexingIntegration:
         # Simulate second index - count skipped
         skipped = 0
         for file_path in files:
-            if file_path.suffix.lower() not in assetindex.IMAGE_EXTENSIONS:
+            if file_path.suffix.lower() not in index.IMAGE_EXTENSIONS:
                 continue
             rel_path = str(file_path.relative_to(sample_asset_pack))
-            current_hash = assetindex.file_hash(file_path)
+            current_hash = index.file_hash(file_path)
             if rel_path in existing_hashes and existing_hashes[rel_path] == current_hash:
                 skipped += 1
 
@@ -571,7 +571,7 @@ class TestSearchIntegration:
     def test_search_by_filename(self, temp_dir):
         """Test searching by filename."""
         db_path = temp_dir / "test.db"
-        conn = assetsearch.get_db(db_path)
+        conn = search.get_db(db_path)
 
         # Insert test data
         conn.execute(
@@ -598,7 +598,7 @@ class TestSearchIntegration:
     def test_search_by_tag(self, temp_dir):
         """Test searching by tag."""
         db_path = temp_dir / "test.db"
-        conn = assetsearch.get_db(db_path)
+        conn = search.get_db(db_path)
 
         # Insert test data
         conn.execute(
@@ -627,7 +627,7 @@ class TestSearchIntegration:
     def test_search_by_color(self, temp_dir):
         """Test searching by color."""
         db_path = temp_dir / "test.db"
-        conn = assetsearch.get_db(db_path)
+        conn = search.get_db(db_path)
 
         # Insert test data
         conn.execute(
@@ -658,7 +658,7 @@ class TestRelationshipDetection:
     def test_detects_gif_preview(self, temp_dir):
         """Test GIF preview relationship detection."""
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
+        conn = index.get_db(db_path)
 
         # Insert test data - main sprite and GIF preview
         conn.execute(
@@ -672,7 +672,7 @@ class TestRelationshipDetection:
         conn.commit()
 
         # Detect relationships
-        assetindex.detect_relationships(conn)
+        index.detect_relationships(conn)
 
         # Check
         rels = conn.execute(
@@ -687,7 +687,7 @@ class TestRelationshipDetection:
     def test_detects_shadow(self, temp_dir):
         """Test shadow relationship detection."""
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
+        conn = index.get_db(db_path)
 
         # Insert test data - main sprite and shadow
         conn.execute(
@@ -701,7 +701,7 @@ class TestRelationshipDetection:
         conn.commit()
 
         # Detect relationships
-        assetindex.detect_relationships(conn)
+        index.detect_relationships(conn)
 
         # Check
         rels = conn.execute(
@@ -722,47 +722,47 @@ class TestRelationshipDetection:
 class TestCLI:
     """Tests for CLI commands."""
 
-    def test_assetsearch_help(self):
+    def test_search_help(self):
         """Test that help works."""
         from typer.testing import CliRunner
         runner = CliRunner()
-        result = runner.invoke(assetsearch.app, ["--help"])
+        result = runner.invoke(search.app, ["--help"])
         assert result.exit_code == 0
         assert "Search your game asset index" in result.stdout
 
-    def test_assetsearch_stats_empty_db(self, temp_dir):
+    def test_search_stats_empty_db(self, temp_dir):
         """Test stats on empty database."""
         from typer.testing import CliRunner
         db_path = temp_dir / "test.db"
-        conn = assetsearch.get_db(db_path)
+        conn = search.get_db(db_path)
         conn.close()
 
         runner = CliRunner()
-        result = runner.invoke(assetsearch.app, ["stats", "--db", str(db_path)])
+        result = runner.invoke(search.app, ["stats", "--db", str(db_path)])
         assert result.exit_code == 0
         assert "packs\t0" in result.stdout
 
-    def test_assetsearch_packs_empty(self, temp_dir):
+    def test_search_packs_empty(self, temp_dir):
         """Test packs command with empty database."""
         from typer.testing import CliRunner
         db_path = temp_dir / "test.db"
-        conn = assetsearch.get_db(db_path)
+        conn = search.get_db(db_path)
         conn.close()
 
         runner = CliRunner()
-        result = runner.invoke(assetsearch.app, ["packs", "--db", str(db_path)])
+        result = runner.invoke(search.app, ["packs", "--db", str(db_path)])
         assert result.exit_code == 0
         assert "No packs indexed" in result.output
 
-    def test_assetsearch_tags_empty(self, temp_dir):
+    def test_search_tags_empty(self, temp_dir):
         """Test tags command with empty database."""
         from typer.testing import CliRunner
         db_path = temp_dir / "test.db"
-        conn = assetsearch.get_db(db_path)
+        conn = search.get_db(db_path)
         conn.close()
 
         runner = CliRunner()
-        result = runner.invoke(assetsearch.app, ["tags", "--db", str(db_path)])
+        result = runner.invoke(search.app, ["tags", "--db", str(db_path)])
         assert result.exit_code == 0
         assert "No tags found" in result.output
 
@@ -787,8 +787,8 @@ class TestIndexAssetPreviewBounds:
         img.save(img_path)
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
-        assetindex.index_asset(conn, img_path, temp_dir)
+        conn = index.get_db(db_path)
+        index.index_asset(conn, img_path, temp_dir)
         conn.commit()
 
         row = conn.execute(
@@ -809,8 +809,8 @@ class TestIndexAssetPreviewBounds:
         img.save(img_path)
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
-        assetindex.index_asset(conn, img_path, temp_dir)
+        conn = index.get_db(db_path)
+        index.index_asset(conn, img_path, temp_dir)
         conn.commit()
 
         row = conn.execute(
@@ -834,8 +834,8 @@ class TestAsepriteIndexing:
         ase_path.write_bytes(create_minimal_aseprite(48, 32))
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
-        assetindex.index_asset(conn, ase_path, temp_dir)
+        conn = index.get_db(db_path)
+        index.index_asset(conn, ase_path, temp_dir)
         conn.commit()
 
         row = conn.execute(
@@ -859,8 +859,8 @@ class TestAsepriteIndexing:
         ))
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
-        assetindex.index_asset(conn, ase_path, temp_dir)
+        conn = index.get_db(db_path)
+        index.index_asset(conn, ase_path, temp_dir)
         conn.commit()
 
         # Check tags were added
@@ -885,8 +885,8 @@ class TestAsepriteIndexing:
         ase_path.write_bytes(create_minimal_aseprite(16, 16))
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
-        assetindex.index_asset(conn, ase_path, temp_dir)
+        conn = index.get_db(db_path)
+        index.index_asset(conn, ase_path, temp_dir)
         conn.commit()
 
         row = conn.execute(
@@ -904,7 +904,7 @@ class TestPreviewBoundsSchema:
 
     def test_assets_table_has_preview_columns(self, temp_db):
         """Verify assets table has preview_x, preview_y, preview_width, preview_height."""
-        conn = assetindex.get_db(temp_db)
+        conn = index.get_db(temp_db)
         cursor = conn.execute("PRAGMA table_info(assets)")
         columns = {row[1] for row in cursor.fetchall()}
         assert "preview_x" in columns
@@ -915,7 +915,7 @@ class TestPreviewBoundsSchema:
 
     def test_sprite_frames_table_removed(self, temp_db):
         """Verify sprite_frames table no longer exists."""
-        conn = assetindex.get_db(temp_db)
+        conn = index.get_db(temp_db)
         cursor = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='sprite_frames'"
         )

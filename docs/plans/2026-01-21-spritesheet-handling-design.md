@@ -143,26 +143,26 @@ GET /api/asset/{id}/extract
 
 ```bash
 # Analyze a spritesheet (standalone, without full index)
-assetindex analyze <image_path>
+index analyze <image_path>
   Output: JSON with detected frame metadata
 
 # Preview animation in terminal or viewer window
-assetindex preview <image_path_or_asset_id>
+index preview <image_path_or_asset_id>
   Options: --fps=10, --scale=2
 
 # Extract frames to files
-assetindex extract <image_path_or_asset_id> <output_dir>
+index extract <image_path_or_asset_id> <output_dir>
   Output: frame_000.png, frame_001.png, etc.
   Options: --scale=1, --format=png
 
 # Re-analyze existing indexed assets
-assetindex reindex --frames-only
+index reindex --frames-only
   Runs AI analysis on all spritesheets, updates sprite_frames table
 ```
 
 ### 5. Integration with Existing Indexing
 
-During `assetindex build`:
+During `index build`:
 
 1. After basic image info extraction
 2. Detect if image is potential spritesheet (PNG with multiple pixels)
@@ -177,8 +177,8 @@ During `assetindex build`:
 |------|--------|
 | `sprite_analyzer.py` | New - AI vision integration module |
 | `test_sprite_analyzer.py` | New - Tests for frame detection |
-| `assetindex.py` | Add frame analysis during indexing, new CLI commands |
-| `test_assetindex.py` | Add tests for new CLI commands |
+| `index.py` | Add frame analysis during indexing, new CLI commands |
+| `test_index.py` | Add tests for new CLI commands |
 | `web/api.py` | Add frame/animation endpoints |
 | `web/test_api.py` | Add tests for new endpoints |
 | `web/frontend/src/components/AssetGrid.vue` | Animated sprite rendering |

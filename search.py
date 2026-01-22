@@ -143,7 +143,7 @@ def find_db() -> Path:
         db_path = parent / "assets.db"
         if db_path.exists():
             return db_path
-    raise typer.BadParameter("No assets.db found. Run assetindex.py first.")
+    raise typer.BadParameter("No assets.db found. Run index.py first.")
 
 
 def hamming_distance(h1: bytes, h2: bytes) -> int:
@@ -457,7 +457,7 @@ def similar(
 COMMAND_HELP = {
     "search": {
         "desc": "Search assets by name, tags, or filters",
-        "usage": "assetsearch.py search [QUERY] [OPTIONS]",
+        "usage": "search.py search [QUERY] [OPTIONS]",
         "args": [
             ("QUERY", "Search filename/path"),
         ],
@@ -472,7 +472,7 @@ COMMAND_HELP = {
     },
     "packs": {
         "desc": "List all indexed packs",
-        "usage": "assetsearch.py packs [OPTIONS]",
+        "usage": "search.py packs [OPTIONS]",
         "args": [],
         "opts": [
             ("--db PATH", "Path to assets.db"),
@@ -480,7 +480,7 @@ COMMAND_HELP = {
     },
     "tags": {
         "desc": "List all tags with counts",
-        "usage": "assetsearch.py tags [OPTIONS]",
+        "usage": "search.py tags [OPTIONS]",
         "args": [],
         "opts": [
             ("--db PATH", "Path to assets.db"),
@@ -489,7 +489,7 @@ COMMAND_HELP = {
     },
     "info": {
         "desc": "Show detailed info for an asset",
-        "usage": "assetsearch.py info ASSET_ID [OPTIONS]",
+        "usage": "search.py info ASSET_ID [OPTIONS]",
         "args": [
             ("ASSET_ID", "Asset ID"),
         ],
@@ -499,7 +499,7 @@ COMMAND_HELP = {
     },
     "stats": {
         "desc": "Show index statistics",
-        "usage": "assetsearch.py stats [OPTIONS]",
+        "usage": "search.py stats [OPTIONS]",
         "args": [],
         "opts": [
             ("--db PATH", "Path to assets.db"),
@@ -507,7 +507,7 @@ COMMAND_HELP = {
     },
     "similar": {
         "desc": "Find visually similar assets",
-        "usage": "assetsearch.py similar REFERENCE [OPTIONS]",
+        "usage": "search.py similar REFERENCE [OPTIONS]",
         "args": [
             ("REFERENCE", "Asset ID or path to image"),
         ],
@@ -519,7 +519,7 @@ COMMAND_HELP = {
     },
     "help": {
         "desc": "Show help for a command",
-        "usage": "assetsearch.py help [COMMAND]",
+        "usage": "search.py help [COMMAND]",
         "args": [
             ("COMMAND", "Command name"),
         ],
@@ -534,13 +534,13 @@ def help(
 ):
     """Show help for a command."""
     if command is None:
-        print("assetsearch - Search your game asset index")
+        print("search - Search your game asset index")
         print()
         print("Commands:")
         for name, info in COMMAND_HELP.items():
             print(f"  {name:10s} {info['desc']}")
         print()
-        print("Use 'assetsearch.py help <command>' for details.")
+        print("Use 'search.py help <command>' for details.")
         return
 
     if command not in COMMAND_HELP:

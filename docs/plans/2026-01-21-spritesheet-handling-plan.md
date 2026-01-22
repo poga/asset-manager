@@ -13,12 +13,12 @@
 ## Task 1: Add sprite_frames Database Schema
 
 **Files:**
-- Modify: `assetindex.py:50-122` (SCHEMA constant)
+- Modify: `index.py:50-122` (SCHEMA constant)
 - Modify: `web/test_api.py:31-68` (test_db fixture schema)
 
 **Step 1: Write test for sprite_frames table existence**
 
-In `test_assetindex.py`, add at end of file before `if __name__`:
+In `test_index.py`, add at end of file before `if __name__`:
 
 ```python
 class TestSpriteFramesSchema:
@@ -26,7 +26,7 @@ class TestSpriteFramesSchema:
 
     def test_sprite_frames_table_exists(self, temp_db):
         """Verify sprite_frames table is created."""
-        conn = assetindex.get_db(temp_db)
+        conn = index.get_db(temp_db)
         cursor = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='sprite_frames'"
         )
@@ -35,7 +35,7 @@ class TestSpriteFramesSchema:
 
     def test_sprite_frames_columns(self, temp_db):
         """Verify sprite_frames has correct columns."""
-        conn = assetindex.get_db(temp_db)
+        conn = index.get_db(temp_db)
         cursor = conn.execute("PRAGMA table_info(sprite_frames)")
         columns = {row[1] for row in cursor.fetchall()}
         expected = {"id", "asset_id", "frame_index", "x", "y", "width", "height"}
@@ -46,14 +46,14 @@ class TestSpriteFramesSchema:
 **Step 2: Run test to verify it fails**
 
 ```bash
-cd /Users/pogaair/projects/asset-manager && uv run pytest test_assetindex.py::TestSpriteFramesSchema -v
+cd /Users/pogaair/projects/asset-manager && uv run pytest test_index.py::TestSpriteFramesSchema -v
 ```
 
 Expected: FAIL - sprite_frames table does not exist
 
 **Step 3: Add sprite_frames table to schema**
 
-In `assetindex.py`, add after line 113 (after `asset_embeddings` table):
+In `index.py`, add after line 113 (after `asset_embeddings` table):
 
 ```python
 CREATE TABLE IF NOT EXISTS sprite_frames (
@@ -80,7 +80,7 @@ Also add columns to assets table (in the CREATE TABLE assets section around line
 **Step 4: Run test to verify it passes**
 
 ```bash
-cd /Users/pogaair/projects/asset-manager && uv run pytest test_assetindex.py::TestSpriteFramesSchema -v
+cd /Users/pogaair/projects/asset-manager && uv run pytest test_index.py::TestSpriteFramesSchema -v
 ```
 
 Expected: PASS
@@ -112,7 +112,7 @@ Expected: All tests pass
 **Step 7: Commit**
 
 ```bash
-git add assetindex.py test_assetindex.py web/test_api.py
+git add index.py test_index.py web/test_api.py
 git commit -m "feat: add sprite_frames table schema
 
 Adds database table for storing per-frame sprite positions and dimensions.
@@ -1010,12 +1010,12 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 7: Integrate Sprite Analysis into Indexer
 
 **Files:**
-- Modify: `assetindex.py`
-- Modify: `test_assetindex.py`
+- Modify: `index.py`
+- Modify: `test_index.py`
 
 **Step 1: Write failing test for frame storage during indexing**
 
-Add to `test_assetindex.py`:
+Add to `test_index.py`:
 
 ```python
 class TestSpriteAnalysisIntegration:
@@ -1030,10 +1030,10 @@ class TestSpriteAnalysisIntegration:
         img.save(img_path)
 
         db_path = temp_dir / "test.db"
-        conn = assetindex.get_db(db_path)
+        conn = index.get_db(db_path)
 
         # Index the file
-        assetindex.index_asset(conn, img_path, temp_dir)
+        index.index_asset(conn, img_path, temp_dir)
         conn.commit()
 
         # Check frames were stored
@@ -1056,14 +1056,14 @@ class TestSpriteAnalysisIntegration:
 **Step 2: Run test to verify it fails**
 
 ```bash
-cd /Users/pogaair/projects/asset-manager && uv run pytest test_assetindex.py::TestSpriteAnalysisIntegration -v
+cd /Users/pogaair/projects/asset-manager && uv run pytest test_index.py::TestSpriteAnalysisIntegration -v
 ```
 
-Expected: FAIL - AttributeError: module 'assetindex' has no attribute 'index_asset'
+Expected: FAIL - AttributeError: module 'index' has no attribute 'index_asset'
 
 **Step 3: Add index_asset function and sprite frame storage**
 
-Add to `assetindex.py`:
+Add to `index.py`:
 
 ```python
 def store_sprite_frames(conn: sqlite3.Connection, asset_id: int, frames: list[dict]):
@@ -1191,7 +1191,7 @@ def index_asset(
 **Step 4: Run tests to verify they pass**
 
 ```bash
-cd /Users/pogaair/projects/asset-manager && uv run pytest test_assetindex.py::TestSpriteAnalysisIntegration -v
+cd /Users/pogaair/projects/asset-manager && uv run pytest test_index.py::TestSpriteAnalysisIntegration -v
 ```
 
 Expected: PASS
@@ -1199,7 +1199,7 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add assetindex.py test_assetindex.py
+git add index.py test_index.py
 git commit -m "feat: integrate sprite analysis into indexer
 
 Automatically analyzes spritesheets during indexing and stores frame data.
@@ -1212,12 +1212,12 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 8: Add CLI Commands for Sprite Operations
 
 **Files:**
-- Modify: `assetindex.py`
-- Modify: `test_assetindex.py`
+- Modify: `index.py`
+- Modify: `test_index.py`
 
 **Step 1: Write failing test for analyze CLI command**
 
-Add to `test_assetindex.py`:
+Add to `test_index.py`:
 
 ```python
 class TestSpriteCLI:
@@ -1233,7 +1233,7 @@ class TestSpriteCLI:
         img.save(img_path)
 
         runner = CliRunner()
-        result = runner.invoke(assetindex.app, ["analyze", str(img_path)])
+        result = runner.invoke(index.app, ["analyze", str(img_path)])
 
         assert result.exit_code == 0
         assert "frames" in result.stdout
@@ -1252,7 +1252,7 @@ class TestSpriteCLI:
         output_dir.mkdir()
 
         runner = CliRunner()
-        result = runner.invoke(assetindex.app, ["extract", str(img_path), str(output_dir)])
+        result = runner.invoke(index.app, ["extract", str(img_path), str(output_dir)])
 
         assert result.exit_code == 0
         # Should create frame_000.png, frame_001.png
@@ -1263,14 +1263,14 @@ class TestSpriteCLI:
 **Step 2: Run test to verify it fails**
 
 ```bash
-cd /Users/pogaair/projects/asset-manager && uv run pytest test_assetindex.py::TestSpriteCLI -v
+cd /Users/pogaair/projects/asset-manager && uv run pytest test_index.py::TestSpriteCLI -v
 ```
 
 Expected: FAIL - No such command 'analyze'
 
 **Step 3: Implement CLI commands**
 
-Add to `assetindex.py`:
+Add to `index.py`:
 
 ```python
 import json
@@ -1333,7 +1333,7 @@ def extract(
 **Step 4: Run tests to verify they pass**
 
 ```bash
-cd /Users/pogaair/projects/asset-manager && uv run pytest test_assetindex.py::TestSpriteCLI -v
+cd /Users/pogaair/projects/asset-manager && uv run pytest test_index.py::TestSpriteCLI -v
 ```
 
 Expected: PASS
@@ -1341,7 +1341,7 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add assetindex.py test_assetindex.py
+git add index.py test_index.py
 git commit -m "feat(cli): add analyze and extract commands
 
 - analyze: Output frame data as JSON or table
@@ -1779,7 +1779,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 **Step 1: Run all Python tests**
 
 ```bash
-cd /Users/pogaair/projects/asset-manager && uv run pytest test_assetindex.py test_sprite_analyzer.py -v
+cd /Users/pogaair/projects/asset-manager && uv run pytest test_index.py test_sprite_analyzer.py -v
 cd /Users/pogaair/projects/asset-manager/web && uv run pytest test_api.py -v
 ```
 
@@ -1790,10 +1790,10 @@ Expected: All pass
 ```bash
 # Re-index with sprite analysis
 cd /Users/pogaair/projects/asset-manager
-uv run ./assetindex.py index assets --force
+uv run ./index.py index assets --force
 
 # Test CLI commands
-uv run ./assetindex.py analyze "assets/Minifantasy_True_Heroes_III_v1.1/Minifantasy_True_Heroes_III_Assets/Fighter/General_Animations/Figther_Jump.png"
+uv run ./index.py analyze "assets/Minifantasy_True_Heroes_III_v1.1/Minifantasy_True_Heroes_III_Assets/Fighter/General_Animations/Figther_Jump.png"
 
 # Start API server
 cd web && uv run ./api.py &

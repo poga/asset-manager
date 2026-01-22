@@ -20,7 +20,7 @@ Vue 3 web interface with instant search for the asset-manager CLI tool. Focus on
 - Modal component for asset details
 
 **Backend:** FastAPI server wrapping existing search logic
-- Reuses `assetsearch.py` query functions directly
+- Reuses `search.py` query functions directly
 - Serves asset images from original paths
 - JSON API responses
 

@@ -22,39 +22,39 @@ A SQLite-based indexing and search system for game development assets. Index spr
 
 ```bash
 # Initial index
-uv run assetindex.py /path/to/assets --db assets.db
+uv run index.py /path/to/assets --db assets.db
 
 # Incremental update
-uv run assetindex.py --update
+uv run index.py --update
 ```
 
 ### Search Assets
 
 ```bash
 # Search by name
-uv run assetsearch.py search goblin
+uv run search.py search goblin
 
 # Search by tags
-uv run assetsearch.py search --tag creature --tag attack
+uv run search.py search --tag creature --tag attack
 
 # Search by color
-uv run assetsearch.py search --color red
-uv run assetsearch.py search --color "#ff5500"
+uv run search.py search --color red
+uv run search.py search --color "#ff5500"
 
 # Find similar assets
-uv run assetsearch.py similar reference.png
+uv run search.py similar reference.png
 
 # Filter by pack
-uv run assetsearch.py search --pack creatures
+uv run search.py search --pack creatures
 ```
 
 ### Utilities
 
 ```bash
-uv run assetsearch.py packs    # List all packs
-uv run assetsearch.py tags     # List all tags
-uv run assetsearch.py info 42  # Asset details by ID
-uv run assetsearch.py stats    # Index statistics
+uv run search.py packs    # List all packs
+uv run search.py tags     # List all tags
+uv run search.py info 42  # Asset details by ID
+uv run search.py stats    # Index statistics
 ```
 
 ## Database Schema
@@ -69,7 +69,7 @@ uv run assetsearch.py stats    # Index statistics
 ## Testing
 
 ```bash
-uv run pytest test_assetindex.py
+uv run pytest test_index.py
 ```
 
 ## Supported Formats

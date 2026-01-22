@@ -54,7 +54,7 @@ TAG_ALIASES = {
     "anims": "animations",
 }
 
-# Schema (same as assetsearch.py)
+# Schema (same as search.py)
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS packs (
     id INTEGER PRIMARY KEY,
@@ -651,7 +651,7 @@ def index(
     conn.commit()
 
     # Generate pack previews
-    preview_dir = db.parent / ".assetindex" / "previews"
+    preview_dir = db.parent / ".index" / "previews"
     console.print("Generating pack previews...")
     for row in conn.execute("SELECT id, name, preview_path FROM packs"):
         if row["preview_path"]:
@@ -683,7 +683,7 @@ def update(
     """Update index (incremental, hash-based)."""
     if not db.exists():
         console.print(f"[red]Database not found: {db}[/red]")
-        console.print("Run 'assetindex.py index <path>' first.")
+        console.print("Run 'index.py index <path>' first.")
         raise typer.Exit(1)
 
     # Get asset root from first pack
