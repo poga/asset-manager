@@ -69,9 +69,10 @@ CREATE TABLE IF NOT EXISTS assets (
     file_size INTEGER,
     width INTEGER,
     height INTEGER,
-    frame_count INTEGER,
-    frame_width INTEGER,
-    frame_height INTEGER,
+    preview_x INTEGER,
+    preview_y INTEGER,
+    preview_width INTEGER,
+    preview_height INTEGER,
     category TEXT,
     indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -218,7 +219,7 @@ def search(
 
     sql = f"""
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
-               a.frame_count, p.name as pack_name,
+               a.preview_width, a.preview_height, p.name as pack_name,
                GROUP_CONCAT(DISTINCT t.name) as tags
         FROM assets a
         LEFT JOIN packs p ON a.pack_id = p.id
@@ -239,8 +240,8 @@ def search(
 
     for row in rows:
         size = f"{row['width']}x{row['height']}" if row['width'] else "-"
-        if row['frame_count'] and row['frame_count'] > 1:
-            size += f" ({row['frame_count']}f)"
+        if row['preview_width'] and row['preview_height']:
+            size += f" (preview: {row['preview_width']}x{row['preview_height']})"
         tags = row['tags'] or ""
         print(f"{row['id']}\t{row['path']}\t{size}\t{row['pack_name'] or '-'}\t{tags}")
 
@@ -320,8 +321,8 @@ def info(
     print(f"size\t{row['file_size']}")
     if row['width']:
         print(f"dimensions\t{row['width']}x{row['height']}")
-    if row['frame_count']:
-        print(f"frames\t{row['frame_count']}\t{row['frame_width']}x{row['frame_height']}")
+    if row['preview_x'] is not None:
+        print(f"preview\t{row['preview_x']},{row['preview_y']}\t{row['preview_width']}x{row['preview_height']}")
 
     # Tags
     tags = conn.execute("""
