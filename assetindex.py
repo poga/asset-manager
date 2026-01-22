@@ -238,7 +238,8 @@ def generate_pack_preview(
     """Generate a preview montage for a pack."""
     # Get representative assets (prefer idle animations)
     rows = conn.execute("""
-        SELECT path, filename FROM assets
+        SELECT path, filename, preview_x, preview_y, preview_width, preview_height
+        FROM assets
         WHERE pack_id = ?
         AND filetype = 'png'
         ORDER BY
@@ -266,13 +267,14 @@ def generate_pack_preview(
 
             img_path = asset_root / row["path"]
             with Image.open(img_path) as img:
-                # For spritesheets, take first frame
-                if img.width > img.height:
-                    frame_w = img.height
-                    img = img.crop((0, 0, frame_w, frame_w))
-                elif img.height > img.width:
-                    frame_h = img.width
-                    img = img.crop((0, 0, frame_h, frame_h))
+                # Use preview bounds if available
+                if row["preview_x"] is not None:
+                    img = img.crop((
+                        row["preview_x"],
+                        row["preview_y"],
+                        row["preview_x"] + row["preview_width"],
+                        row["preview_y"] + row["preview_height"]
+                    ))
 
                 img.thumbnail((thumb_size, thumb_size), Image.Resampling.NEAREST)
                 # Center in cell
