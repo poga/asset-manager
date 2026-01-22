@@ -137,7 +137,7 @@ defineExpose({ addTagExternal })
 <style scoped>
 .search-bar {
   display: flex;
-  gap: 0.5rem;
+  gap: 12px;
   flex-wrap: wrap;
   align-items: center;
   margin-bottom: 1rem;
@@ -178,21 +178,6 @@ defineExpose({ addTagExternal })
 
 .search-input-wrapper input::placeholder {
   color: var(--color-text-muted);
-}
-
-.search-bar select {
-  padding: 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-bg-surface);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  transition: border-color 150ms;
-}
-
-.search-bar select:focus {
-  outline: none;
-  border-color: var(--color-accent);
 }
 
 .tag {
