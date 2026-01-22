@@ -19,9 +19,9 @@ index-assets:
 reindex-assets:
     uv run --script index.py index assets/ --force
 
-# Start API server (port 8000)
+# Start API server (port 8000) with auto-reload
 start-api:
-    uv run --script web/api.py
+    uv run --with fastapi --with uvicorn --with pillow uvicorn web.api:app --host 0.0.0.0 --port 8000 --reload
 
 # Start frontend dev server (port 5173)
 start-frontend:
