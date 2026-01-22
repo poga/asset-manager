@@ -391,7 +391,7 @@ def index_asset(
         conn.execute(
             """INSERT OR REPLACE INTO packs (name, path, version, indexed_at)
                VALUES (?, ?, ?, ?)""",
-            [pack_name, pack_rel, version, datetime.now()]
+            [pack_name, pack_rel, version, datetime.now().isoformat()]
         )
         pack_id = conn.execute("SELECT id FROM packs WHERE path = ?", [pack_rel]).fetchone()[0]
 
@@ -431,7 +431,7 @@ def index_asset(
             preview_bounds[2] if preview_bounds else None,
             preview_bounds[3] if preview_bounds else None,
             category,
-            datetime.now(),
+            datetime.now().isoformat(),
         ]
     )
 
