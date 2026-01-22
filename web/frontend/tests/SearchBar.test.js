@@ -52,9 +52,12 @@ describe('SearchBar', () => {
     const wrapper = mount(SearchBar, {
       props: { filters: mockFilters }
     })
-    // Select a tag from the dropdown
-    const tagSelect = wrapper.find('[data-filter="tag"]')
-    await tagSelect.setValue('character')
+    // Open the tag dropdown
+    const tagTrigger = wrapper.find('[data-filter="tag"] .dropdown-trigger')
+    await tagTrigger.trigger('click')
+    // Select a tag from the dropdown options
+    const options = wrapper.findAll('[data-filter="tag"] .dropdown-option')
+    await options[0].trigger('click')
     expect(wrapper.find('.tag').exists()).toBe(true)
   })
 

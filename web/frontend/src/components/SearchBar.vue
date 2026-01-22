@@ -32,10 +32,25 @@
         </button>
       </div>
     </div>
-    <select data-filter="tag" v-model="selectedTag" @change="addTag">
-      <option value="">Add tag...</option>
-      <option v-for="t in filters.tags" :key="t" :value="t">{{ t }}</option>
-    </select>
+    <div class="dropdown" data-filter="tag">
+      <button type="button" class="dropdown-trigger" @click="tagDropdownOpen = !tagDropdownOpen">
+        <span>Add tag...</span>
+        <svg class="dropdown-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+      <div v-if="tagDropdownOpen" class="dropdown-panel">
+        <button
+          v-for="t in filters.tags"
+          :key="t"
+          type="button"
+          class="dropdown-option"
+          @click="selectTag(t)"
+        >
+          {{ t }}
+        </button>
+      </div>
+    </div>
     <span v-for="t in tags" :key="t" class="tag" @click="removeTag(t)">
       {{ t }} &times;
     </span>
@@ -57,8 +72,8 @@ const emit = defineEmits(['search'])
 const query = ref('')
 const color = ref('')
 const tags = ref([])
-const selectedTag = ref('')
 const colorDropdownOpen = ref(false)
+const tagDropdownOpen = ref(false)
 
 function emitSearch() {
   emit('search', {
@@ -75,12 +90,12 @@ function selectColor(c) {
   emitSearch()
 }
 
-function addTag() {
-  if (selectedTag.value && !tags.value.includes(selectedTag.value)) {
-    tags.value.push(selectedTag.value)
-    selectedTag.value = ''
+function selectTag(tag) {
+  if (tag && !tags.value.includes(tag)) {
+    tags.value.push(tag)
     emitSearch()
   }
+  tagDropdownOpen.value = false
 }
 
 function removeTag(tag) {
