@@ -32,6 +32,16 @@ describe('router', () => {
       const route = parseRoute('/similar/abc-def')
       expect(route).toEqual({ name: 'similar', params: { id: 'abc-def' } })
     })
+
+    it('parses /pack/:name as pack route', () => {
+      const route = parseRoute('/pack/fantasy-characters')
+      expect(route).toEqual({ name: 'pack', params: { name: 'fantasy-characters' } })
+    })
+
+    it('parses /pack/:name with spaces encoded', () => {
+      const route = parseRoute('/pack/RPG%20Heroes')
+      expect(route).toEqual({ name: 'pack', params: { name: 'RPG%20Heroes' } })
+    })
   })
 
   describe('buildUrl', () => {
@@ -58,6 +68,11 @@ describe('router', () => {
     it('builds similar URL with string id', () => {
       const url = buildUrl({ name: 'similar', params: { id: 'abc-def' } })
       expect(url).toBe('/similar/abc-def')
+    })
+
+    it('builds pack URL with name', () => {
+      const url = buildUrl({ name: 'pack', params: { name: 'fantasy-characters' } })
+      expect(url).toBe('/pack/fantasy-characters')
     })
   })
 })
