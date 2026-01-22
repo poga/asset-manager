@@ -8,16 +8,28 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 
 const props = defineProps({
   assetId: {
     type: Number,
     required: true
   },
-  frames: {
-    type: Array,
-    required: true
+  previewX: {
+    type: Number,
+    default: null
+  },
+  previewY: {
+    type: Number,
+    default: null
+  },
+  previewWidth: {
+    type: Number,
+    default: null
+  },
+  previewHeight: {
+    type: Number,
+    default: null
   },
   width: {
     type: Number,
@@ -31,9 +43,6 @@ const props = defineProps({
 
 const canvas = ref(null)
 const displaySize = 100
-let animationInterval = null
-let currentFrame = 0
-let spriteImage = null
 
 const loadImage = () => {
   return new Promise((resolve, reject) => {
@@ -44,64 +53,46 @@ const loadImage = () => {
   })
 }
 
-const drawFrame = () => {
-  if (!canvas.value || !spriteImage || !props.frames.length) return
+const drawPreview = async () => {
+  if (!canvas.value) return
 
-  const ctx = canvas.value.getContext('2d')
-  const frame = props.frames[currentFrame]
-
-  // Clear canvas
-  ctx.clearRect(0, 0, displaySize, displaySize)
-
-  // Calculate scale to fit frame in display area
-  const scale = Math.min(displaySize / frame.width, displaySize / frame.height)
-  const scaledWidth = frame.width * scale
-  const scaledHeight = frame.height * scale
-  const offsetX = (displaySize - scaledWidth) / 2
-  const offsetY = (displaySize - scaledHeight) / 2
-
-  // Disable smoothing for pixel art
-  ctx.imageSmoothingEnabled = false
-
-  // Draw current frame
-  ctx.drawImage(
-    spriteImage,
-    frame.x, frame.y, frame.width, frame.height,
-    offsetX, offsetY, scaledWidth, scaledHeight
-  )
-}
-
-const startAnimation = async () => {
   try {
-    spriteImage = await loadImage()
-    drawFrame()
+    const img = await loadImage()
+    const ctx = canvas.value.getContext('2d')
 
-    if (props.frames.length > 1) {
-      animationInterval = setInterval(() => {
-        currentFrame = (currentFrame + 1) % props.frames.length
-        drawFrame()
-      }, 120)
-    }
+    // Clear canvas
+    ctx.clearRect(0, 0, displaySize, displaySize)
+
+    // Determine source region
+    const sx = props.previewX ?? 0
+    const sy = props.previewY ?? 0
+    const sw = props.previewWidth ?? props.width
+    const sh = props.previewHeight ?? props.height
+
+    // Calculate scale to fit in display area
+    const scale = Math.min(displaySize / sw, displaySize / sh)
+    const scaledWidth = sw * scale
+    const scaledHeight = sh * scale
+    const offsetX = (displaySize - scaledWidth) / 2
+    const offsetY = (displaySize - scaledHeight) / 2
+
+    // Disable smoothing for pixel art
+    ctx.imageSmoothingEnabled = false
+
+    // Draw preview region
+    ctx.drawImage(
+      img,
+      sx, sy, sw, sh,
+      offsetX, offsetY, scaledWidth, scaledHeight
+    )
   } catch (e) {
     console.error('Failed to load sprite:', e)
   }
 }
 
-const stopAnimation = () => {
-  if (animationInterval) {
-    clearInterval(animationInterval)
-    animationInterval = null
-  }
-}
+onMounted(drawPreview)
 
-onMounted(startAnimation)
-onUnmounted(stopAnimation)
-
-watch(() => props.assetId, () => {
-  stopAnimation()
-  currentFrame = 0
-  startAnimation()
-})
+watch(() => props.assetId, drawPreview)
 </script>
 
 <style scoped>

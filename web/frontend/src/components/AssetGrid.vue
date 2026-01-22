@@ -11,9 +11,12 @@
         @click="$emit('select', asset.id)"
       >
         <SpritePreview
-          v-if="asset.frames && asset.frames.length > 1"
+          v-if="asset.preview_x !== null"
           :asset-id="asset.id"
-          :frames="asset.frames"
+          :preview-x="asset.preview_x"
+          :preview-y="asset.preview_y"
+          :preview-width="asset.preview_width"
+          :preview-height="asset.preview_height"
           :width="asset.width"
           :height="asset.height"
         />
