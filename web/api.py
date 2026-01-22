@@ -161,6 +161,7 @@ def search(
 
     sql = f"""
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
+               a.preview_x, a.preview_y, a.preview_width, a.preview_height,
                p.name as pack_name,
                GROUP_CONCAT(DISTINCT tg.name) as tags
         FROM assets a
@@ -187,6 +188,10 @@ def search(
             "tags": row["tags"].split(",") if row["tags"] else [],
             "width": row["width"],
             "height": row["height"],
+            "preview_x": row["preview_x"],
+            "preview_y": row["preview_y"],
+            "preview_width": row["preview_width"],
+            "preview_height": row["preview_height"],
         })
 
     return {"assets": assets, "total": len(assets)}

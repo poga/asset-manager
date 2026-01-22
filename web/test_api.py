@@ -268,5 +268,42 @@ def test_image_serves_file(test_db, tmp_path):
     assert response.headers["content-type"] == "image/png"
 
 
+def test_search_includes_preview_bounds(test_db):
+    """Search results include preview bounds."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # Add preview bounds to test asset
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    conn.execute(
+        "UPDATE assets SET preview_x=0, preview_y=0, preview_width=32, preview_height=32 WHERE id=1"
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.get("/api/search?q=goblin")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["assets"]) == 1
+    asset = data["assets"][0]
+    assert asset["preview_x"] == 0
+    assert asset["preview_y"] == 0
+    assert asset["preview_width"] == 32
+    assert asset["preview_height"] == 32
+
+
+def test_search_preview_bounds_null_when_not_set(test_db):
+    """Search results have null preview bounds when not detected."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.get("/api/search?q=goblin")
+    assert response.status_code == 200
+    data = response.json()
+    asset = data["assets"][0]
+    assert asset["preview_x"] is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
