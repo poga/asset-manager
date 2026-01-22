@@ -10,6 +10,83 @@ import AssetGrid from '../src/components/AssetGrid.vue'
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
+// Mock localStorage globally for all tests
+let localStorageMock = {}
+beforeEach(() => {
+  localStorageMock = {}
+  vi.stubGlobal('localStorage', {
+    getItem: vi.fn((key) => localStorageMock[key] || null),
+    setItem: vi.fn((key, value) => { localStorageMock[key] = value }),
+    removeItem: vi.fn((key) => { delete localStorageMock[key] }),
+    clear: vi.fn(() => { localStorageMock = {} })
+  })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  document.documentElement.removeAttribute('data-theme')
+})
+
+describe('Theme toggle', () => {
+  beforeEach(() => {
+    document.documentElement.removeAttribute('data-theme')
+
+    // Default fetch responses
+    mockFetch.mockImplementation((url) => {
+      if (url === '/api/filters') {
+        return Promise.resolve({
+          json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
+        })
+      }
+      if (url.startsWith('/api/search')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({ assets: [] })
+        })
+      }
+      return Promise.resolve({ json: () => Promise.resolve({}) })
+    })
+  })
+
+  afterEach(() => {
+    mockFetch.mockReset()
+  })
+
+  it('renders theme toggle button', async () => {
+    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="theme-toggle"]').exists()).toBe(true)
+  })
+
+  it('toggles theme on click', async () => {
+    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    await flushPromises()
+
+    const toggle = wrapper.find('[data-testid="theme-toggle"]')
+    await toggle.trigger('click')
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+  })
+
+  it('persists theme to localStorage', async () => {
+    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    await flushPromises()
+
+    const toggle = wrapper.find('[data-testid="theme-toggle"]')
+    await toggle.trigger('click')
+
+    expect(localStorage.getItem('theme')).toBe('dark')
+  })
+
+  it('loads theme from localStorage on mount', async () => {
+    localStorageMock['theme'] = 'dark'
+
+    mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    await flushPromises()
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+  })
+})
+
 describe('App URL routing', () => {
   let pushStateSpy
   let originalLocation
