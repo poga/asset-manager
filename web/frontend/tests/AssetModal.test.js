@@ -63,4 +63,13 @@ describe('AssetModal', () => {
     await wrapper.find('.modal-overlay').trigger('click')
     expect(wrapper.emitted('close')).toBeTruthy()
   })
+
+  it('emits view-pack event with pack name when View Pack clicked', async () => {
+    const wrapper = mount(AssetModal, {
+      props: { asset: mockAsset }
+    })
+    await wrapper.find('.view-pack-btn').trigger('click')
+    expect(wrapper.emitted('view-pack')).toBeTruthy()
+    expect(wrapper.emitted('view-pack')[0]).toEqual(['creatures'])
+  })
 })

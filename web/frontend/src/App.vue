@@ -2,15 +2,16 @@
   <div class="app">
     <h1>Asset Search</h1>
 
-    <SearchBar :filters="filters" @search="handleSearch" />
+    <SearchBar :filters="filters" :current-pack="currentPack" @search="handleSearch" @clear-pack="clearPack" />
 
-    <AssetGrid :assets="assets" @select="selectAsset" />
+    <AssetGrid :assets="assets" @select="selectAsset" @view-pack="viewPack" />
 
     <AssetModal
       v-if="selectedAsset"
       :asset="selectedAsset"
       @close="selectedAsset = null"
       @find-similar="findSimilar"
+      @view-pack="viewPack"
     />
   </div>
 </template>
@@ -25,6 +26,7 @@ import { parseRoute } from './router.js'
 const filters = ref({ packs: [], tags: [], colors: [] })
 const assets = ref([])
 const selectedAsset = ref(null)
+const currentPack = ref(null)
 
 let debounceTimer = null
 let skipNextPush = false
@@ -75,6 +77,23 @@ async function loadSimilarFromUrl(id) {
   assets.value = data.assets
 }
 
+async function loadPack(packName) {
+  currentPack.value = packName
+  await search({ q: null, tag: [], color: null, pack: packName, type: null })
+}
+
+function viewPack(packName) {
+  selectedAsset.value = null
+  window.history.pushState({ route: 'pack', name: packName }, '', `/pack/${packName}`)
+  loadPack(packName)
+}
+
+function clearPack() {
+  currentPack.value = null
+  window.history.pushState({ route: 'home' }, '', '/')
+  search({ q: null, tag: [], color: null, pack: null, type: null })
+}
+
 watch(selectedAsset, (newVal, oldVal) => {
   if (oldVal !== null && newVal === null && !skipNextPush) {
     window.history.pushState({ route: 'home' }, '', '/')
@@ -87,12 +106,17 @@ function handlePopState(event) {
   skipNextPush = true
   if (route.name === 'home') {
     selectedAsset.value = null
+    currentPack.value = null
     search({ q: null, tag: [], color: null, pack: null, type: null })
   } else if (route.name === 'asset') {
     selectAssetFromUrl(route.params.id)
   } else if (route.name === 'similar') {
     selectedAsset.value = null
+    currentPack.value = null
     loadSimilarFromUrl(route.params.id)
+  } else if (route.name === 'pack') {
+    selectedAsset.value = null
+    loadPack(route.params.name)
   }
 }
 
@@ -107,6 +131,8 @@ function handleInitialRoute() {
     selectAssetFromUrl(route.params.id)
   } else if (route.name === 'similar') {
     loadSimilarFromUrl(route.params.id)
+  } else if (route.name === 'pack') {
+    loadPack(route.params.name)
   }
 }
 

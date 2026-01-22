@@ -45,4 +45,25 @@ describe('SearchBar', () => {
     const select = wrapper.find('select[data-filter="color"]')
     expect(select.exists()).toBe(true)
   })
+
+  it('shows pack header when currentPack is set', () => {
+    const wrapper = mount(SearchBar, {
+      props: {
+        filters: { packs: [], tags: [], colors: [] },
+        currentPack: 'fantasy-pack'
+      }
+    })
+    expect(wrapper.text()).toContain('Viewing: fantasy-pack')
+  })
+
+  it('emits clear-pack when clear button clicked', async () => {
+    const wrapper = mount(SearchBar, {
+      props: {
+        filters: { packs: [], tags: [], colors: [] },
+        currentPack: 'fantasy-pack'
+      }
+    })
+    await wrapper.find('.clear-pack-btn').trigger('click')
+    expect(wrapper.emitted('clear-pack')).toBeTruthy()
+  })
 })

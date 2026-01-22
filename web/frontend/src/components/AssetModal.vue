@@ -35,6 +35,9 @@
       <button @click="$emit('find-similar', asset.id)" class="find-similar-btn">
         Find Similar
       </button>
+      <button @click="$emit('view-pack', asset.pack)" class="view-pack-btn" v-if="asset.pack">
+        View Pack
+      </button>
     </div>
   </div>
 </template>
@@ -47,7 +50,7 @@ defineProps({
   }
 })
 
-defineEmits(['close', 'find-similar'])
+defineEmits(['close', 'find-similar', 'view-pack'])
 </script>
 
 <style scoped>
@@ -144,5 +147,20 @@ h2 {
 
 .find-similar-btn:hover {
   background: #0056b3;
+}
+
+.view-pack-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-left: 0.5rem;
+}
+
+.view-pack-btn:hover {
+  background: #218838;
 }
 </style>
