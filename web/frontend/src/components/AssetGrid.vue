@@ -8,6 +8,9 @@
         v-for="asset in assets"
         :key="asset.id"
         class="asset-item"
+        :class="{ 'in-cart': cartIds.includes(asset.id) }"
+        @mouseenter="hoveredId = asset.id"
+        @mouseleave="hoveredId = null"
       >
         <div
           class="asset-image-container"
@@ -29,6 +32,12 @@
             :src="`/api/image/${asset.id}`"
             :alt="asset.filename"
           />
+          <button
+            v-if="hoveredId === asset.id && !cartIds.includes(asset.id)"
+            class="add-cart-btn"
+            @click.stop="$emit('add-to-cart', asset)"
+          >+</button>
+          <span v-if="cartIds.includes(asset.id)" class="cart-indicator">✓</span>
         </div>
         <div class="asset-info">
           <span
@@ -47,16 +56,23 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import SpritePreview from './SpritePreview.vue'
 
 defineProps({
   assets: {
     type: Array,
     required: true
+  },
+  cartIds: {
+    type: Array,
+    default: () => []
   }
 })
 
-defineEmits(['select', 'view-pack'])
+defineEmits(['select', 'view-pack', 'add-to-cart'])
+
+const hoveredId = ref(null)
 </script>
 
 <style scoped>
@@ -90,6 +106,47 @@ defineEmits(['select', 'view-pack'])
   align-items: center;
   justify-content: center;
   background: #f8f8f8;
+  position: relative;
+}
+
+.add-cart-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: #007bff;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-cart-btn:hover {
+  background: #0056b3;
+}
+
+.cart-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #28a745;
+  color: white;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.in-cart {
+  border-color: #28a745;
 }
 
 .asset-image-container img {

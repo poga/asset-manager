@@ -61,4 +61,30 @@ describe('AssetGrid', () => {
     expect(wrapper.emitted('view-pack')).toBeTruthy()
     expect(wrapper.emitted('view-pack')[0]).toEqual(['fantasy-pack'])
   })
+
+  it('shows add-to-cart button on hover', async () => {
+    const wrapper = mount(AssetGrid, {
+      props: { assets: mockAssets, cartIds: [] }
+    })
+    const item = wrapper.find('.asset-item')
+    await item.trigger('mouseenter')
+    expect(wrapper.find('.add-cart-btn').exists()).toBe(true)
+  })
+
+  it('emits add-to-cart when button clicked', async () => {
+    const wrapper = mount(AssetGrid, {
+      props: { assets: mockAssets, cartIds: [] }
+    })
+    const item = wrapper.find('.asset-item')
+    await item.trigger('mouseenter')
+    await wrapper.find('.add-cart-btn').trigger('click')
+    expect(wrapper.emitted('add-to-cart')).toBeTruthy()
+  })
+
+  it('shows in-cart indicator for items in cart', () => {
+    const wrapper = mount(AssetGrid, {
+      props: { assets: mockAssets, cartIds: [1] }
+    })
+    expect(wrapper.find('.in-cart').exists()).toBe(true)
+  })
 })
