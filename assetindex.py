@@ -568,6 +568,11 @@ def index(
             # Get image info
             img_info = get_image_info(file_path) if file_path.suffix.lower() in IMAGE_EXTENSIONS else {}
 
+            # Detect preview bounds for spritesheets
+            preview_bounds = None
+            if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+                preview_bounds = detect_first_sprite_bounds(file_path)
+
             # Category
             category = get_category(file_path, pack_path) if pack_name else ""
 
@@ -575,8 +580,9 @@ def index(
             conn.execute(
                 """INSERT OR REPLACE INTO assets
                    (pack_id, path, filename, filetype, file_hash, file_size,
-                    width, height, category, indexed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    width, height, preview_x, preview_y, preview_width, preview_height,
+                    category, indexed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [
                     pack_id,
                     rel_path,
@@ -586,6 +592,10 @@ def index(
                     file_path.stat().st_size,
                     img_info.get("width"),
                     img_info.get("height"),
+                    preview_bounds[0] if preview_bounds else None,
+                    preview_bounds[1] if preview_bounds else None,
+                    preview_bounds[2] if preview_bounds else None,
+                    preview_bounds[3] if preview_bounds else None,
                     category,
                     datetime.now(),
                 ]
