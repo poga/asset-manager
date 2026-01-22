@@ -103,7 +103,6 @@ function formatPackName(name) {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #fafafa;
 }
 
 .pack-header {
@@ -111,14 +110,14 @@ function formatPackName(name) {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
 .pack-title {
   font-weight: 600;
   font-size: 0.875rem;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .icon-btn {
@@ -127,22 +126,35 @@ function formatPackName(name) {
   cursor: pointer;
   padding: 0.25rem;
   font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.icon-btn:hover {
+  color: var(--color-text-primary);
 }
 
 .pack-search {
   margin: 0.5rem;
   padding: 0.5rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   font-size: 0.875rem;
   flex-shrink: 0;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+}
+
+.pack-search:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-light);
 }
 
 .pack-actions {
   display: flex;
   gap: 0.5rem;
   padding: 0.5rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -150,14 +162,17 @@ function formatPackName(name) {
   flex: 1;
   padding: 0.375rem 0.5rem;
   font-size: 0.75rem;
-  background: #fff;
-  border: 1px solid #ddd;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   cursor: pointer;
+  color: var(--color-text-primary);
+  transition: background-color 150ms, border-color 150ms;
 }
 
 .action-btn:hover:not(:disabled) {
-  background: #f0f0f0;
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-emphasis);
 }
 
 .action-btn:disabled {
@@ -172,22 +187,24 @@ function formatPackName(name) {
 }
 
 .pack-card {
-  background: #fff;
-  border: 2px solid #e0e0e0;
+  background: var(--color-bg-surface);
+  border: 2px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   margin-bottom: 0.5rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 150ms, box-shadow 150ms;
 }
 
 .pack-card:hover {
-  border-color: #999;
+  border-color: var(--color-border-emphasis);
+  box-shadow: var(--shadow-card);
 }
 
 .pack-card.selected {
-  border-color: #2196f3;
-  box-shadow: 0 0 0 1px #2196f3;
+  border-color: var(--color-accent);
+  border-left-width: 4px;
+  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 .pack-preview-container {
@@ -212,21 +229,21 @@ function formatPackName(name) {
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
-  background: #fff;
+  background: var(--color-bg-surface);
 }
 
 .pack-name {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
   line-height: 1.3;
   flex: 1;
 }
 
 .pack-count {
   font-size: 0.75rem;
-  color: #666;
-  background: #f0f0f0;
+  color: var(--color-text-secondary);
+  background: var(--color-accent-light);
   padding: 0.125rem 0.5rem;
   border-radius: 10px;
   flex-shrink: 0;
