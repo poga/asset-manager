@@ -12,10 +12,26 @@
         @input="emitSearch"
       />
     </div>
-    <select data-filter="color" v-model="color" @change="emitSearch">
-      <option value="">Any color</option>
-      <option v-for="c in filters.colors" :key="c" :value="c">{{ c }}</option>
-    </select>
+    <div class="dropdown" data-filter="color">
+      <button type="button" class="dropdown-trigger" @click="colorDropdownOpen = !colorDropdownOpen">
+        <span>{{ color || 'Any color' }}</span>
+        <svg class="dropdown-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+      <div v-if="colorDropdownOpen" class="dropdown-panel">
+        <button type="button" class="dropdown-option" @click="selectColor('')">Any color</button>
+        <button
+          v-for="c in filters.colors"
+          :key="c"
+          type="button"
+          class="dropdown-option"
+          @click="selectColor(c)"
+        >
+          {{ c }}
+        </button>
+      </div>
+    </div>
     <select data-filter="tag" v-model="selectedTag" @change="addTag">
       <option value="">Add tag...</option>
       <option v-for="t in filters.tags" :key="t" :value="t">{{ t }}</option>
@@ -42,6 +58,7 @@ const query = ref('')
 const color = ref('')
 const tags = ref([])
 const selectedTag = ref('')
+const colorDropdownOpen = ref(false)
 
 function emitSearch() {
   emit('search', {
@@ -50,6 +67,12 @@ function emitSearch() {
     color: color.value || null,
     type: null
   })
+}
+
+function selectColor(c) {
+  color.value = c
+  colorDropdownOpen.value = false
+  emitSearch()
 }
 
 function addTag() {
@@ -149,5 +172,66 @@ defineExpose({ addTagExternal })
 .tag:hover {
   background: var(--color-accent);
   color: white;
+}
+
+.dropdown {
+  position: relative;
+}
+
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  min-width: 100px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.dropdown-trigger:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.dropdown-chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.dropdown-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-elevated);
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dropdown-option {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown-option:hover {
+  background: var(--color-bg-elevated);
 }
 </style>

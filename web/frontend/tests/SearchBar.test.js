@@ -52,10 +52,9 @@ describe('SearchBar', () => {
     const wrapper = mount(SearchBar, {
       props: { filters: mockFilters }
     })
-    // Open tag dropdown
-    await wrapper.find('[data-filter="tag"]').trigger('click')
-    // Click first tag option
-    await wrapper.find('[data-filter="tag"] .dropdown-option').trigger('click')
+    // Select a tag from the dropdown
+    const tagSelect = wrapper.find('[data-filter="tag"]')
+    await tagSelect.setValue('character')
     expect(wrapper.find('.tag').exists()).toBe(true)
   })
 
@@ -76,14 +75,14 @@ describe('SearchBar', () => {
     const wrapper = mount(SearchBar, {
       props: { filters: mockFilters }
     })
-    const dropdown = wrapper.find('[data-filter="color"]')
+    const dropdownTrigger = wrapper.find('[data-filter="color"] .dropdown-trigger')
     // Initially closed
     expect(wrapper.find('[data-filter="color"] .dropdown-panel').exists()).toBe(false)
     // Click to open
-    await dropdown.trigger('click')
+    await dropdownTrigger.trigger('click')
     expect(wrapper.find('.dropdown-panel').exists()).toBe(true)
     // Click again to close
-    await dropdown.trigger('click')
+    await dropdownTrigger.trigger('click')
     expect(wrapper.find('[data-filter="color"] .dropdown-panel').exists()).toBe(false)
   })
 
