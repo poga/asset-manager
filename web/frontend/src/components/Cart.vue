@@ -58,7 +58,6 @@ defineEmits(['remove', 'download'])
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #fafafa;
 }
 
 .cart-header {
@@ -66,13 +65,13 @@ defineEmits(['remove', 'download'])
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .cart-title {
   font-weight: 600;
   font-size: 0.875rem;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .download-btn {
@@ -82,16 +81,18 @@ defineEmits(['remove', 'download'])
   gap: 0.5rem;
   margin: 1rem;
   padding: 1rem;
-  background: #f0f0f0;
-  border: 1px solid #ddd;
+  background: var(--color-accent);
+  color: white;
+  border: none;
   border-radius: 8px;
   cursor: pointer;
   font-size: 0.875rem;
-  transition: background 0.2s;
+  font-weight: 500;
+  transition: background-color 150ms;
 }
 
 .download-btn:hover:not(:disabled) {
-  background: #e8e8e8;
+  background: var(--color-accent-hover);
 }
 
 .download-btn:disabled {
@@ -109,12 +110,13 @@ defineEmits(['remove', 'download'])
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
-  color: #666;
-  border-bottom: 1px solid #e0e0e0;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .item-count {
-  background: #e0e0e0;
+  background: var(--color-accent-light);
+  color: var(--color-accent-hover);
   padding: 0.125rem 0.5rem;
   border-radius: 10px;
   font-size: 0.75rem;
@@ -130,19 +132,20 @@ defineEmits(['remove', 'download'])
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 150ms;
 }
 
 .cart-item:hover {
-  background: #f5f5f5;
+  background: var(--color-bg-elevated);
 }
 
 .item-thumbnail {
   width: 40px;
   height: 40px;
   object-fit: contain;
-  background: #fff;
-  border: 1px solid #ddd;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   image-rendering: pixelated;
 }
@@ -156,7 +159,7 @@ defineEmits(['remove', 'download'])
   display: block;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -165,20 +168,21 @@ defineEmits(['remove', 'download'])
 .item-pack {
   display: block;
   font-size: 0.75rem;
-  color: #888;
+  color: var(--color-text-muted);
 }
 
 .remove-btn {
   background: none;
   border: none;
   font-size: 1.25rem;
-  color: #999;
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0.25rem;
+  transition: color 150ms;
 }
 
 .remove-btn:hover {
-  color: #666;
+  color: var(--color-danger);
 }
 
 .empty-state {
@@ -187,7 +191,7 @@ defineEmits(['remove', 'download'])
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #888;
+  color: var(--color-text-muted);
   text-align: center;
   padding: 2rem;
 }
@@ -198,5 +202,6 @@ defineEmits(['remove', 'download'])
 
 .hint {
   font-size: 0.75rem;
+  color: var(--color-accent);
 }
 </style>
