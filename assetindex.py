@@ -75,9 +75,10 @@ CREATE TABLE IF NOT EXISTS assets (
     file_size INTEGER,
     width INTEGER,
     height INTEGER,
-    frame_count INTEGER,
-    frame_width INTEGER,
-    frame_height INTEGER,
+    preview_x INTEGER,
+    preview_y INTEGER,
+    preview_width INTEGER,
+    preview_height INTEGER,
     category TEXT,
     indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -117,20 +118,6 @@ CREATE TABLE IF NOT EXISTS asset_embeddings (
     asset_id INTEGER PRIMARY KEY REFERENCES assets(id),
     embedding BLOB
 );
-
-CREATE TABLE IF NOT EXISTS sprite_frames (
-    id INTEGER PRIMARY KEY,
-    asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
-    frame_index INTEGER NOT NULL,
-    x INTEGER NOT NULL,
-    y INTEGER NOT NULL,
-    width INTEGER NOT NULL,
-    height INTEGER NOT NULL,
-    duration_ms INTEGER,
-    UNIQUE(asset_id, frame_index)
-);
-
-CREATE INDEX IF NOT EXISTS idx_sprite_frames_asset_id ON sprite_frames(asset_id);
 
 CREATE INDEX IF NOT EXISTS idx_assets_filename ON assets(filename);
 CREATE INDEX IF NOT EXISTS idx_assets_filetype ON assets(filetype);

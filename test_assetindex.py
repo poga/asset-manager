@@ -796,25 +796,27 @@ class TestSpriteAnalysisIntegration:
         conn.close()
 
 
-class TestSpriteFramesSchema:
-    """Tests for sprite_frames table."""
+class TestPreviewBoundsSchema:
+    """Tests for preview bounds columns in assets table."""
 
-    def test_sprite_frames_table_exists(self, temp_db):
-        """Verify sprite_frames table is created."""
+    def test_assets_table_has_preview_columns(self, temp_db):
+        """Verify assets table has preview_x, preview_y, preview_width, preview_height."""
+        conn = assetindex.get_db(temp_db)
+        cursor = conn.execute("PRAGMA table_info(assets)")
+        columns = {row[1] for row in cursor.fetchall()}
+        assert "preview_x" in columns
+        assert "preview_y" in columns
+        assert "preview_width" in columns
+        assert "preview_height" in columns
+        conn.close()
+
+    def test_sprite_frames_table_removed(self, temp_db):
+        """Verify sprite_frames table no longer exists."""
         conn = assetindex.get_db(temp_db)
         cursor = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='sprite_frames'"
         )
-        assert cursor.fetchone() is not None
-        conn.close()
-
-    def test_sprite_frames_columns(self, temp_db):
-        """Verify sprite_frames has correct columns."""
-        conn = assetindex.get_db(temp_db)
-        cursor = conn.execute("PRAGMA table_info(sprite_frames)")
-        columns = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "asset_id", "frame_index", "x", "y", "width", "height"}
-        assert expected.issubset(columns)
+        assert cursor.fetchone() is None
         conn.close()
 
 
