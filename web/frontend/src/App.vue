@@ -87,6 +87,7 @@ function handlePopState(event) {
   skipNextPush = true
   if (route.name === 'home') {
     selectedAsset.value = null
+    search({ q: null, tag: [], color: null, pack: null, type: null })
   } else if (route.name === 'asset') {
     selectAssetFromUrl(route.params.id)
   } else if (route.name === 'similar') {

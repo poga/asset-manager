@@ -181,4 +181,52 @@ describe('App URL routing', () => {
 
     expect(mockFetch).toHaveBeenCalledWith('/api/similar/789')
   })
+
+  it('reloads default search when navigating back to home from similar', async () => {
+    // Start at /similar/123
+    window.history.replaceState({}, '', '/similar/123')
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    // Verify we have similar assets loaded
+    expect(wrapper.vm.assets.length).toBe(2)
+    mockFetch.mockClear()
+
+    // Navigate back to home
+    window.history.replaceState({}, '', '/')
+    window.dispatchEvent(new PopStateEvent('popstate', {
+      state: { route: 'home' }
+    }))
+    await flushPromises()
+
+    // Should have called search API
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/search'))
+  })
+
+  it('reloads default search when navigating back to home from asset', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    // Load similar first to have non-default assets
+    wrapper.vm.findSimilar(123)
+    await flushPromises()
+    expect(wrapper.vm.assets.length).toBe(2)
+    mockFetch.mockClear()
+
+    // Open an asset
+    wrapper.vm.selectAsset(123)
+    await flushPromises()
+    mockFetch.mockClear()
+
+    // Navigate back to home (close modal)
+    window.history.replaceState({}, '', '/')
+    window.dispatchEvent(new PopStateEvent('popstate', {
+      state: { route: 'home' }
+    }))
+    await flushPromises()
+
+    // Should have called search API to reload default results
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/search'))
+  })
 })
