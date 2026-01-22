@@ -201,6 +201,64 @@ def compute_phash(path: Path) -> Optional[bytes]:
         return None
 
 
+def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]]:
+    """
+    Find the bounding box of the first sprite in an image using flood-fill.
+
+    Returns (x, y, width, height) or None if no sprite found or no alpha channel.
+    """
+    try:
+        with Image.open(path) as img:
+            # Only work with images that have an alpha channel
+            if img.mode != "RGBA":
+                return None
+
+            width, height = img.size
+            pixels = img.load()
+
+            start_x, start_y = None, None
+            for y in range(height):
+                for x in range(width):
+                    if pixels[x, y][3] > 0:
+                        start_x, start_y = x, y
+                        break
+                if start_x is not None:
+                    break
+
+            if start_x is None:
+                return None
+
+            visited = set()
+            stack = [(start_x, start_y)]
+            min_x, min_y = start_x, start_y
+            max_x, max_y = start_x, start_y
+
+            while stack:
+                cx, cy = stack.pop()
+                if (cx, cy) in visited:
+                    continue
+                if cx < 0 or cx >= width or cy < 0 or cy >= height:
+                    continue
+                if pixels[cx, cy][3] == 0:
+                    continue
+
+                visited.add((cx, cy))
+                min_x = min(min_x, cx)
+                min_y = min(min_y, cy)
+                max_x = max(max_x, cx)
+                max_y = max(max_y, cy)
+
+                for dx in [-1, 0, 1]:
+                    for dy in [-1, 0, 1]:
+                        if dx == 0 and dy == 0:
+                            continue
+                        stack.append((cx + dx, cy + dy))
+
+            return (min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+    except Exception:
+        return None
+
+
 def generate_pack_preview(
     conn: sqlite3.Connection,
     pack_id: int,

@@ -235,6 +235,68 @@ class TestExtractColors:
         assert colors == []
 
 
+class TestDetectFirstSpriteBounds:
+    """Tests for detect_first_sprite_bounds function."""
+
+    def test_finds_first_sprite_in_horizontal_strip(self, temp_dir):
+        """Detects first sprite in a horizontal spritesheet."""
+        img_path = temp_dir / "strip.png"
+        img = Image.new("RGBA", (64, 32), (0, 0, 0, 0))
+        for x in range(32):
+            for y in range(32):
+                img.putpixel((x, y), (255, 0, 0, 255))
+        img.save(img_path)
+
+        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        assert bounds == (0, 0, 32, 32)
+
+    def test_finds_sprite_with_internal_transparency(self, temp_dir):
+        """Detects sprite that has transparent pixels inside (like a donut)."""
+        img_path = temp_dir / "donut.png"
+        img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+        for x in range(32):
+            for y in range(32):
+                dist_from_center = ((x - 16) ** 2 + (y - 16) ** 2) ** 0.5
+                if 8 <= dist_from_center <= 14:
+                    img.putpixel((x, y), (0, 255, 0, 255))
+        img.save(img_path)
+
+        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        assert bounds is not None
+        x, y, w, h = bounds
+        assert w >= 28 and h >= 28
+
+    def test_returns_none_for_fully_transparent(self, temp_dir):
+        """Returns None for fully transparent image."""
+        img_path = temp_dir / "transparent.png"
+        img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+        img.save(img_path)
+
+        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        assert bounds is None
+
+    def test_returns_none_for_no_alpha_channel(self, temp_dir):
+        """Returns None for images without alpha channel."""
+        img_path = temp_dir / "rgb.png"
+        img = Image.new("RGB", (32, 32), (255, 0, 0))
+        img.save(img_path)
+
+        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        assert bounds is None
+
+    def test_handles_sprite_not_at_origin(self, temp_dir):
+        """Finds sprite that doesn't start at (0,0)."""
+        img_path = temp_dir / "offset.png"
+        img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        for x in range(16, 36):
+            for y in range(16, 36):
+                img.putpixel((x, y), (0, 0, 255, 255))
+        img.save(img_path)
+
+        bounds = assetindex.detect_first_sprite_bounds(img_path)
+        assert bounds == (16, 16, 20, 20)
+
+
 class TestComputePhash:
     """Tests for compute_phash function."""
 
