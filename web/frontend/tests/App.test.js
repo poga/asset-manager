@@ -229,4 +229,66 @@ describe('App URL routing', () => {
     // Should have called search API to reload default results
     expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/search'))
   })
+
+  it('loads pack assets when navigating to /pack/:name', async () => {
+    // Set URL before mounting
+    window.history.replaceState({}, '', '/pack/fantasy-pack')
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    // Verify the search API was called with pack filter
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('pack=fantasy-pack'))
+  })
+
+  it('calls pushState with /pack/:name when viewing pack', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+    pushStateSpy.mockClear()
+
+    // View pack
+    wrapper.vm.viewPack('fantasy-pack')
+    await flushPromises()
+
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { route: 'pack', name: 'fantasy-pack' },
+      '',
+      '/pack/fantasy-pack'
+    )
+  })
+
+  it('handles popstate to pack route', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+    mockFetch.mockClear()
+
+    // Simulate forward to pack
+    window.history.replaceState({}, '', '/pack/sci-fi-pack')
+    window.dispatchEvent(new PopStateEvent('popstate', {
+      state: { route: 'pack', name: 'sci-fi-pack' }
+    }))
+    await flushPromises()
+
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('pack=sci-fi-pack'))
+  })
+
+  it('resets currentPack when navigating back to home from pack', async () => {
+    // Start at /pack/test-pack
+    window.history.replaceState({}, '', '/pack/test-pack')
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.vm.currentPack).toBe('test-pack')
+    mockFetch.mockClear()
+
+    // Navigate back to home
+    window.history.replaceState({}, '', '/')
+    window.dispatchEvent(new PopStateEvent('popstate', {
+      state: { route: 'home' }
+    }))
+    await flushPromises()
+
+    expect(wrapper.vm.currentPack).toBeNull()
+  })
 })
