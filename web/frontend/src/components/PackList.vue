@@ -1,7 +1,7 @@
 <template>
   <div class="pack-list">
     <div class="pack-header">
-      <span class="pack-title">Packs</span>
+      <span class="pack-title">Packs<span v-if="selectedPacks.length > 0"> ({{ selectedPacks.length }} selected)</span></span>
       <button class="icon-btn" @click="showSearch = !showSearch">
         <span>&#x1F50D;</span>
       </button>
@@ -104,7 +104,6 @@ function formatPackName(name) {
   flex-direction: column;
   height: 100%;
   background: #fafafa;
-  border-right: 1px solid #e0e0e0;
 }
 
 .pack-header {

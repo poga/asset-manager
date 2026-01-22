@@ -59,7 +59,6 @@ defineEmits(['remove', 'download'])
   flex-direction: column;
   height: 100%;
   background: #fafafa;
-  border-left: 1px solid #e0e0e0;
 }
 
 .cart-header {

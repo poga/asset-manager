@@ -250,12 +250,18 @@ body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f0f0f0;
 }
 
 .left-panel {
   width: 320px;
   flex-shrink: 0;
   overflow-y: auto;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
 }
 
 .middle-panel {
@@ -263,17 +269,23 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  padding: 1rem;
 }
 
 .middle-panel > :last-child {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem;
 }
 
 .right-panel {
   width: 280px;
   flex-shrink: 0;
   overflow-y: auto;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
 }
 </style>
