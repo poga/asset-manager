@@ -340,7 +340,11 @@ def filters():
     """Get available filter options."""
     conn = get_db()
 
-    packs = conn.execute("SELECT name FROM packs ORDER BY name").fetchall()
+    packs = conn.execute("""
+        SELECT p.name, p.asset_count as count
+        FROM packs p
+        ORDER BY p.name
+    """).fetchall()
     tags = conn.execute("""
         SELECT t.name, COUNT(at.asset_id) as count
         FROM tags t
@@ -353,7 +357,7 @@ def filters():
     conn.close()
 
     return {
-        "packs": [p["name"] for p in packs],
+        "packs": [{"name": p["name"], "count": p["count"]} for p in packs],
         "tags": [t["name"] for t in tags],
         "colors": list(COLOR_NAMES.keys()),
     }

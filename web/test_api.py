@@ -219,7 +219,8 @@ def test_filters_returns_options(test_db):
     assert "packs" in data
     assert "tags" in data
     assert "colors" in data
-    assert "creatures" in data["packs"]
+    pack_names = [p["name"] for p in data["packs"]]
+    assert "creatures" in pack_names
     assert "creature" in data["tags"]
 
 
@@ -480,6 +481,24 @@ def test_search_multiple_packs(test_client, sample_db):
     # Should have assets from both packs
     assert "icons" in packs or "creatures" in packs
     assert len(data["assets"]) >= 2  # At least one from each pack
+
+
+def test_filters_returns_pack_counts(test_client, sample_db):
+    """Test filters endpoint returns pack counts."""
+    # Update pack asset_count to reflect actual counts
+    import sqlite3
+    conn = sqlite3.connect(sample_db)
+    conn.execute("UPDATE packs SET asset_count = 2 WHERE name = 'creatures'")
+    conn.commit()
+    conn.close()
+
+    response = test_client.get("/api/filters")
+    assert response.status_code == 200
+    data = response.json()
+    assert "packs" in data
+    assert len(data["packs"]) > 0
+    assert "name" in data["packs"][0]
+    assert "count" in data["packs"][0]
 
 
 if __name__ == "__main__":
