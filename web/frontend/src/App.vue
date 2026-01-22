@@ -440,4 +440,33 @@ body {
   border-radius: 8px;
   border: 1px solid var(--color-border);
 }
+
+/* Scrollbar styling - Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: var(--color-text-muted) transparent;
+}
+
+/* Scrollbar styling - WebKit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+}
 </style>
