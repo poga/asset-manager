@@ -94,4 +94,14 @@ describe('AssetDetail', () => {
     expect(style.minWidth).toBe('300px')
     expect(style.minHeight).toBe('300px')
   })
+
+  it('emits tag-click when tag clicked', async () => {
+    const wrapper = mount(AssetDetail, {
+      props: { asset: mockAsset }
+    })
+    const tags = wrapper.findAll('.tag')
+    await tags[0].trigger('click')
+    expect(wrapper.emitted('tag-click')).toBeTruthy()
+    expect(wrapper.emitted('tag-click')[0][0]).toBe('character')
+  })
 })

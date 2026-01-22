@@ -29,7 +29,12 @@
 
         <div class="tags" v-if="asset.tags && asset.tags.length">
           <strong>Tags:</strong>
-          <span v-for="tag in asset.tags" :key="tag" class="tag">{{ tag }}</span>
+          <span
+            v-for="tag in asset.tags"
+            :key="tag"
+            class="tag"
+            @click="$emit('tag-click', tag)"
+          >{{ tag }}</span>
         </div>
 
         <div class="colors" v-if="asset.colors && asset.colors.length">
@@ -64,7 +69,7 @@ defineProps({
   asset: { type: Object, required: true }
 })
 
-defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack'])
+defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack', 'tag-click'])
 </script>
 
 <style scoped>
@@ -148,6 +153,13 @@ h2 {
   border-radius: 4px;
   margin-left: 0.25rem;
   font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 150ms;
+}
+
+.tag:hover {
+  background: var(--color-accent);
+  color: white;
 }
 
 .colors {
