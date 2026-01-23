@@ -19,8 +19,18 @@
     </header>
 
     <div class="app-layout">
-      <aside class="left-panel">
-        <PackList :packs="packList" v-model:selectedPacks="selectedPacks" />
+      <aside class="left-panel" :class="'pack-' + packPanelState">
+        <div v-if="packPanelState === 'collapsed'" class="collapsed-strip" @click="togglePackPanel">
+          <span class="strip-icon">📦</span>
+          <span v-if="selectedPacks.length > 0" class="strip-badge">{{ selectedPacks.length }}</span>
+        </div>
+        <PackList
+          v-else
+          :packs="packList"
+          v-model:selectedPacks="selectedPacks"
+          :panelState="packPanelState"
+          @toggle-panel="togglePackPanel"
+        />
       </aside>
 
       <main class="middle-panel">
@@ -46,8 +56,18 @@
         />
       </main>
 
-      <aside class="right-panel">
-        <Cart :items="cartItems" @remove="removeFromCart" @download="downloadCart" />
+      <aside class="right-panel" :class="{ 'cart-collapsed': !cartPanelExpanded }">
+        <div v-if="!cartPanelExpanded" class="collapsed-strip" @click="toggleCartPanel">
+          <span class="strip-icon">🛒</span>
+          <span v-if="cartItems.length > 0" class="strip-badge">{{ cartItems.length }}</span>
+        </div>
+        <Cart
+          v-else
+          :items="cartItems"
+          @remove="removeFromCart"
+          @download="downloadCart"
+          @toggle-panel="toggleCartPanel"
+        />
       </aside>
     </div>
   </div>
