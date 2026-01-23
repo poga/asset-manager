@@ -57,4 +57,34 @@ describe('PackList', () => {
     expect(wrapper.text()).toContain('icons')
     expect(wrapper.text()).not.toContain('monsters')
   })
+
+  it('single mode: clicking a pack replaces selection', async () => {
+    const wrapper = mount(PackList, {
+      props: { packs: mockPacks, selectedPacks: ['icons'], selectionMode: 'single' }
+    })
+    const spritesCard = wrapper.findAll('.pack-card').find(card => card.text().includes('sprites'))
+    await spritesCard.trigger('click')
+    const emitted = wrapper.emitted('update:selectedPacks')
+    expect(emitted[0][0]).toEqual(['sprites'])
+  })
+
+  it('single mode: clicking selected pack deselects it', async () => {
+    const wrapper = mount(PackList, {
+      props: { packs: mockPacks, selectedPacks: ['icons'], selectionMode: 'single' }
+    })
+    const iconsCard = wrapper.findAll('.pack-card').find(card => card.text().includes('icons'))
+    await iconsCard.trigger('click')
+    const emitted = wrapper.emitted('update:selectedPacks')
+    expect(emitted[0][0]).toEqual([])
+  })
+
+  it('multi mode: clicking toggles pack in/out of selection', async () => {
+    const wrapper = mount(PackList, {
+      props: { packs: mockPacks, selectedPacks: ['icons'], selectionMode: 'multi' }
+    })
+    const spritesCard = wrapper.findAll('.pack-card').find(card => card.text().includes('sprites'))
+    await spritesCard.trigger('click')
+    const emitted = wrapper.emitted('update:selectedPacks')
+    expect(emitted[0][0]).toEqual(['icons', 'sprites'])
+  })
 })

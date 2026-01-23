@@ -59,7 +59,8 @@ const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 const props = defineProps({
   packs: { type: Array, required: true },
   selectedPacks: { type: Array, required: true },
-  panelState: { type: String, default: 'normal' }
+  panelState: { type: String, default: 'normal' },
+  selectionMode: { type: String, default: 'single', validator: v => ['single', 'multi'].includes(v) }
 })
 
 const emit = defineEmits(['update:selectedPacks', 'toggle-panel'])
@@ -80,10 +81,17 @@ const allSelected = computed(() =>
 const noneSelected = computed(() => props.selectedPacks.length === 0)
 
 function togglePack(name) {
-  const newSelected = props.selectedPacks.includes(name)
-    ? props.selectedPacks.filter(n => n !== name)
-    : [...props.selectedPacks, name]
-  emit('update:selectedPacks', newSelected)
+  if (props.selectionMode === 'single') {
+    // Single mode: clicking selected pack deselects, otherwise replace selection
+    const newSelected = props.selectedPacks.includes(name) ? [] : [name]
+    emit('update:selectedPacks', newSelected)
+  } else {
+    // Multi mode: toggle pack in/out of selection
+    const newSelected = props.selectedPacks.includes(name)
+      ? props.selectedPacks.filter(n => n !== name)
+      : [...props.selectedPacks, name]
+    emit('update:selectedPacks', newSelected)
+  }
 }
 
 function selectAll() {
