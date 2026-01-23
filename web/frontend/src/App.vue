@@ -60,7 +60,9 @@ import SearchBar from './components/SearchBar.vue'
 import AssetGrid from './components/AssetGrid.vue'
 import AssetDetail from './components/AssetDetail.vue'
 import Cart from './components/Cart.vue'
-import { parseRoute } from './router.js'
+import { parseRoute, buildUrl } from './router.js'
+
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
 const filters = ref({ packs: [], tags: [], colors: [] })
 const assets = ref([])
@@ -112,7 +114,7 @@ const packList = computed(() => filters.value.packs)
 const cartIds = computed(() => cartItems.value.map(item => item.id))
 
 async function fetchFilters() {
-  const res = await fetch('/api/filters')
+  const res = await fetch(`${API_BASE}/filters`)
   const data = await res.json()
   filters.value = data
   // Default to no selection (which means "all packs")
@@ -133,7 +135,7 @@ async function search(params) {
     }
   }
 
-  const res = await fetch(`/api/search?${query}`)
+  const res = await fetch(`${API_BASE}/search?${query}`)
   if (!res) return
   const data = await res.json()
   assets.value = data.assets
@@ -153,24 +155,24 @@ function handleTagClick(tag) {
 }
 
 async function selectAsset(id) {
-  const res = await fetch(`/api/asset/${id}`)
+  const res = await fetch(`${API_BASE}/asset/${id}`)
   selectedAsset.value = await res.json()
-  window.history.pushState({ route: 'asset', id }, '', `/asset/${id}`)
+  window.history.pushState({ route: 'asset', id }, '', buildUrl({ name: 'asset', params: { id } }))
 }
 
 async function findSimilar(id) {
   skipNextPush = true
   selectedAsset.value = null
   isDefaultHomeView.value = false
-  const res = await fetch(`/api/similar/${id}`)
+  const res = await fetch(`${API_BASE}/similar/${id}`)
   const data = await res.json()
   assets.value = data.assets
-  window.history.pushState({ route: 'similar', id }, '', `/similar/${id}`)
+  window.history.pushState({ route: 'similar', id }, '', buildUrl({ name: 'similar', params: { id } }))
 }
 
 async function loadSimilarFromUrl(id) {
   isDefaultHomeView.value = false
-  const res = await fetch(`/api/similar/${id}`)
+  const res = await fetch(`${API_BASE}/similar/${id}`)
   const data = await res.json()
   assets.value = data.assets
 }
@@ -186,7 +188,7 @@ function viewPack(packName) {
   selectedAsset.value = null
   isDefaultHomeView.value = false
   selectedPacks.value = [packName]
-  window.history.pushState({ route: 'pack', name: packName }, '', `/pack/${packName}`)
+  window.history.pushState({ route: 'pack', name: packName }, '', buildUrl({ name: 'pack', params: { name: packName } }))
 }
 
 function addToCart(asset) {
@@ -201,7 +203,7 @@ function removeFromCart(id) {
 
 async function downloadCart() {
   if (cartItems.value.length === 0) return
-  const response = await fetch('/api/download-cart', {
+  const response = await fetch(`${API_BASE}/download-cart`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ asset_ids: cartIds.value })
@@ -219,7 +221,7 @@ async function downloadCart() {
 
 watch(selectedAsset, (newVal, oldVal) => {
   if (oldVal !== null && newVal === null && !skipNextPush) {
-    window.history.pushState({ route: 'home' }, '', '/')
+    window.history.pushState({ route: 'home' }, '', buildUrl({ name: 'home' }))
   }
   skipNextPush = false
 })
@@ -255,7 +257,7 @@ function handlePopState(event) {
 }
 
 async function selectAssetFromUrl(id) {
-  const res = await fetch(`/api/asset/${id}`)
+  const res = await fetch(`${API_BASE}/asset/${id}`)
   selectedAsset.value = await res.json()
 }
 

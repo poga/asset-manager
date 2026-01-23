@@ -10,6 +10,8 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
+
 const props = defineProps({
   assetId: {
     type: Number,
@@ -49,7 +51,7 @@ const loadImage = () => {
     const img = new Image()
     img.onload = () => resolve(img)
     img.onerror = reject
-    img.src = `/api/image/${props.assetId}`
+    img.src = `${API_BASE}/image/${props.assetId}`
   })
 }
 

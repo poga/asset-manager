@@ -8,7 +8,7 @@
     <div class="detail-content">
       <!-- inline style needed for jsdom test compatibility (scoped CSS not processed) -->
       <img
-        :src="`/api/image/${asset.id}`"
+        :src="`${API_BASE}/image/${asset.id}`"
         :alt="asset.filename"
         class="asset-image"
         :style="{ minWidth: '300px', minHeight: '300px' }"
@@ -65,6 +65,8 @@
 </template>
 
 <script setup>
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
+
 defineProps({
   asset: { type: Object, required: true }
 })

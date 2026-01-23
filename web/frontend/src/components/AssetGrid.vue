@@ -29,7 +29,7 @@
           />
           <img
             v-else
-            :src="`/api/image/${asset.id}`"
+            :src="`${API_BASE}/image/${asset.id}`"
             :alt="asset.filename"
           />
           <button
@@ -58,6 +58,8 @@
 <script setup>
 import { ref } from 'vue'
 import SpritePreview from './SpritePreview.vue'
+
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
 defineProps({
   assets: {

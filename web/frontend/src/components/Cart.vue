@@ -26,7 +26,7 @@
         class="cart-item"
       >
         <img
-          :src="`/api/image/${item.id}`"
+          :src="`${API_BASE}/image/${item.id}`"
           :alt="item.filename"
           class="item-thumbnail"
         />
@@ -46,6 +46,8 @@
 </template>
 
 <script setup>
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
+
 defineProps({
   items: { type: Array, required: true }
 })

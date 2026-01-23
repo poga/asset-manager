@@ -48,6 +48,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
+
 const props = defineProps({
   packs: { type: Array, required: true },
   selectedPacks: { type: Array, required: true }
@@ -86,7 +88,7 @@ function clearAll() {
 }
 
 function getPreviewUrl(packName) {
-  return `/api/pack-preview/${encodeURIComponent(packName)}`
+  return `${API_BASE}/pack-preview/${encodeURIComponent(packName)}`
 }
 
 function formatPackName(name) {
