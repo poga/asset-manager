@@ -74,6 +74,47 @@ const currentSearchParams = ref({})
 const isDark = ref(false)
 const isDefaultHomeView = ref(true)
 
+// Panel state management
+const packPanelState = ref('normal') // 'collapsed' | 'normal' | 'expanded'
+const cartPanelExpanded = ref(false)
+
+function loadPanelState() {
+  try {
+    const saved = localStorage.getItem('panelState')
+    if (saved) {
+      const state = JSON.parse(saved)
+      const validPackStates = ['collapsed', 'normal', 'expanded']
+      if (validPackStates.includes(state.pack)) packPanelState.value = state.pack
+      if (typeof state.cart === 'boolean') cartPanelExpanded.value = state.cart
+    }
+  } catch (e) {
+    // Ignore invalid localStorage data
+  }
+}
+
+function savePanelState() {
+  localStorage.setItem('panelState', JSON.stringify({
+    pack: packPanelState.value,
+    cart: cartPanelExpanded.value
+  }))
+}
+
+function togglePackPanel() {
+  const states = ['collapsed', 'normal', 'expanded']
+  const currentIndex = states.indexOf(packPanelState.value)
+  packPanelState.value = states[(currentIndex + 1) % 3]
+  // Auto-collapse cart when pack expands to 60%
+  if (packPanelState.value === 'expanded' && cartPanelExpanded.value) {
+    cartPanelExpanded.value = false
+  }
+  savePanelState()
+}
+
+function toggleCartPanel() {
+  cartPanelExpanded.value = !cartPanelExpanded.value
+  savePanelState()
+}
+
 let debounceTimer = null
 let skipNextPush = false
 let isInitializing = true
@@ -274,6 +315,7 @@ function handleInitialRoute() {
 
 onMounted(async () => {
   initTheme()
+  loadPanelState()
   if (window.matchMedia) {
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     mediaQuery.addEventListener('change', handleSystemThemeChange)
