@@ -2,9 +2,15 @@
   <div class="pack-list">
     <div class="pack-header">
       <span class="pack-title">Packs<span v-if="selectedPacks.length > 0"> ({{ selectedPacks.length }} selected)</span></span>
-      <button class="icon-btn" @click="showSearch = !showSearch">
-        <span>&#x1F50D;</span>
-      </button>
+      <div class="header-actions">
+        <button class="icon-btn" @click="showSearch = !showSearch">
+          <span>&#x1F50D;</span>
+        </button>
+        <button class="icon-btn" @click="$emit('toggle-panel')" :title="panelState === 'normal' ? 'Expand panel' : 'Collapse panel'">
+          <span v-if="panelState === 'normal'">⬅️</span>
+          <span v-else>➡️</span>
+        </button>
+      </div>
     </div>
 
     <input
@@ -20,7 +26,7 @@
       <button class="action-btn" @click="clearAll" :disabled="noneSelected">Clear</button>
     </div>
 
-    <div class="pack-grid">
+    <div class="pack-grid" :class="{ expanded: panelState === 'expanded' }">
       <div
         v-for="pack in filteredPacks"
         :key="pack.name"
@@ -52,10 +58,11 @@ const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
 const props = defineProps({
   packs: { type: Array, required: true },
-  selectedPacks: { type: Array, required: true }
+  selectedPacks: { type: Array, required: true },
+  panelState: { type: String, default: 'normal' }
 })
 
-const emit = defineEmits(['update:selectedPacks'])
+const emit = defineEmits(['update:selectedPacks', 'toggle-panel'])
 
 const showSearch = ref(false)
 const searchQuery = ref('')
@@ -135,6 +142,11 @@ function formatPackName(name) {
   color: var(--color-text-primary);
 }
 
+.header-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
 .pack-search {
   margin: 0.5rem;
   padding: 0.5rem;
@@ -186,6 +198,13 @@ function formatPackName(name) {
   flex: 1;
   overflow-y: auto;
   padding: 0.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.pack-grid.expanded {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .pack-card {
@@ -194,7 +213,6 @@ function formatPackName(name) {
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  margin-bottom: 0.5rem;
   transition: border-color 150ms, box-shadow 150ms;
 }
 
