@@ -7,8 +7,8 @@
           <span>&#x1F50D;</span>
         </button>
         <button class="icon-btn" @click="$emit('toggle-panel')" :title="panelState === 'normal' ? 'Expand panel' : 'Collapse panel'">
-          <span v-if="panelState === 'normal'">⬅️</span>
-          <span v-else>➡️</span>
+          <span v-if="panelState === 'normal'">➡️</span>
+          <span v-else>⬅️</span>
         </button>
       </div>
     </div>
@@ -200,6 +200,7 @@ function formatPackName(name) {
   padding: 0.5rem;
   display: grid;
   grid-template-columns: 1fr;
+  grid-auto-rows: min-content;
   gap: 0.5rem;
 }
 
