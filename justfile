@@ -27,6 +27,10 @@ start-api:
 start-frontend:
     cd web/frontend && npm run dev
 
+# Build frontend for production
+build-frontend:
+    cd web/frontend && npm run build
+
 # Stop API server
 stop-api:
     -lsof -ti:8000 | xargs kill
