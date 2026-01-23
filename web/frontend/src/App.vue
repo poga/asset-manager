@@ -28,6 +28,7 @@
           v-else
           :packs="packList"
           v-model:selectedPacks="selectedPacks"
+          v-model:selectionMode="selectionMode"
           :panelState="packPanelState"
           @toggle-panel="togglePackPanel"
         />
@@ -89,6 +90,7 @@ const assets = ref([])
 const selectedAsset = ref(null)
 const searchBarRef = ref(null)
 const selectedPacks = ref([])
+const selectionMode = ref('single')
 const cartItems = ref([])
 const currentSearchParams = ref({})
 const isDark = ref(false)
@@ -106,6 +108,9 @@ function loadPanelState() {
       const validPackStates = ['collapsed', 'normal', 'expanded']
       if (validPackStates.includes(state.pack)) packPanelState.value = state.pack
       if (typeof state.cart === 'boolean') cartPanelExpanded.value = state.cart
+      if (state.selectionMode === 'single' || state.selectionMode === 'multi') {
+        selectionMode.value = state.selectionMode
+      }
     }
   } catch (e) {
     // Ignore invalid localStorage data
@@ -115,7 +120,8 @@ function loadPanelState() {
 function savePanelState() {
   localStorage.setItem('panelState', JSON.stringify({
     pack: packPanelState.value,
-    cart: cartPanelExpanded.value
+    cart: cartPanelExpanded.value,
+    selectionMode: selectionMode.value
   }))
 }
 
@@ -291,6 +297,14 @@ watch(selectedPacks, () => {
   if (!isInitializing) {
     search(currentSearchParams.value)
   }
+})
+
+watch(selectionMode, (newMode, oldMode) => {
+  // When switching from multi to single, keep only first selected pack
+  if (oldMode === 'multi' && newMode === 'single' && selectedPacks.value.length > 1) {
+    selectedPacks.value = [selectedPacks.value[0]]
+  }
+  savePanelState()
 })
 
 function handlePopState(event) {
