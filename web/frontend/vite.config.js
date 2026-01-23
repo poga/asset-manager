@@ -9,6 +9,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    allowedHosts: ['dev.taileea02.ts.net'],
     proxy: {
       '/api': 'http://localhost:8000'
     }
