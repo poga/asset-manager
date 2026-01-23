@@ -3,8 +3,17 @@
     <div class="pack-header">
       <span class="pack-title">Packs<span v-if="selectedPacks.length > 0"> ({{ selectedPacks.length }} selected)</span></span>
       <div class="header-actions">
-        <button class="icon-btn" @click="showSearch = !showSearch">
+        <button class="icon-btn" @click="showSearch = !showSearch" title="Search packs">
           <span>&#x1F50D;</span>
+        </button>
+        <button
+          class="icon-btn"
+          data-testid="mode-toggle"
+          @click="toggleMode"
+          :title="selectionMode === 'single' ? 'Single select mode' : 'Multi select mode'"
+        >
+          <span v-if="selectionMode === 'single'">1️⃣</span>
+          <span v-else>🔢</span>
         </button>
         <button class="icon-btn" @click="$emit('toggle-panel')" :title="panelState === 'normal' ? 'Expand panel' : 'Collapse panel'">
           <span v-if="panelState === 'normal'">➡️</span>
@@ -22,7 +31,7 @@
     />
 
     <div class="pack-actions">
-      <button class="action-btn" @click="selectAll" :disabled="allSelected">Select all</button>
+      <button v-if="selectionMode === 'multi'" class="action-btn" @click="selectAll" :disabled="allSelected">Select all</button>
       <button class="action-btn" @click="clearAll" :disabled="noneSelected">Clear</button>
     </div>
 
@@ -63,7 +72,7 @@ const props = defineProps({
   selectionMode: { type: String, default: 'single', validator: v => ['single', 'multi'].includes(v) }
 })
 
-const emit = defineEmits(['update:selectedPacks', 'toggle-panel'])
+const emit = defineEmits(['update:selectedPacks', 'update:selectionMode', 'toggle-panel'])
 
 const showSearch = ref(false)
 const searchQuery = ref('')
@@ -100,6 +109,11 @@ function selectAll() {
 
 function clearAll() {
   emit('update:selectedPacks', [])
+}
+
+function toggleMode() {
+  const newMode = props.selectionMode === 'single' ? 'multi' : 'single'
+  emit('update:selectionMode', newMode)
 }
 
 function getPreviewUrl(packName) {

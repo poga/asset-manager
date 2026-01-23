@@ -38,7 +38,7 @@ describe('PackList', () => {
 
   it('select all button selects all packs', async () => {
     const wrapper = mount(PackList, {
-      props: { packs: mockPacks, selectedPacks: [] }
+      props: { packs: mockPacks, selectedPacks: [], selectionMode: 'multi' }
     })
     const selectAllBtn = wrapper.findAll('.action-btn').find(btn => btn.text() === 'Select all')
     await selectAllBtn.trigger('click')
@@ -86,5 +86,32 @@ describe('PackList', () => {
     await spritesCard.trigger('click')
     const emitted = wrapper.emitted('update:selectedPacks')
     expect(emitted[0][0]).toEqual(['icons', 'sprites'])
+  })
+
+  it('mode toggle button switches between single and multi', async () => {
+    const wrapper = mount(PackList, {
+      props: { packs: mockPacks, selectedPacks: [], selectionMode: 'single' }
+    })
+    const modeBtn = wrapper.find('[data-testid="mode-toggle"]')
+    expect(modeBtn.exists()).toBe(true)
+    await modeBtn.trigger('click')
+    const emitted = wrapper.emitted('update:selectionMode')
+    expect(emitted[0][0]).toBe('multi')
+  })
+
+  it('single mode: hides Select all button', () => {
+    const wrapper = mount(PackList, {
+      props: { packs: mockPacks, selectedPacks: [], selectionMode: 'single' }
+    })
+    const selectAllBtn = wrapper.findAll('.action-btn').find(btn => btn.text() === 'Select all')
+    expect(selectAllBtn).toBeUndefined()
+  })
+
+  it('multi mode: shows Select all button', () => {
+    const wrapper = mount(PackList, {
+      props: { packs: mockPacks, selectedPacks: [], selectionMode: 'multi' }
+    })
+    const selectAllBtn = wrapper.findAll('.action-btn').find(btn => btn.text() === 'Select all')
+    expect(selectAllBtn).toBeDefined()
   })
 })
