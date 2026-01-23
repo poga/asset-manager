@@ -3,6 +3,9 @@
   <div class="cart">
     <div class="cart-header">
       <span class="cart-title">Cart</span>
+      <button class="icon-btn" @click="$emit('toggle-panel')" title="Collapse panel">
+        <span>➡️</span>
+      </button>
     </div>
 
     <button
@@ -52,7 +55,7 @@ defineProps({
   items: { type: Array, required: true }
 })
 
-defineEmits(['remove', 'download'])
+defineEmits(['remove', 'download', 'toggle-panel'])
 </script>
 
 <style scoped>
@@ -73,6 +76,19 @@ defineEmits(['remove', 'download'])
 .cart-title {
   font-weight: 600;
   font-size: 0.875rem;
+  color: var(--color-text-primary);
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.icon-btn:hover {
   color: var(--color-text-primary);
 }
 
