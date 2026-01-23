@@ -470,13 +470,25 @@ body {
 }
 
 .left-panel {
-  width: 320px;
   flex-shrink: 0;
   overflow-y: auto;
   background: var(--glass-bg);
   backdrop-filter: blur(8px);
   border-radius: 8px;
   border: 1px solid var(--color-border);
+}
+
+.left-panel.pack-collapsed {
+  width: 40px;
+  overflow: hidden;
+}
+
+.left-panel.pack-normal {
+  width: 320px;
+}
+
+.left-panel.pack-expanded {
+  width: 60%;
 }
 
 .middle-panel {
@@ -496,13 +508,21 @@ body {
 }
 
 .right-panel {
-  width: 280px;
   flex-shrink: 0;
   overflow-y: auto;
   background: var(--glass-bg);
   backdrop-filter: blur(8px);
   border-radius: 8px;
   border: 1px solid var(--color-border);
+}
+
+.right-panel.cart-collapsed {
+  width: 40px;
+  overflow: hidden;
+}
+
+.right-panel:not(.cart-collapsed) {
+  width: 280px;
 }
 
 /* Scrollbar styling - Firefox */
@@ -532,5 +552,33 @@ body {
 
 *:hover::-webkit-scrollbar-thumb {
   background: var(--color-text-muted);
+}
+
+.collapsed-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 1rem;
+  gap: 0.5rem;
+  cursor: pointer;
+  height: 100%;
+}
+
+.collapsed-strip:hover {
+  background: var(--color-bg-elevated);
+}
+
+.strip-icon {
+  font-size: 1.25rem;
+}
+
+.strip-badge {
+  font-size: 0.625rem;
+  background: var(--color-accent);
+  color: white;
+  padding: 0.125rem 0.375rem;
+  border-radius: 8px;
+  min-width: 1rem;
+  text-align: center;
 }
 </style>
