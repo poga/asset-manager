@@ -690,68 +690,6 @@ class TestSearchIntegration:
         conn.close()
 
 
-class TestRelationshipDetection:
-    """Tests for asset relationship detection."""
-
-    def test_detects_gif_preview(self, temp_dir):
-        """Test GIF preview relationship detection."""
-        db_path = temp_dir / "test.db"
-        conn = index.get_db(db_path)
-
-        # Insert test data - main sprite and GIF preview
-        conn.execute(
-            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
-            [1, "pack/Goblin/GoblinIdle.png", "GoblinIdle.png", "png", "abc"]
-        )
-        conn.execute(
-            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
-            [2, "pack/Goblin/_GIFs/GoblinIdle.gif", "GoblinIdle.gif", "gif", "def"]
-        )
-        conn.commit()
-
-        # Detect relationships
-        index.detect_relationships(conn)
-
-        # Check
-        rels = conn.execute(
-            "SELECT * FROM asset_relations WHERE asset_id = 1 AND relation_type = 'gif_preview'"
-        ).fetchall()
-
-        assert len(rels) == 1
-        assert rels[0]["related_id"] == 2
-
-        conn.close()
-
-    def test_detects_shadow(self, temp_dir):
-        """Test shadow relationship detection."""
-        db_path = temp_dir / "test.db"
-        conn = index.get_db(db_path)
-
-        # Insert test data - main sprite and shadow
-        conn.execute(
-            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
-            [1, "pack/Goblin/GoblinIdle.png", "GoblinIdle.png", "png", "abc"]
-        )
-        conn.execute(
-            "INSERT INTO assets (id, path, filename, filetype, file_hash) VALUES (?, ?, ?, ?, ?)",
-            [2, "pack/Goblin/_Shadows/GoblinIdle.png", "GoblinIdle.png", "png", "def"]
-        )
-        conn.commit()
-
-        # Detect relationships
-        index.detect_relationships(conn)
-
-        # Check
-        rels = conn.execute(
-            "SELECT * FROM asset_relations WHERE asset_id = 1 AND relation_type = 'shadow'"
-        ).fetchall()
-
-        assert len(rels) == 1
-        assert rels[0]["related_id"] == 2
-
-        conn.close()
-
-
 # =============================================================================
 # CLI Tests
 # =============================================================================

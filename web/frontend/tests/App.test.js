@@ -118,7 +118,6 @@ describe('App URL routing', () => {
             height: 32,
             tags: [],
             colors: [],
-            related: []
           })
         })
       }
@@ -339,7 +338,6 @@ describe('App URL routing', () => {
             height: 32,
             tags: [],
             colors: [],
-            related: []
           })
         })
       }
@@ -510,7 +508,6 @@ describe('App 3-column layout', () => {
             height: 32,
             tags: [],
             colors: [],
-            related: []
           })
         })
       }

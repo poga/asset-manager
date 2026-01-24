@@ -77,14 +77,6 @@ CREATE TABLE IF NOT EXISTS assets (
     indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Related assets (sprite <-> shadow <-> gif)
-CREATE TABLE IF NOT EXISTS asset_relations (
-    asset_id INTEGER REFERENCES assets(id),
-    related_id INTEGER REFERENCES assets(id),
-    relation_type TEXT,
-    PRIMARY KEY (asset_id, related_id)
-);
-
 -- Tags
 CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY,
@@ -347,18 +339,6 @@ def info(
     if colors:
         color_str = ",".join(f"{c['color_hex']}:{c['percentage']:.0%}" for c in colors)
         print(f"colors\t{color_str}")
-
-    # Related
-    related = conn.execute("""
-        SELECT a.filename, ar.relation_type
-        FROM asset_relations ar
-        JOIN assets a ON ar.related_id = a.id
-        WHERE ar.asset_id = ?
-    """, [asset_id]).fetchall()
-
-    if related:
-        related_str = ",".join(f"{r['filename']}:{r['relation_type']}" for r in related)
-        print(f"related\t{related_str}")
 
 
 @app.command()
