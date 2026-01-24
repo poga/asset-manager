@@ -87,4 +87,35 @@ describe('AssetGrid', () => {
     })
     expect(wrapper.find('.in-cart').exists()).toBe(true)
   })
+
+  it('uses preview dimensions for aspect ratio when preview bounds exist', () => {
+    // A spritesheet asset: full image is 137x2002 but preview bounds are 50x33
+    const spritesheetAsset = {
+      id: 3,
+      filename: 'attack 1.png',
+      path: '/assets/attack.png',
+      width: 137,
+      height: 2002,
+      preview_x: 1,
+      preview_y: 52,
+      preview_width: 50,
+      preview_height: 33,
+      pack: 'penusbmic_Sci-fi'
+    }
+    const wrapper = mount(AssetGrid, {
+      props: { assets: [spritesheetAsset] }
+    })
+    const container = wrapper.find('.asset-image-container')
+    // Should use preview dimensions (50/33) not full image dimensions (137/2002)
+    expect(container.attributes('style')).toContain('50 / 33')
+  })
+
+  it('uses full image dimensions for aspect ratio when no preview bounds', () => {
+    const wrapper = mount(AssetGrid, {
+      props: { assets: mockAssets }
+    })
+    const container = wrapper.find('.asset-image-container')
+    // Should use full image dimensions
+    expect(container.attributes('style')).toContain('64 / 64')
+  })
 })

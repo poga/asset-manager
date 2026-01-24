@@ -14,7 +14,7 @@
       >
         <div
           class="asset-image-container"
-          :style="{ aspectRatio: `${asset.width} / ${asset.height}` }"
+          :style="{ aspectRatio: asset.preview_x != null ? `${asset.preview_width} / ${asset.preview_height}` : `${asset.width} / ${asset.height}` }"
           @click="$emit('select', asset.id)"
         >
           <SpritePreview

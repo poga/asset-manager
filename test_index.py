@@ -340,6 +340,44 @@ class TestDetectFirstSpriteBounds:
         # Should return bounding box of all content (the diagonal + blob)
         assert bounds == (0, 0, 64, 64)
 
+    def test_ignores_nearly_transparent_pixels(self, temp_dir):
+        """Ignores pixels with very low alpha (like alpha=1) when detecting frame boundaries.
+
+        This reproduces a real bug where penusbmic spritesheets have ghost pixels with
+        alpha=1 that cause the preview to show an empty/wrong region instead of the
+        actual visible sprite.
+        """
+        img_path = temp_dir / "low_alpha.png"
+        # Create image mimicking the real bug:
+        # - Nearly transparent pixels (alpha=1) in first 20 columns - these should be IGNORED
+        # - A transparent gap at columns 20-49
+        # - Fully opaque sprite content at x=50-70 - this should be detected
+        img = Image.new("RGBA", (100, 50), (0, 0, 0, 0))
+
+        # Add nearly-invisible "ghost" pixels in first columns (simulates the bug)
+        # These have alpha=1 which is technically non-zero but visually invisible
+        for x in range(20):
+            for y in range(10, 40):
+                img.putpixel((x, y), (100, 50, 50, 1))  # alpha=1, nearly invisible
+
+        # Add actual visible sprite content at x=50-70
+        for x in range(50, 70):
+            for y in range(15, 35):
+                img.putpixel((x, y), (255, 0, 0, 255))  # Fully opaque
+
+        img.save(img_path)
+
+        bounds = index.detect_first_sprite_bounds(img_path)
+        # Should detect the actual visible content, not the ghost pixels
+        assert bounds is not None
+        x, y, w, h = bounds
+
+        # The preview bounds should include the VISIBLE sprite (at x=50-70),
+        # NOT just the ghost pixels (at x=0-20).
+        # If the bug exists, bounds would be (0, 10, 20, 30) - just the ghost pixels
+        # With the fix, bounds should start at or after x=50, or cover the full width
+        assert x >= 40, f"Expected x >= 40 (visible sprite area), got x={x}. Bounds detected ghost pixels only."
+
 
 class TestComputePhash:
     """Tests for compute_phash function."""

@@ -183,6 +183,11 @@ def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]
 
     Returns (x, y, width, height) or None if no content found or no alpha channel.
     """
+    # Alpha threshold: pixels with alpha <= this value are considered transparent.
+    # This handles sprites with "ghost" pixels (alpha=1) that are visually invisible
+    # but would otherwise be detected as content.
+    ALPHA_THRESHOLD = 10
+
     try:
         with Image.open(path) as img:
             if img.mode != "RGBA":
@@ -195,10 +200,11 @@ def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]
             alpha_data = alpha.tobytes()
 
             # Find first fully transparent column AFTER some content (frame boundary)
+            # A column is "empty" if all pixels have alpha <= ALPHA_THRESHOLD
             first_gap_col = width
             found_content_col = False
             for x in range(width):
-                col_empty = all(alpha_data[y * width + x] == 0 for y in range(height))
+                col_empty = all(alpha_data[y * width + x] <= ALPHA_THRESHOLD for y in range(height))
                 if not col_empty:
                     found_content_col = True
                 elif found_content_col:
@@ -210,7 +216,7 @@ def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]
             found_content_row = False
             for y in range(height):
                 row_start = y * width
-                row_empty = all(alpha_data[row_start + x] == 0 for x in range(width))
+                row_empty = all(alpha_data[row_start + x] <= ALPHA_THRESHOLD for x in range(width))
                 if not row_empty:
                     found_content_row = True
                 elif found_content_row:
@@ -219,7 +225,13 @@ def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]
 
             # Crop to first frame, get content bounds
             first_frame = img.crop((0, 0, first_gap_col, first_gap_row))
-            bbox = first_frame.split()[3].getbbox()
+
+            # Apply same threshold for bounding box detection
+            # Create a mask where only pixels with alpha > threshold are considered
+            frame_alpha = first_frame.split()[3]
+            # Use point() to threshold the alpha channel
+            thresholded = frame_alpha.point(lambda p: 255 if p > ALPHA_THRESHOLD else 0)
+            bbox = thresholded.getbbox()
 
             if bbox is None:
                 return None
@@ -761,11 +773,18 @@ def update(
         console.print("[yellow]No packs in database. Run index command first.[/yellow]")
         raise typer.Exit(1)
 
-    # Infer asset root from pack paths
+    # Infer asset root - check common locations
     pack_path = Path(row["path"])
-    asset_root = db.parent
-    if not (asset_root / pack_path).exists():
-        console.print(f"[red]Asset root not found. Expected packs at: {asset_root}[/red]")
+    asset_root = None
+
+    # Try common asset root locations
+    for candidate in [db.parent / "assets", db.parent, Path("assets"), Path(".")]:
+        if (candidate / pack_path).exists():
+            asset_root = candidate
+            break
+
+    if asset_root is None:
+        console.print(f"[red]Asset root not found. Could not locate pack: {pack_path}[/red]")
         raise typer.Exit(1)
 
     # Re-run index
