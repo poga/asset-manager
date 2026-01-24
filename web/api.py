@@ -57,6 +57,10 @@ COLOR_NAMES = {
 }
 
 
+class PreviewOverrideRequest(BaseModel):
+    use_full_image: bool
+
+
 def set_db_path(path: Path):
     """Set database path (for testing)."""
     global _db_path
@@ -337,6 +341,31 @@ def asset_detail(asset_id: int):
         "tags": [t["name"] for t in tags],
         "colors": [{"hex": c["color_hex"], "percentage": c["percentage"]} for c in colors],
     }
+
+
+@app.post("/api/asset/{asset_id}/preview-override")
+def set_preview_override(asset_id: int, request: PreviewOverrideRequest):
+    """Set preview override for an asset."""
+    conn = get_db()
+
+    # Get asset path
+    row = conn.execute("SELECT path FROM assets WHERE id = ?", [asset_id]).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    asset_path = row["path"]
+
+    # Insert or replace override
+    conn.execute(
+        """INSERT OR REPLACE INTO asset_preview_overrides (path, use_full_image, created_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)""",
+        [asset_path, request.use_full_image]
+    )
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
 
 
 @app.get("/api/filters")

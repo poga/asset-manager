@@ -600,5 +600,34 @@ def test_preview_override_table_exists(test_db):
     conn.close()
 
 
+def test_set_preview_override(test_db):
+    """POST /api/asset/{id}/preview-override sets the override."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.post("/api/asset/1/preview-override", json={"use_full_image": True})
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+    # Verify it was saved
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    row = conn.execute(
+        "SELECT use_full_image FROM asset_preview_overrides WHERE path = '/assets/creatures/goblin.png'"
+    ).fetchone()
+    conn.close()
+    assert row is not None
+    assert row[0] == 1  # SQLite stores True as 1
+
+
+def test_set_preview_override_not_found(test_db):
+    """POST /api/asset/{id}/preview-override returns 404 for unknown asset."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    response = client.post("/api/asset/999/preview-override", json={"use_full_image": True})
+    assert response.status_code == 404
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
