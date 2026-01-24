@@ -512,6 +512,74 @@ def detect_relationships(conn: sqlite3.Connection):
     conn.commit()
 
 
+def set_pack_preview(
+    conn: sqlite3.Connection,
+    pack_pattern: str,
+    preview_dir: Path,
+    image_path: Optional[Path] = None,
+    asset_root: Optional[Path] = None,
+) -> int:
+    """
+    Set custom preview image for packs matching a pattern.
+
+    Args:
+        conn: Database connection
+        pack_pattern: Pack name or glob pattern (case-insensitive)
+        preview_dir: Directory to store previews
+        image_path: Explicit path to preview image (optional)
+        asset_root: Root directory for assets (needed for convention-based lookup)
+
+    Returns:
+        Number of packs updated
+    """
+    import fnmatch
+    import shutil
+
+    # Get all packs
+    packs = conn.execute("SELECT id, name, path FROM packs").fetchall()
+
+    # Match packs using fnmatch (case-insensitive)
+    matched = [p for p in packs if fnmatch.fnmatch(p["name"].lower(), pack_pattern.lower())]
+
+    if not matched:
+        return 0
+
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    updated = 0
+
+    for pack in matched:
+        # Determine source image
+        source_image = image_path
+
+        if source_image is None and asset_root:
+            # Convention-based lookup
+            pack_dir = asset_root / pack["path"]
+            for name in ["preview.gif", "preview.png"]:
+                candidate = pack_dir / name
+                if candidate.exists():
+                    source_image = candidate
+                    break
+
+        if source_image is None or not source_image.exists():
+            continue
+
+        # Copy to preview directory
+        ext = source_image.suffix.lower()
+        dest_path = preview_dir / f"{pack['name']}{ext}"
+        shutil.copy2(source_image, dest_path)
+
+        # Update database
+        preview_rel_path = f"previews/{pack['name']}{ext}"
+        conn.execute(
+            "UPDATE packs SET preview_path = ?, preview_generated = FALSE WHERE id = ?",
+            [preview_rel_path, pack["id"]]
+        )
+        updated += 1
+
+    conn.commit()
+    return updated
+
+
 @app.command()
 def index(
     asset_path: Path = typer.Argument(..., help="Path to assets directory"),
