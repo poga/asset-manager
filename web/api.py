@@ -368,6 +368,27 @@ def set_preview_override(asset_id: int, request: PreviewOverrideRequest):
     return {"success": True}
 
 
+@app.delete("/api/asset/{asset_id}/preview-override")
+def delete_preview_override(asset_id: int):
+    """Remove preview override for an asset."""
+    conn = get_db()
+
+    # Get asset path
+    row = conn.execute("SELECT path FROM assets WHERE id = ?", [asset_id]).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    asset_path = row["path"]
+
+    # Delete override
+    conn.execute("DELETE FROM asset_preview_overrides WHERE path = ?", [asset_path])
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
+
+
 @app.get("/api/filters")
 def filters():
     """Get available filter options."""

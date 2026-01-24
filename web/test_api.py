@@ -629,5 +629,28 @@ def test_set_preview_override_not_found(test_db):
     assert response.status_code == 404
 
 
+def test_delete_preview_override(test_db):
+    """DELETE /api/asset/{id}/preview-override removes the override."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # First set an override
+    client.post("/api/asset/1/preview-override", json={"use_full_image": True})
+
+    # Then delete it
+    response = client.delete("/api/asset/1/preview-override")
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+    # Verify it was removed
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    row = conn.execute(
+        "SELECT use_full_image FROM asset_preview_overrides WHERE path = '/assets/creatures/goblin.png'"
+    ).fetchone()
+    conn.close()
+    assert row is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
