@@ -694,5 +694,35 @@ def test_search_includes_use_full_image(test_db):
     assert assets_by_id[2]["use_full_image"] is None
 
 
+def test_preview_override_full_workflow(test_db):
+    """Test complete preview override workflow."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # 1. Initially, asset has no override
+    response = client.get("/api/asset/1")
+    assert response.json()["use_full_image"] is None
+
+    # 2. Set override to True
+    response = client.post("/api/asset/1/preview-override", json={"use_full_image": True})
+    assert response.status_code == 200
+
+    # 3. Verify in detail
+    response = client.get("/api/asset/1")
+    assert response.json()["use_full_image"] is True
+
+    # 4. Verify in search
+    response = client.get("/api/search?q=goblin")
+    assert response.json()["assets"][0]["use_full_image"] is True
+
+    # 5. Delete override
+    response = client.delete("/api/asset/1/preview-override")
+    assert response.status_code == 200
+
+    # 6. Verify removed
+    response = client.get("/api/asset/1")
+    assert response.json()["use_full_image"] is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
