@@ -21,10 +21,7 @@ A SQLite-based indexing and search system for game development assets. Index spr
 ### Index Assets
 
 ```bash
-# Initial index
-uv run index.py index /path/to/assets --db assets.db
-
-# Incremental update (re-run index command, skips unchanged files)
+# index (Incremental)
 uv run index.py index /path/to/assets --db assets.db
 ```
 
