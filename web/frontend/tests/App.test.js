@@ -33,12 +33,12 @@ describe('Theme toggle', () => {
 
     // Default fetch responses
     mockFetch.mockImplementation((url) => {
-      if (url === '/api/filters') {
+      if (url === '/assets/api/filters') {
         return Promise.resolve({
           json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
         })
       }
-      if (url.startsWith('/api/search')) {
+      if (url.startsWith('/assets/api/search')) {
         return Promise.resolve({
           json: () => Promise.resolve({ assets: [] })
         })
@@ -97,17 +97,17 @@ describe('App URL routing', () => {
 
     // Default fetch responses
     mockFetch.mockImplementation((url) => {
-      if (url === '/api/filters') {
+      if (url === '/assets/api/filters') {
         return Promise.resolve({
           json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
         })
       }
-      if (url.startsWith('/api/search')) {
+      if (url.startsWith('/assets/api/search')) {
         return Promise.resolve({
           json: () => Promise.resolve({ assets: [] })
         })
       }
-      if (url.startsWith('/api/asset/')) {
+      if (url.startsWith('/assets/api/asset/')) {
         return Promise.resolve({
           json: () => Promise.resolve({
             id: 123,
@@ -122,7 +122,7 @@ describe('App URL routing', () => {
           })
         })
       }
-      if (url.startsWith('/api/similar/')) {
+      if (url.startsWith('/assets/api/similar/')) {
         return Promise.resolve({
           json: () => Promise.resolve({
             assets: [
@@ -154,7 +154,7 @@ describe('App URL routing', () => {
     expect(pushStateSpy).toHaveBeenCalledWith(
       { route: 'asset', id: 123 },
       '',
-      '/asset/123'
+      '/assets/asset/123'
     )
   })
 
@@ -174,18 +174,18 @@ describe('App URL routing', () => {
     expect(pushStateSpy).toHaveBeenCalledWith(
       { route: 'home' },
       '',
-      '/'
+      '/assets/'
     )
   })
 
   it('loads asset from URL on mount when path is /asset/:id', async () => {
     // Set URL before mounting
-    window.history.replaceState({}, '', '/asset/456')
+    window.history.replaceState({}, '', '/assets/asset/456')
 
     const wrapper = mount(App)
     await flushPromises()
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/asset/456')
+    expect(mockFetch).toHaveBeenCalledWith('/assets/api/asset/456')
     expect(wrapper.vm.selectedAsset).not.toBeNull()
   })
 
@@ -198,7 +198,7 @@ describe('App URL routing', () => {
     await flushPromises()
 
     // Simulate back button
-    window.history.replaceState({}, '', '/')
+    window.history.replaceState({}, '', '/assets/')
     window.dispatchEvent(new PopStateEvent('popstate', {
       state: { route: 'home' }
     }))
@@ -212,13 +212,13 @@ describe('App URL routing', () => {
     await flushPromises()
 
     // Simulate forward to asset
-    window.history.replaceState({}, '', '/asset/789')
+    window.history.replaceState({}, '', '/assets/asset/789')
     window.dispatchEvent(new PopStateEvent('popstate', {
       state: { route: 'asset', id: 789 }
     }))
     await flushPromises()
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/asset/789')
+    expect(mockFetch).toHaveBeenCalledWith('/assets/api/asset/789')
   })
 
   it('calls pushState with /similar/:id when finding similar', async () => {
@@ -233,18 +233,18 @@ describe('App URL routing', () => {
     expect(pushStateSpy).toHaveBeenCalledWith(
       { route: 'similar', id: 123 },
       '',
-      '/similar/123'
+      '/assets/similar/123'
     )
   })
 
   it('loads similar assets from URL on mount when path is /similar/:id', async () => {
     // Set URL before mounting
-    window.history.replaceState({}, '', '/similar/456')
+    window.history.replaceState({}, '', '/assets/similar/456')
 
     const wrapper = mount(App)
     await flushPromises()
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/similar/456')
+    expect(mockFetch).toHaveBeenCalledWith('/assets/api/similar/456')
     expect(wrapper.vm.assets.length).toBe(2)
   })
 
@@ -254,18 +254,18 @@ describe('App URL routing', () => {
     mockFetch.mockClear()
 
     // Simulate forward to similar
-    window.history.replaceState({}, '', '/similar/789')
+    window.history.replaceState({}, '', '/assets/similar/789')
     window.dispatchEvent(new PopStateEvent('popstate', {
       state: { route: 'similar', id: 789 }
     }))
     await flushPromises()
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/similar/789')
+    expect(mockFetch).toHaveBeenCalledWith('/assets/api/similar/789')
   })
 
   it('reloads default search when navigating back to home from similar', async () => {
     // Start at /similar/123
-    window.history.replaceState({}, '', '/similar/123')
+    window.history.replaceState({}, '', '/assets/similar/123')
 
     const wrapper = mount(App)
     await flushPromises()
@@ -275,14 +275,14 @@ describe('App URL routing', () => {
     mockFetch.mockClear()
 
     // Navigate back to home
-    window.history.replaceState({}, '', '/')
+    window.history.replaceState({}, '', '/assets/')
     window.dispatchEvent(new PopStateEvent('popstate', {
       state: { route: 'home' }
     }))
     await flushPromises()
 
     // Should have called search API
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/search'))
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/assets/api/search'))
   })
 
   it('reloads default search when navigating back to home from asset that was accessed from similar view', async () => {
@@ -301,14 +301,14 @@ describe('App URL routing', () => {
     mockFetch.mockClear()
 
     // Navigate back to home (close modal)
-    window.history.replaceState({}, '', '/')
+    window.history.replaceState({}, '', '/assets/')
     window.dispatchEvent(new PopStateEvent('popstate', {
       state: { route: 'home' }
     }))
     await flushPromises()
 
     // Should have called search API to reload default results
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/search'))
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/assets/api/search'))
   })
 
   it('preserves assets when navigating back from asset to home (no prior similar/pack view)', async () => {
@@ -318,17 +318,17 @@ describe('App URL routing', () => {
       { id: 2, filename: 'home2.png', path: '/home2.png', pack: 'test', tags: [], width: 32, height: 32 }
     ]
     mockFetch.mockImplementation((url) => {
-      if (url === '/api/filters') {
+      if (url === '/assets/api/filters') {
         return Promise.resolve({
           json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
         })
       }
-      if (url.startsWith('/api/search')) {
+      if (url.startsWith('/assets/api/search')) {
         return Promise.resolve({
           json: () => Promise.resolve({ assets: homeAssets })
         })
       }
-      if (url.startsWith('/api/asset/')) {
+      if (url.startsWith('/assets/api/asset/')) {
         return Promise.resolve({
           json: () => Promise.resolve({
             id: 1,
@@ -359,14 +359,14 @@ describe('App URL routing', () => {
     mockFetch.mockClear()
 
     // Navigate back to home via popstate (browser back button)
-    window.history.replaceState({}, '', '/')
+    window.history.replaceState({}, '', '/assets/')
     window.dispatchEvent(new PopStateEvent('popstate', {
       state: { route: 'home' }
     }))
     await flushPromises()
 
     // Should NOT have called search API - assets should be preserved
-    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/search'))
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining('/assets/api/search'))
     // Assets should still be the same
     expect(wrapper.vm.assets.length).toBe(2)
     expect(wrapper.vm.assets[0].filename).toBe('home1.png')
@@ -374,7 +374,7 @@ describe('App URL routing', () => {
 
   it('loads pack assets when navigating to /pack/:name', async () => {
     // Set URL before mounting
-    window.history.replaceState({}, '', '/pack/fantasy-pack')
+    window.history.replaceState({}, '', '/assets/pack/fantasy-pack')
 
     const wrapper = mount(App)
     await flushPromises()
@@ -395,7 +395,7 @@ describe('App URL routing', () => {
     expect(pushStateSpy).toHaveBeenCalledWith(
       { route: 'pack', name: 'fantasy-pack' },
       '',
-      '/pack/fantasy-pack'
+      '/assets/pack/fantasy-pack'
     )
   })
 
@@ -405,7 +405,7 @@ describe('App URL routing', () => {
     mockFetch.mockClear()
 
     // Simulate forward to pack
-    window.history.replaceState({}, '', '/pack/sci-fi-pack')
+    window.history.replaceState({}, '', '/assets/pack/sci-fi-pack')
     window.dispatchEvent(new PopStateEvent('popstate', {
       state: { route: 'pack', name: 'sci-fi-pack' }
     }))
@@ -416,7 +416,7 @@ describe('App URL routing', () => {
 
   it('resets selectedPacks when navigating back to home from pack', async () => {
     // Start at /pack/test-pack
-    window.history.replaceState({}, '', '/pack/test-pack')
+    window.history.replaceState({}, '', '/assets/pack/test-pack')
 
     const wrapper = mount(App)
     await flushPromises()
@@ -425,7 +425,7 @@ describe('App URL routing', () => {
     mockFetch.mockClear()
 
     // Navigate back to home
-    window.history.replaceState({}, '', '/')
+    window.history.replaceState({}, '', '/assets/')
     window.dispatchEvent(new PopStateEvent('popstate', {
       state: { route: 'home' }
     }))
@@ -433,6 +433,49 @@ describe('App URL routing', () => {
 
     // Should select all packs (from filters)
     expect(wrapper.vm.selectedPacks).toEqual([])
+  })
+
+  it('calls pushState with /pack/:name when selecting a pack in single mode', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+    pushStateSpy.mockClear()
+
+    // Ensure single selection mode
+    wrapper.vm.selectionMode = 'single'
+    await flushPromises()
+
+    // Simulate pack selection via v-model update (as PackList would do)
+    wrapper.vm.selectedPacks = ['fantasy-pack']
+    await flushPromises()
+
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { route: 'pack', name: 'fantasy-pack' },
+      '',
+      '/assets/pack/fantasy-pack'
+    )
+  })
+
+  it('calls pushState with / when deselecting the last pack in single mode', async () => {
+    // Start at /pack/test-pack
+    window.history.replaceState({}, '', '/assets/pack/test-pack')
+
+    const wrapper = mount(App)
+    await flushPromises()
+    pushStateSpy.mockClear()
+
+    // Ensure single selection mode
+    wrapper.vm.selectionMode = 'single'
+    expect(wrapper.vm.selectedPacks).toContain('test-pack')
+
+    // Deselect the pack
+    wrapper.vm.selectedPacks = []
+    await flushPromises()
+
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { route: 'home' },
+      '',
+      '/assets/'
+    )
   })
 })
 
@@ -446,17 +489,17 @@ describe('App 3-column layout', () => {
 
     // Default fetch responses
     mockFetch.mockImplementation((url) => {
-      if (url === '/api/filters') {
+      if (url === '/assets/api/filters') {
         return Promise.resolve({
           json: () => Promise.resolve({ packs: [{ name: 'pack1', count: 10 }], tags: [], colors: [] })
         })
       }
-      if (url.startsWith('/api/search')) {
+      if (url.startsWith('/assets/api/search')) {
         return Promise.resolve({
           json: () => Promise.resolve({ assets: [] })
         })
       }
-      if (url.startsWith('/api/asset/')) {
+      if (url.startsWith('/assets/api/asset/')) {
         return Promise.resolve({
           json: () => Promise.resolve({
             id: 123,
@@ -493,8 +536,11 @@ describe('App 3-column layout', () => {
     expect(wrapper.findComponent(PackList).exists()).toBe(true)
   })
 
-  it('renders Cart in right panel', () => {
+  it('renders Cart in right panel', async () => {
     const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'AssetDetail'] } })
+    // Cart is only shown when panel is expanded
+    wrapper.vm.cartPanelExpanded = true
+    await wrapper.vm.$nextTick()
     expect(wrapper.findComponent(Cart).exists()).toBe(true)
   })
 

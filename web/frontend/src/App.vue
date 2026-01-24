@@ -293,10 +293,19 @@ watch(selectedAsset, (newVal, oldVal) => {
   skipNextPush = false
 })
 
-watch(selectedPacks, () => {
+watch(selectedPacks, (newPacks, oldPacks) => {
   if (!isInitializing) {
     search(currentSearchParams.value)
+    // In single mode, update URL to reflect pack selection
+    if (selectionMode.value === 'single' && !skipNextPush) {
+      if (newPacks.length === 1) {
+        window.history.pushState({ route: 'pack', name: newPacks[0] }, '', buildUrl({ name: 'pack', params: { name: newPacks[0] } }))
+      } else if (newPacks.length === 0 && oldPacks && oldPacks.length > 0) {
+        window.history.pushState({ route: 'home' }, '', buildUrl({ name: 'home' }))
+      }
+    }
   }
+  skipNextPush = false
 })
 
 watch(selectionMode, (newMode, oldMode) => {

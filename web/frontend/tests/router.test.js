@@ -47,32 +47,32 @@ describe('router', () => {
   describe('buildUrl', () => {
     it('builds root URL for home route', () => {
       const url = buildUrl({ name: 'home' })
-      expect(url).toBe('/')
+      expect(url).toBe('/assets/')
     })
 
     it('builds asset URL with id', () => {
       const url = buildUrl({ name: 'asset', params: { id: '123' } })
-      expect(url).toBe('/asset/123')
+      expect(url).toBe('/assets/asset/123')
     })
 
     it('builds asset URL with string id', () => {
       const url = buildUrl({ name: 'asset', params: { id: 'abc-def' } })
-      expect(url).toBe('/asset/abc-def')
+      expect(url).toBe('/assets/asset/abc-def')
     })
 
     it('builds similar URL with id', () => {
       const url = buildUrl({ name: 'similar', params: { id: '123' } })
-      expect(url).toBe('/similar/123')
+      expect(url).toBe('/assets/similar/123')
     })
 
     it('builds similar URL with string id', () => {
       const url = buildUrl({ name: 'similar', params: { id: 'abc-def' } })
-      expect(url).toBe('/similar/abc-def')
+      expect(url).toBe('/assets/similar/abc-def')
     })
 
     it('builds pack URL with name', () => {
       const url = buildUrl({ name: 'pack', params: { name: 'fantasy-characters' } })
-      expect(url).toBe('/pack/fantasy-characters')
+      expect(url).toBe('/assets/pack/fantasy-characters')
     })
   })
 })
