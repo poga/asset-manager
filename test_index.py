@@ -923,6 +923,41 @@ class TestPreviewBoundsSchema:
         conn.close()
 
 
+class TestSetPackPreview:
+    """Tests for set_pack_preview function."""
+
+    def test_sets_preview_with_explicit_path(self, temp_dir):
+        """Set preview from explicit image path."""
+        # Create pack in database
+        db_path = temp_dir / "test.db"
+        conn = index.get_db(db_path)
+        conn.execute(
+            "INSERT INTO packs (id, name, path) VALUES (?, ?, ?)",
+            [1, "TestPack_v1.0", "TestPack_v1.0"]
+        )
+        conn.commit()
+
+        # Create preview image
+        preview_img = temp_dir / "custom_preview.png"
+        img = Image.new("RGBA", (64, 64), (255, 0, 0, 255))
+        img.save(preview_img)
+
+        # Create preview directory
+        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir.mkdir(parents=True)
+
+        # Call function
+        count = index.set_pack_preview(conn, "TestPack_v1.0", preview_dir, preview_img)
+
+        # Verify
+        assert count == 1
+        assert (preview_dir / "TestPack_v1.0.png").exists()
+        row = conn.execute("SELECT preview_path, preview_generated FROM packs WHERE id = 1").fetchone()
+        assert row["preview_path"] == "previews/TestPack_v1.0.png"
+        assert row["preview_generated"] == 0
+        conn.close()
+
+
 # =============================================================================
 # Entry point
 # =============================================================================
