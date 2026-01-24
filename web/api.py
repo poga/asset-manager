@@ -328,6 +328,12 @@ def asset_detail(asset_id: int):
         ORDER BY percentage DESC
     """, [asset_id]).fetchall()
 
+    # Get preview override
+    override = conn.execute(
+        "SELECT use_full_image FROM asset_preview_overrides WHERE path = ?",
+        [row["path"]]
+    ).fetchone()
+
     conn.close()
 
     return {
@@ -338,8 +344,13 @@ def asset_detail(asset_id: int):
         "pack": row["pack_name"],
         "width": row["width"],
         "height": row["height"],
+        "preview_x": row["preview_x"],
+        "preview_y": row["preview_y"],
+        "preview_width": row["preview_width"],
+        "preview_height": row["preview_height"],
         "tags": [t["name"] for t in tags],
         "colors": [{"hex": c["color_hex"], "percentage": c["percentage"]} for c in colors],
+        "use_full_image": bool(override["use_full_image"]) if override else None,
     }
 
 

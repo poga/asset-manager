@@ -652,5 +652,26 @@ def test_delete_preview_override(test_db):
     assert row is None
 
 
+def test_asset_detail_includes_use_full_image(test_db):
+    """GET /api/asset/{id} includes use_full_image field."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # Without override, should be null/None
+    response = client.get("/api/asset/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert "use_full_image" in data
+    assert data["use_full_image"] is None
+
+    # Set override
+    client.post("/api/asset/1/preview-override", json={"use_full_image": True})
+
+    # Now should be True
+    response = client.get("/api/asset/1")
+    data = response.json()
+    assert data["use_full_image"] is True
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
