@@ -22,10 +22,10 @@ A SQLite-based indexing and search system for game development assets. Index spr
 
 ```bash
 # Initial index
-uv run index.py /path/to/assets --db assets.db
+uv run index.py index /path/to/assets --db assets.db
 
-# Incremental update
-uv run index.py --update
+# Incremental update (re-run index command, skips unchanged files)
+uv run index.py index /path/to/assets --db assets.db
 ```
 
 ### Search Assets
