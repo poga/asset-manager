@@ -204,11 +204,13 @@ def search(
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
                a.preview_x, a.preview_y, a.preview_width, a.preview_height,
                p.name as pack_name,
-               GROUP_CONCAT(DISTINCT tg.name) as tags
+               GROUP_CONCAT(DISTINCT tg.name) as tags,
+               po.use_full_image
         FROM assets a
         LEFT JOIN packs p ON a.pack_id = p.id
         LEFT JOIN asset_tags at ON a.id = at.asset_id
         LEFT JOIN tags tg ON at.tag_id = tg.id
+        LEFT JOIN asset_preview_overrides po ON a.path = po.path
         WHERE {where}
         GROUP BY a.id
         ORDER BY {order_by}
@@ -221,6 +223,9 @@ def search(
 
     assets = []
     for row in rows:
+        use_full_image = None
+        if row["use_full_image"] is not None:
+            use_full_image = bool(row["use_full_image"])
         assets.append({
             "id": row["id"],
             "path": row["path"],
@@ -233,6 +238,7 @@ def search(
             "preview_y": row["preview_y"],
             "preview_width": row["preview_width"],
             "preview_height": row["preview_height"],
+            "use_full_image": use_full_image,
         })
 
     return {"assets": assets, "total": len(assets)}

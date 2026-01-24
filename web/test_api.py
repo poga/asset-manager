@@ -673,5 +673,26 @@ def test_asset_detail_includes_use_full_image(test_db):
     assert data["use_full_image"] is True
 
 
+def test_search_includes_use_full_image(test_db):
+    """GET /api/search includes use_full_image field per asset."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # Set override for one asset
+    client.post("/api/asset/1/preview-override", json={"use_full_image": True})
+
+    response = client.get("/api/search")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Find goblin (id=1) and orc (id=2)
+    assets_by_id = {a["id"]: a for a in data["assets"]}
+
+    # Asset 1 should have use_full_image=True
+    assert assets_by_id[1]["use_full_image"] is True
+    # Asset 2 should have use_full_image=None
+    assert assets_by_id[2]["use_full_image"] is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
