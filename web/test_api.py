@@ -66,6 +66,11 @@ def test_db():
         CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, source TEXT, PRIMARY KEY (asset_id, tag_id));
         CREATE TABLE asset_colors (asset_id INTEGER, color_hex TEXT, percentage REAL, PRIMARY KEY (asset_id, color_hex));
         CREATE TABLE asset_phash (asset_id INTEGER PRIMARY KEY, phash BLOB);
+        CREATE TABLE asset_preview_overrides (
+            path TEXT PRIMARY KEY,
+            use_full_image BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
         INSERT INTO packs (id, name, path) VALUES (1, 'creatures', '/assets/creatures');
         INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height)
@@ -582,6 +587,17 @@ def test_filtered_search_returns_deterministic_order(test_db):
     # All orders should be the same (deterministic)
     unique_orders = set(orders)
     assert len(unique_orders) == 1, "Filtered search should return deterministic order"
+
+
+def test_preview_override_table_exists(test_db):
+    """Preview override table should exist in database."""
+    import sqlite3
+    conn = sqlite3.connect(test_db)
+    cursor = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='asset_preview_overrides'"
+    )
+    assert cursor.fetchone() is not None
+    conn.close()
 
 
 if __name__ == "__main__":

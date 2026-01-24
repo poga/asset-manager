@@ -114,6 +114,12 @@ CREATE TABLE IF NOT EXISTS asset_embeddings (
     embedding BLOB
 );
 
+CREATE TABLE IF NOT EXISTS asset_preview_overrides (
+    path TEXT PRIMARY KEY,
+    use_full_image BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_filename ON assets(filename);
 CREATE INDEX IF NOT EXISTS idx_assets_filetype ON assets(filetype);
 CREATE INDEX IF NOT EXISTS idx_assets_pack_id ON assets(pack_id);
