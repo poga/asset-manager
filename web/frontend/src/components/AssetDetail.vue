@@ -13,6 +13,17 @@
         class="asset-image"
         :style="{ minWidth: '300px', minHeight: '300px' }"
       />
+        <label
+          v-if="asset.preview_x !== null && asset.preview_x !== undefined"
+          class="preview-override-checkbox"
+        >
+          <input
+            type="checkbox"
+            :checked="asset.use_full_image"
+            @change="$emit('toggle-preview-override', { assetId: asset.id, useFullImage: !asset.use_full_image })"
+          />
+          Show full image
+        </label>
 
       <div class="asset-info">
         <h2>{{ asset.filename }}</h2>
@@ -71,7 +82,7 @@ defineProps({
   asset: { type: Object, required: true }
 })
 
-defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack', 'tag-click'])
+defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack', 'tag-click', 'toggle-preview-override'])
 </script>
 
 <style scoped>
@@ -220,5 +231,19 @@ h2 {
 
 .pack-btn:hover {
   background: var(--color-success-hover);
+}
+
+.preview-override-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.preview-override-checkbox input {
+  cursor: pointer;
 }
 </style>

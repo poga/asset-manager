@@ -104,4 +104,58 @@ describe('AssetDetail', () => {
     expect(wrapper.emitted('tag-click')).toBeTruthy()
     expect(wrapper.emitted('tag-click')[0][0]).toBe('character')
   })
+
+  describe('Preview Override', () => {
+    const mockAssetWithPreview = {
+      id: 1,
+      filename: 'sprite.png',
+      path: 'sprites/sprite.png',
+      pack: 'sprites',
+      width: 128,
+      height: 64,
+      preview_x: 0,
+      preview_y: 0,
+      preview_width: 32,
+      preview_height: 32,
+      tags: [],
+      colors: [],
+      use_full_image: false,
+    }
+
+    it('shows checkbox when asset has preview bounds', () => {
+      const wrapper = mount(AssetDetail, {
+        props: { asset: mockAssetWithPreview }
+      })
+      expect(wrapper.find('.preview-override-checkbox').exists()).toBe(true)
+    })
+
+    it('hides checkbox when asset has no preview bounds', () => {
+      const assetNoPreview = { ...mockAssetWithPreview, preview_x: null }
+      const wrapper = mount(AssetDetail, {
+        props: { asset: assetNoPreview }
+      })
+      expect(wrapper.find('.preview-override-checkbox').exists()).toBe(false)
+    })
+
+    it('emits toggle-preview-override when checkbox clicked', async () => {
+      const wrapper = mount(AssetDetail, {
+        props: { asset: mockAssetWithPreview }
+      })
+      await wrapper.find('.preview-override-checkbox input').trigger('change')
+      expect(wrapper.emitted('toggle-preview-override')).toBeTruthy()
+      expect(wrapper.emitted('toggle-preview-override')[0][0]).toEqual({
+        assetId: 1,
+        useFullImage: true
+      })
+    })
+
+    it('checkbox reflects use_full_image state', () => {
+      const assetWithOverride = { ...mockAssetWithPreview, use_full_image: true }
+      const wrapper = mount(AssetDetail, {
+        props: { asset: assetWithOverride }
+      })
+      const checkbox = wrapper.find('.preview-override-checkbox input')
+      expect(checkbox.element.checked).toBe(true)
+    })
+  })
 })
