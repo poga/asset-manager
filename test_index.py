@@ -957,6 +957,72 @@ class TestSetPackPreview:
         assert row["preview_generated"] == 0
         conn.close()
 
+    def test_matches_packs_with_glob_pattern(self, temp_dir):
+        """Set preview for multiple packs using glob pattern."""
+        db_path = temp_dir / "test.db"
+        conn = index.get_db(db_path)
+        conn.execute("INSERT INTO packs (id, name, path) VALUES (?, ?, ?)", [1, "Penusbmic_Dungeon", "Penusbmic_Dungeon"])
+        conn.execute("INSERT INTO packs (id, name, path) VALUES (?, ?, ?)", [2, "Penusbmic_Forest", "Penusbmic_Forest"])
+        conn.execute("INSERT INTO packs (id, name, path) VALUES (?, ?, ?)", [3, "OtherPack", "OtherPack"])
+        conn.commit()
+
+        preview_img = temp_dir / "preview.gif"
+        img = Image.new("RGBA", (64, 64), (0, 255, 0, 255))
+        img.save(preview_img)
+
+        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir.mkdir(parents=True)
+
+        count = index.set_pack_preview(conn, "penusbmic_*", preview_dir, preview_img)
+
+        assert count == 2
+        assert (preview_dir / "Penusbmic_Dungeon.gif").exists()
+        assert (preview_dir / "Penusbmic_Forest.gif").exists()
+        assert not (preview_dir / "OtherPack.gif").exists()
+        conn.close()
+
+    def test_finds_preview_in_pack_directory(self, temp_dir):
+        """Find preview.png/gif in pack directory when no explicit path given."""
+        db_path = temp_dir / "test.db"
+        conn = index.get_db(db_path)
+        conn.execute("INSERT INTO packs (id, name, path) VALUES (?, ?, ?)", [1, "TestPack", "TestPack"])
+        conn.commit()
+
+        # Create pack directory with preview.gif
+        pack_dir = temp_dir / "TestPack"
+        pack_dir.mkdir()
+        preview_in_pack = pack_dir / "preview.gif"
+        img = Image.new("RGBA", (32, 32), (0, 0, 255, 255))
+        img.save(preview_in_pack)
+
+        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir.mkdir(parents=True)
+
+        count = index.set_pack_preview(conn, "TestPack", preview_dir, asset_root=temp_dir)
+
+        assert count == 1
+        assert (preview_dir / "TestPack.gif").exists()
+        conn.close()
+
+    def test_returns_zero_for_no_matches(self, temp_dir):
+        """Return 0 when no packs match the pattern."""
+        db_path = temp_dir / "test.db"
+        conn = index.get_db(db_path)
+        conn.execute("INSERT INTO packs (id, name, path) VALUES (?, ?, ?)", [1, "SomePack", "SomePack"])
+        conn.commit()
+
+        preview_img = temp_dir / "preview.png"
+        img = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
+        img.save(preview_img)
+
+        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir.mkdir(parents=True)
+
+        count = index.set_pack_preview(conn, "nonexistent_*", preview_dir, preview_img)
+
+        assert count == 0
+        conn.close()
+
 
 # =============================================================================
 # Entry point
