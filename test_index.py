@@ -1024,6 +1024,42 @@ class TestSetPackPreview:
         conn.close()
 
 
+class TestSetPreviewCLI:
+    """Tests for set-preview CLI command."""
+
+    def test_set_preview_command_with_explicit_path(self, temp_dir):
+        """CLI command sets preview with explicit path."""
+        from typer.testing import CliRunner
+
+        # Setup: create database with pack
+        db_path = temp_dir / "test.db"
+        conn = index.get_db(db_path)
+        conn.execute("INSERT INTO packs (id, name, path) VALUES (?, ?, ?)", [1, "TestPack", "TestPack"])
+        conn.commit()
+        conn.close()
+
+        # Create preview image
+        preview_img = temp_dir / "my_preview.png"
+        img = Image.new("RGBA", (64, 64), (255, 0, 0, 255))
+        img.save(preview_img)
+
+        # Create preview directory
+        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir.mkdir(parents=True)
+
+        runner = CliRunner()
+        result = runner.invoke(index.app, [
+            "set-preview",
+            "TestPack",
+            str(preview_img),
+            "--db", str(db_path)
+        ])
+
+        assert result.exit_code == 0
+        assert "Updated 1 pack(s)" in result.stdout
+        assert (preview_dir / "TestPack.png").exists()
+
+
 # =============================================================================
 # Entry point
 # =============================================================================
