@@ -773,5 +773,58 @@ def update(
     index(asset_root, db, force=False)
 
 
+@app.command("set-preview")
+def set_preview(
+    pack_pattern: str = typer.Argument(..., help="Pack name or glob pattern (e.g., 'pensubmic_*')"),
+    image_path: Optional[Path] = typer.Argument(None, help="Path to preview image (png/gif)"),
+    db: Path = typer.Option("assets.db", "--db", help="Database path"),
+):
+    """Set custom preview image for packs."""
+    if not db.exists():
+        console.print(f"[red]Database not found: {db}[/red]")
+        raise typer.Exit(1)
+
+    # Validate explicit image path if provided
+    if image_path is not None:
+        if not image_path.exists():
+            console.print(f"[red]Error: File not found: {image_path}[/red]")
+            raise typer.Exit(1)
+        if image_path.suffix.lower() not in {".png", ".gif"}:
+            console.print(f"[red]Error: Preview must be .png or .gif[/red]")
+            raise typer.Exit(1)
+
+    conn = get_db(db)
+    preview_dir = db.parent / ".assetindex" / "previews"
+
+    # Infer asset root from pack paths
+    asset_root = db.parent
+    row = conn.execute("SELECT path FROM packs LIMIT 1").fetchone()
+    if row and not (asset_root / row["path"]).exists():
+        # Try to find assets directory
+        for candidate in [db.parent / "assets", db.parent]:
+            if candidate.exists():
+                asset_root = candidate
+                break
+
+    count = set_pack_preview(conn, pack_pattern, preview_dir, image_path, asset_root)
+
+    if count == 0:
+        if image_path is None:
+            console.print(f"[yellow]No packs matching '{pack_pattern}' found, or no preview.png/gif in pack directories[/yellow]")
+        else:
+            console.print(f"[red]Error: No packs matching '{pack_pattern}' found[/red]")
+        raise typer.Exit(1)
+
+    # Print what was updated
+    matched_packs = conn.execute(
+        "SELECT name FROM packs WHERE preview_generated = FALSE"
+    ).fetchall()
+    for pack in matched_packs[-count:]:
+        console.print(f"Set preview for {pack['name']}")
+
+    console.print(f"[green]Updated {count} pack(s)[/green]")
+    conn.close()
+
+
 if __name__ == "__main__":
     app()
