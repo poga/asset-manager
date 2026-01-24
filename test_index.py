@@ -1059,6 +1059,47 @@ class TestSetPreviewCLI:
         assert "Updated 1 pack(s)" in result.stdout
         assert (preview_dir / "TestPack.png").exists()
 
+    def test_error_when_image_not_found(self, temp_dir):
+        """CLI exits with error when image path doesn't exist."""
+        from typer.testing import CliRunner
+
+        db_path = temp_dir / "test.db"
+        conn = index.get_db(db_path)
+        conn.close()
+
+        runner = CliRunner()
+        result = runner.invoke(index.app, [
+            "set-preview",
+            "TestPack",
+            "/nonexistent/image.png",
+            "--db", str(db_path)
+        ])
+
+        assert result.exit_code == 1
+        assert "File not found" in result.stdout
+
+    def test_error_when_invalid_file_type(self, temp_dir):
+        """CLI exits with error when image is not png/gif."""
+        from typer.testing import CliRunner
+
+        db_path = temp_dir / "test.db"
+        conn = index.get_db(db_path)
+        conn.close()
+
+        bad_file = temp_dir / "preview.jpg"
+        bad_file.touch()
+
+        runner = CliRunner()
+        result = runner.invoke(index.app, [
+            "set-preview",
+            "TestPack",
+            str(bad_file),
+            "--db", str(db_path)
+        ])
+
+        assert result.exit_code == 1
+        assert "must be .png or .gif" in result.stdout
+
 
 # =============================================================================
 # Entry point
