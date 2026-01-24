@@ -559,3 +559,45 @@ describe('App 3-column layout', () => {
     expect(wrapper.findComponent(AssetGrid).exists()).toBe(false)
   })
 })
+
+describe('Preview Override', () => {
+  beforeEach(() => {
+    // Default fetch responses
+    mockFetch.mockImplementation((url) => {
+      if (url === '/assets/api/filters') {
+        return Promise.resolve({
+          json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
+        })
+      }
+      if (url.startsWith('/assets/api/search')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({ assets: [] })
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+  })
+
+  afterEach(() => {
+    mockFetch.mockReset()
+  })
+
+  it('calls API when toggle-preview-override is emitted', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ success: true })
+    })
+
+    const wrapper = mount(App)
+    // Simulate the event from AssetDetail
+    await wrapper.vm.handleTogglePreviewOverride({ assetId: 1, useFullImage: true })
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/asset/1/preview-override'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ use_full_image: true })
+      })
+    )
+  })
+})

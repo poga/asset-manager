@@ -45,6 +45,7 @@
           @find-similar="findSimilar"
           @view-pack="viewPack"
           @tag-click="handleTagClick"
+          @toggle-preview-override="handleTogglePreviewOverride"
         />
 
         <AssetGrid
@@ -284,6 +285,39 @@ async function downloadCart() {
     a.click()
     URL.revokeObjectURL(url)
   }
+}
+
+const selectedAssetId = computed(() => selectedAsset.value?.id)
+
+async function loadAssetDetail(assetId) {
+  const res = await fetch(`${API_BASE}/asset/${assetId}`)
+  selectedAsset.value = await res.json()
+}
+
+async function doSearch() {
+  await search(currentSearchParams.value)
+}
+
+async function handleTogglePreviewOverride({ assetId, useFullImage }) {
+  const url = `${API_BASE}/asset/${assetId}/preview-override`
+
+  if (useFullImage) {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ use_full_image: true })
+    })
+  } else {
+    await fetch(url, { method: 'DELETE' })
+  }
+
+  // Refresh the selected asset detail
+  if (selectedAssetId.value === assetId) {
+    await loadAssetDetail(assetId)
+  }
+
+  // Refresh search results to update grid
+  await doSearch()
 }
 
 watch(selectedAsset, (newVal, oldVal) => {
