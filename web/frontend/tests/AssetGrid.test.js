@@ -118,4 +118,50 @@ describe('AssetGrid', () => {
     // Should use full image dimensions
     expect(container.attributes('style')).toContain('64 / 64')
   })
+
+  describe('Preview Override', () => {
+    it('shows full image when use_full_image is true even with preview bounds', () => {
+      const assets = [{
+        id: 1,
+        filename: 'sprite.png',
+        pack: 'sprites',
+        width: 128,
+        height: 64,
+        preview_x: 0,
+        preview_y: 0,
+        preview_width: 32,
+        preview_height: 32,
+        use_full_image: true,
+      }]
+
+      const wrapper = mount(AssetGrid, {
+        props: { assets, cartIds: [] }
+      })
+
+      // Should use img tag, not SpritePreview
+      expect(wrapper.findComponent({ name: 'SpritePreview' }).exists()).toBe(false)
+      expect(wrapper.find('.asset-image-container img').exists()).toBe(true)
+    })
+
+    it('uses SpritePreview when use_full_image is false with preview bounds', () => {
+      const assets = [{
+        id: 1,
+        filename: 'sprite.png',
+        pack: 'sprites',
+        width: 128,
+        height: 64,
+        preview_x: 0,
+        preview_y: 0,
+        preview_width: 32,
+        preview_height: 32,
+        use_full_image: false,
+      }]
+
+      const wrapper = mount(AssetGrid, {
+        props: { assets, cartIds: [] }
+      })
+
+      expect(wrapper.findComponent({ name: 'SpritePreview' }).exists()).toBe(true)
+    })
+  })
 })

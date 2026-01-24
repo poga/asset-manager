@@ -14,11 +14,11 @@
       >
         <div
           class="asset-image-container"
-          :style="{ aspectRatio: asset.preview_x != null ? `${asset.preview_width} / ${asset.preview_height}` : `${asset.width} / ${asset.height}` }"
+          :style="{ aspectRatio: (asset.preview_x != null && !asset.use_full_image) ? `${asset.preview_width} / ${asset.preview_height}` : `${asset.width} / ${asset.height}` }"
           @click="$emit('select', asset.id)"
         >
           <SpritePreview
-            v-if="asset.preview_x !== null"
+            v-if="asset.preview_x !== null && !asset.use_full_image"
             :asset-id="asset.id"
             :preview-x="asset.preview_x"
             :preview-y="asset.preview_y"
