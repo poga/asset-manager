@@ -31,7 +31,8 @@
 
         <div class="metadata">
           <div v-if="asset.pack">
-            <strong>Pack:</strong> {{ asset.pack }}
+            <strong>Pack:</strong>
+            <span class="pack-link" @click="$emit('view-pack', asset.pack)">{{ asset.pack }}</span>
           </div>
           <div>
             <strong>Size:</strong> {{ asset.width }}x{{ asset.height }}
@@ -151,6 +152,17 @@ h2 {
 
 .metadata div {
   margin-bottom: 0.25rem;
+}
+
+.pack-link {
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: color 150ms;
+}
+
+.pack-link:hover {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
 }
 
 .tags {
