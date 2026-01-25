@@ -72,7 +72,7 @@ const props = defineProps({
   selectionMode: { type: String, default: 'single', validator: v => ['single', 'multi'].includes(v) }
 })
 
-const emit = defineEmits(['update:selectedPacks', 'update:selectionMode', 'toggle-panel'])
+const emit = defineEmits(['update:selectedPacks', 'update:selectionMode', 'toggle-panel', 'view-pack'])
 
 const showSearch = ref(false)
 const searchQuery = ref('')
@@ -91,9 +91,12 @@ const noneSelected = computed(() => props.selectedPacks.length === 0)
 
 function togglePack(name) {
   if (props.selectionMode === 'single') {
-    // Single mode: clicking selected pack deselects, otherwise replace selection
-    const newSelected = props.selectedPacks.includes(name) ? [] : [name]
-    emit('update:selectedPacks', newSelected)
+    // Single mode: clicking selected pack navigates to it, otherwise select it
+    if (props.selectedPacks.includes(name)) {
+      emit('view-pack', name)
+    } else {
+      emit('update:selectedPacks', [name])
+    }
   } else {
     // Multi mode: toggle pack in/out of selection
     const newSelected = props.selectedPacks.includes(name)

@@ -68,14 +68,18 @@ describe('PackList', () => {
     expect(emitted[0][0]).toEqual(['sprites'])
   })
 
-  it('single mode: clicking selected pack deselects it', async () => {
+  it('single mode: clicking selected pack emits view-pack to navigate', async () => {
     const wrapper = mount(PackList, {
       props: { packs: mockPacks, selectedPacks: ['icons'], selectionMode: 'single' }
     })
     const iconsCard = wrapper.findAll('.pack-card').find(card => card.text().includes('icons'))
     await iconsCard.trigger('click')
-    const emitted = wrapper.emitted('update:selectedPacks')
-    expect(emitted[0][0]).toEqual([])
+    // Should emit view-pack, NOT deselect
+    const viewPackEmitted = wrapper.emitted('view-pack')
+    expect(viewPackEmitted).toBeTruthy()
+    expect(viewPackEmitted[0][0]).toBe('icons')
+    // Should NOT emit update:selectedPacks (no deselection)
+    expect(wrapper.emitted('update:selectedPacks')).toBeFalsy()
   })
 
   it('multi mode: clicking toggles pack in/out of selection', async () => {

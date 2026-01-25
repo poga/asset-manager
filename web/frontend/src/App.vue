@@ -31,6 +31,7 @@
           v-model:selectionMode="selectionMode"
           :panelState="packPanelState"
           @toggle-panel="togglePackPanel"
+          @view-pack="viewPack"
         />
       </aside>
 

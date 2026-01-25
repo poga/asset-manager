@@ -583,16 +583,16 @@ describe('Preview Override', () => {
   })
 
   it('calls API when toggle-preview-override is emitted', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true })
+    const wrapper = mount(App, {
+      global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] }
     })
+    await flushPromises()
+    mockFetch.mockClear()
 
-    const wrapper = mount(App)
     // Simulate the event from AssetDetail
     await wrapper.vm.handleTogglePreviewOverride({ assetId: 1, useFullImage: true })
 
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/asset/1/preview-override'),
       expect.objectContaining({
         method: 'POST',
