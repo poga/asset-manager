@@ -70,6 +70,14 @@
           <button class="pack-btn" v-if="asset.pack" @click="$emit('view-pack', asset.pack)">
             View Pack
           </button>
+          <a
+            :href="`${API_BASE}/image/${asset.id}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="full-size-btn"
+          >
+            Full Size
+          </a>
         </div>
       </div>
     </div>
@@ -243,6 +251,23 @@ h2 {
 
 .pack-btn:hover {
   background: var(--color-success-hover);
+}
+
+.full-size-btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  text-decoration: none;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background-color 150ms;
+}
+
+.full-size-btn:hover {
+  background: var(--color-border);
 }
 
 .preview-override-checkbox {

@@ -69,6 +69,18 @@ describe('AssetDetail', () => {
     expect(wrapper.emitted('view-pack')[0][0]).toBe('sprites')
   })
 
+  it('renders Full Size link pointing to image URL', () => {
+    const wrapper = mount(AssetDetail, {
+      props: { asset: mockAsset }
+    })
+    const fullSizeLink = wrapper.find('.full-size-btn')
+    expect(fullSizeLink.exists()).toBe(true)
+    expect(fullSizeLink.attributes('href')).toBe('/assets/api/image/1')
+    expect(fullSizeLink.attributes('target')).toBe('_blank')
+    expect(fullSizeLink.attributes('rel')).toBe('noopener noreferrer')
+    expect(fullSizeLink.text()).toBe('Full Size')
+  })
+
   it('renders tags', () => {
     const wrapper = mount(AssetDetail, {
       props: { asset: mockAsset }
