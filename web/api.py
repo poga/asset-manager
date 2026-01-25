@@ -96,14 +96,6 @@ def get_db() -> sqlite3.Connection:
     path = _db_path or find_db()
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
-    # Ensure preview overrides table exists (may be missing in older databases)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS asset_preview_overrides (
-            path TEXT PRIMARY KEY,
-            use_full_image BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
     return conn
 
 
