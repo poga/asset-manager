@@ -42,3 +42,11 @@ stop-frontend:
 # Start both servers (run in separate terminals)
 start-all:
     @echo "Run 'just start-api' and 'just start-frontend' in separate terminals"
+
+# Start API server for background service (port 38471)
+start-api-bg:
+    /Users/poga/.local/bin/uv run --with fastapi --with uvicorn --with pillow uvicorn web.api:app --host 127.0.0.1 --port 38471
+
+# Start frontend for background service (port 38472)
+start-frontend-bg:
+    cd web/frontend && /opt/homebrew/bin/npm run dev -- --port 38472
