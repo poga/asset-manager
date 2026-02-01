@@ -40,14 +40,16 @@ Set up launchd user agents to automatically start the API and frontend servers o
 
 ### 1. justfile - Add Background Targets
 
+Note: Uses absolute paths because launchd has a limited PATH.
+
 ```just
 # Start API server for background service (port 38471)
 start-api-bg:
-    uv run --with fastapi --with uvicorn --with pillow uvicorn web.api:app --host 127.0.0.1 --port 38471
+    /Users/poga/.local/bin/uv run --with fastapi --with uvicorn --with pillow uvicorn web.api:app --host 127.0.0.1 --port 38471
 
 # Start frontend for background service (port 38472)
 start-frontend-bg:
-    cd web/frontend && npm run dev -- --port 38472
+    cd web/frontend && /opt/homebrew/bin/npm run dev -- --port 38472
 ```
 
 ### 2. ~/Library/LaunchAgents/com.poga.asset-manager-api.plist
@@ -80,6 +82,8 @@ start-frontend-bg:
 
 ### 3. ~/Library/LaunchAgents/com.poga.asset-manager-frontend.plist
 
+Note: Requires EnvironmentVariables to set PATH because npm internally calls node.
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -89,6 +93,11 @@ start-frontend-bg:
     <string>com.poga.asset-manager-frontend</string>
     <key>WorkingDirectory</key>
     <string>/Users/poga/projects/asset-manager</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
     <key>ProgramArguments</key>
     <array>
         <string>/opt/homebrew/bin/just</string>
