@@ -74,6 +74,18 @@ def test_db():
             use_full_image BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE asset_relations (
+            from_asset_id INTEGER NOT NULL,
+            to_asset_id INTEGER NOT NULL,
+            relation_type TEXT NOT NULL,
+            PRIMARY KEY (from_asset_id, to_asset_id, relation_type)
+        );
+        CREATE TABLE asset_animations (
+            id INTEGER PRIMARY KEY,
+            asset_id INTEGER NOT NULL,
+            clip_index INTEGER NOT NULL,
+            name TEXT NOT NULL
+        );
 
         INSERT INTO packs (id, name, path) VALUES (1, 'creatures', '/assets/creatures');
         INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, width, height)
@@ -817,6 +829,33 @@ class TestModelEndpoint:
         aid = cur.lastrowid; conn.commit(); conn.close()
         r = _client.get(f"/api/asset/{aid}/model/../../../etc/passwd")
         assert r.status_code in (400, 404)
+
+
+class TestAnimationsEndpoint:
+    def _setup(self, test_db):
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind,rig) VALUES ('Knight.glb','Knight.glb','glb','h1','model','Rig_Medium')")
+        char_id = cur.lastrowid
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind,rig) VALUES ('Rig_Medium_General.glb','Rig_Medium_General.glb','glb','h2','animation_bundle','Rig_Medium')")
+        bundle_id = cur.lastrowid
+        conn.execute("INSERT INTO asset_animations (asset_id, clip_index, name) VALUES (?,0,'Idle')", [bundle_id])
+        conn.execute("INSERT INTO asset_animations (asset_id, clip_index, name) VALUES (?,1,'Walk')", [bundle_id])
+        conn.execute("INSERT INTO asset_relations (from_asset_id,to_asset_id,relation_type) VALUES (?,?,'animation_for_rig')", [char_id, bundle_id])
+        conn.commit(); conn.close()
+        return char_id, bundle_id
+
+    def test_returns_clips_from_linked_bundles(self, test_db):
+        from api import set_db_path
+        set_db_path(test_db)
+        char_id, bundle_id = self._setup(test_db)
+        r = _client.get(f"/api/asset/{char_id}/animations")
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body) == 1
+        assert body[0]["bundle_id"] == bundle_id
+        assert body[0]["bundle_name"] == "Rig_Medium_General.glb"
+        clip_names = [c["name"] for c in body[0]["clips"]]
+        assert clip_names == ["Idle", "Walk"]
 
 
 if __name__ == "__main__":

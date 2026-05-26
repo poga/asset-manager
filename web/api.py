@@ -482,6 +482,43 @@ MODEL_CONTENT_TYPES = {
 }
 
 
+@app.get("/api/asset/{asset_id}/animations")
+def asset_animations(asset_id: int):
+    conn = get_db()
+    row = conn.execute("SELECT id FROM assets WHERE id = ?", [asset_id]).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+
+    # Bundles: asset itself (if it has embedded clips) plus linked animation bundles
+    bundle_ids: list[int] = []
+    self_clips = conn.execute(
+        "SELECT clip_index, name FROM asset_animations WHERE asset_id = ? ORDER BY clip_index",
+        [asset_id]
+    ).fetchall()
+    if self_clips:
+        bundle_ids.append(asset_id)
+    linked = conn.execute(
+        "SELECT to_asset_id FROM asset_relations WHERE from_asset_id = ? AND relation_type='animation_for_rig'",
+        [asset_id]
+    ).fetchall()
+    bundle_ids.extend(r["to_asset_id"] for r in linked)
+
+    out = []
+    for bid in bundle_ids:
+        b = conn.execute("SELECT filename FROM assets WHERE id = ?", [bid]).fetchone()
+        clips = conn.execute(
+            "SELECT clip_index, name FROM asset_animations WHERE asset_id = ? ORDER BY clip_index",
+            [bid]
+        ).fetchall()
+        out.append({
+            "bundle_id": bid,
+            "bundle_name": b["filename"],
+            "clips": [{"name": c["name"], "gltf_name": c["name"]} for c in clips],
+        })
+    conn.close()
+    return out
+
+
 @app.get("/api/asset/{asset_id}/model")
 def asset_model(asset_id: int):
     conn = get_db()
