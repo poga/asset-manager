@@ -770,5 +770,54 @@ class Test3DSerialization:
         assert "b.glb" in kinds and "a.png" not in kinds
 
 
+class TestModelEndpoint:
+    def test_serves_glb(self, test_db, tmp_path):
+        from api import set_db_path, set_assets_path
+        set_db_path(test_db)
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        src = Path(__file__).parent.parent / "tests" / "fixtures" / "3d" / "Knight.glb"
+        (assets_dir / "Knight.glb").write_bytes(src.read_bytes())
+        set_assets_path(assets_dir)
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) VALUES ('Knight.glb','Knight.glb','glb','h','model')")
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/asset/{aid}/model")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "model/gltf-binary"
+        assert r.content[:4] == b"glTF"
+
+    def test_serves_gltf_and_sibling_bin(self, test_db, tmp_path):
+        from api import set_db_path, set_assets_path
+        set_db_path(test_db)
+        assets_dir = tmp_path / "assets"; assets_dir.mkdir()
+        fx = Path(__file__).parent.parent / "tests" / "fixtures" / "3d"
+        (assets_dir / "axe_1handed.gltf").write_bytes((fx / "axe_1handed.gltf").read_bytes())
+        (assets_dir / "axe_1handed.bin").write_bytes((fx / "axe_1handed.bin").read_bytes())
+        set_assets_path(assets_dir)
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) VALUES ('axe_1handed.gltf','axe_1handed.gltf','gltf','h','model')")
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/asset/{aid}/model")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "model/gltf+json"
+        r2 = _client.get(f"/api/asset/{aid}/model/axe_1handed.bin")
+        assert r2.status_code == 200
+
+    def test_rejects_path_traversal(self, test_db, tmp_path):
+        from api import set_db_path, set_assets_path
+        set_db_path(test_db)
+        assets_dir = tmp_path / "assets"; assets_dir.mkdir()
+        (assets_dir / "a.gltf").write_text("{}")
+        set_assets_path(assets_dir)
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) VALUES ('a.gltf','a.gltf','gltf','h','model')")
+        aid = cur.lastrowid; conn.commit(); conn.close()
+        r = _client.get(f"/api/asset/{aid}/model/../../../etc/passwd")
+        assert r.status_code in (400, 404)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

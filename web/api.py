@@ -476,6 +476,50 @@ def image(asset_id: int):
     return FileResponse(image_path)
 
 
+MODEL_CONTENT_TYPES = {
+    ".glb": "model/gltf-binary",
+    ".gltf": "model/gltf+json",
+}
+
+
+@app.get("/api/asset/{asset_id}/model")
+def asset_model(asset_id: int):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT path, asset_kind FROM assets WHERE id = ?", [asset_id]
+    ).fetchone()
+    conn.close()
+    if not row or row["asset_kind"] not in ("model", "animation_bundle"):
+        raise HTTPException(404, "Model not found")
+    p = (get_assets_path() / row["path"]).resolve()
+    if not p.exists():
+        raise HTTPException(404, "Model file missing")
+    ct = MODEL_CONTENT_TYPES.get(p.suffix.lower(), "application/octet-stream")
+    return FileResponse(p, media_type=ct)
+
+
+@app.get("/api/asset/{asset_id}/model/{filename}")
+def asset_model_sibling(asset_id: int, filename: str):
+    if "/" in filename or filename.startswith(".."):
+        raise HTTPException(400, "Invalid filename")
+    conn = get_db()
+    row = conn.execute(
+        "SELECT path, asset_kind FROM assets WHERE id = ?", [asset_id]
+    ).fetchone()
+    conn.close()
+    if not row or row["asset_kind"] not in ("model", "animation_bundle"):
+        raise HTTPException(404)
+    assets_dir = get_assets_path().resolve()
+    asset_dir = (assets_dir / row["path"]).parent.resolve()
+    target = (asset_dir / filename).resolve()
+    # Reject resolved paths that escape the asset's directory
+    if asset_dir not in target.parents and target.parent != asset_dir:
+        raise HTTPException(400, "Path traversal")
+    if not target.exists():
+        raise HTTPException(404)
+    return FileResponse(target)
+
+
 @app.get("/api/pack-preview/{pack_name:path}")
 def pack_preview(pack_name: str):
     """Serve pack preview image."""
@@ -599,6 +643,9 @@ def download_cart(request: DownloadCartRequest):
 @app.get("/{full_path:path}")
 def spa_fallback(full_path: str):
     """Serve static files or fallback to index.html for SPA routing."""
+    # API routes that didn't match a handler → 404, not SPA
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not found")
     static_path = get_static_path()
     if not static_path:
         raise HTTPException(status_code=404, detail="Frontend not built")
