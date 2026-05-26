@@ -919,7 +919,7 @@ class TestSetPackPreview:
         img.save(preview_img)
 
         # Create preview directory
-        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir = temp_dir / ".index" / "previews"
         preview_dir.mkdir(parents=True)
 
         # Call function
@@ -946,7 +946,7 @@ class TestSetPackPreview:
         img = Image.new("RGBA", (64, 64), (0, 255, 0, 255))
         img.save(preview_img)
 
-        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir = temp_dir / ".index" / "previews"
         preview_dir.mkdir(parents=True)
 
         count = index.set_pack_preview(conn, "penusbmic_*", preview_dir, preview_img)
@@ -971,7 +971,7 @@ class TestSetPackPreview:
         img = Image.new("RGBA", (32, 32), (0, 0, 255, 255))
         img.save(preview_in_pack)
 
-        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir = temp_dir / ".index" / "previews"
         preview_dir.mkdir(parents=True)
 
         count = index.set_pack_preview(conn, "TestPack", preview_dir, asset_root=temp_dir)
@@ -991,7 +991,7 @@ class TestSetPackPreview:
         img = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
         img.save(preview_img)
 
-        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir = temp_dir / ".index" / "previews"
         preview_dir.mkdir(parents=True)
 
         count = index.set_pack_preview(conn, "nonexistent_*", preview_dir, preview_img)
@@ -1020,7 +1020,7 @@ class TestSetPreviewCLI:
         img.save(preview_img)
 
         # Create preview directory
-        preview_dir = temp_dir / ".assetindex" / "previews"
+        preview_dir = temp_dir / ".index" / "previews"
         preview_dir.mkdir(parents=True)
 
         runner = CliRunner()

@@ -182,12 +182,9 @@ def main(force: bool = False):
     if "--force" in sys.argv:
         force = True
 
-    # Find database - try multiple locations
     db_path = Path("assets.db")
     if not db_path.exists():
-        db_path = Path(".assetindex/assets.db")
-    if not db_path.exists():
-        console.print("[red]Database not found at assets.db or .assetindex/assets.db[/red]")
+        console.print("[red]Database not found at assets.db[/red]")
         return
 
     # Get pack names from database
@@ -200,7 +197,7 @@ def main(force: bool = False):
     console.print(f"Found {len(pack_names)} packs in database")
 
     # Create output directory
-    output_dir = Path(".assetindex/previews")
+    output_dir = Path(".index/previews")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Fetch previews
