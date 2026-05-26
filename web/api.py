@@ -22,9 +22,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
-# Add parent directory to path for aseprite_parser import
+# Add parent directory to path for local module imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import aseprite_parser
+import model_indexer
 
 app = FastAPI(title="Asset Search API")
 
@@ -595,7 +596,7 @@ def download_cart(request: DownloadCartRequest):
     # Get asset info with pack name
     placeholders = ",".join("?" * len(request.asset_ids))
     rows = conn.execute(
-        f"""SELECT a.id, a.path, a.filename, a.width, a.height, p.name as pack_name
+        f"""SELECT a.id, a.path, a.filename, a.width, a.height, a.asset_kind, p.name as pack_name
             FROM assets a
             LEFT JOIN packs p ON a.pack_id = p.id
             WHERE a.id IN ({placeholders})""",
@@ -662,6 +663,15 @@ def download_cart(request: DownloadCartRequest):
             if file_path.exists():
                 # Use filename to avoid path issues
                 zf.write(file_path, row["filename"])
+            if row["asset_kind"] in ("model", "animation_bundle") and file_path.suffix.lower() == ".gltf":
+                try:
+                    info = model_indexer.extract_model_info(file_path)
+                    for ref in info.referenced_files:
+                        ref_path = (file_path.parent / ref).resolve()
+                        if ref_path.exists() and ref_path.is_relative_to(assets_dir.resolve()):
+                            zf.write(ref_path, ref_path.name)
+                except Exception:
+                    pass
         # Add metadata file
         zf.writestr("metadata.txt", "\n".join(metadata_lines))
 

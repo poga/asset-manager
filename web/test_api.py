@@ -858,5 +858,28 @@ class TestAnimationsEndpoint:
         assert clip_names == ["Idle", "Walk"]
 
 
+class TestCart3D:
+    def test_cart_zip_includes_gltf_bin(self, test_client, sample_db, tmp_path):
+        from pathlib import Path
+        fx = Path(__file__).parent.parent / "tests" / "fixtures" / "3d"
+        assets_dir = tmp_path / "assets3d"; assets_dir.mkdir()
+        (assets_dir / "axe_1handed.gltf").write_bytes((fx / "axe_1handed.gltf").read_bytes())
+        (assets_dir / "axe_1handed.bin").write_bytes((fx / "axe_1handed.bin").read_bytes())
+        import api
+        api.set_assets_path(assets_dir)
+
+        conn = sqlite3.connect(sample_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) VALUES ('axe_1handed.gltf','axe_1handed.gltf','gltf','h','model')")
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = test_client.post("/api/download-cart", json={"asset_ids": [aid]})
+        assert r.status_code == 200
+        import zipfile, io
+        with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
+            names = zf.namelist()
+            assert "axe_1handed.gltf" in names
+            assert "axe_1handed.bin" in names
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
