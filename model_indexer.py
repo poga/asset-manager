@@ -112,19 +112,46 @@ def find_sample_thumbnail(model_path: Path, pack_root: Path) -> Optional[Path]:
         cur = cur.parent
 
 
+BLENDER_CANDIDATES = (
+    "/Applications/Blender.app/Contents/MacOS/Blender",
+    "/usr/local/bin/blender",
+    "/opt/homebrew/bin/blender",
+    "blender",
+)
+
+
+def find_blender() -> Optional[str]:
+    """Locate a Blender executable, honoring BLENDER_PATH env var first."""
+    import os
+    import shutil as _sh
+    env = os.environ.get("BLENDER_PATH")
+    if env and (Path(env).is_file() or _sh.which(env)):
+        return env
+    for c in BLENDER_CANDIDATES:
+        if Path(c).is_file() or _sh.which(c):
+            return c
+    return None
+
+
+RENDER_SCRIPT = Path(__file__).parent / "scripts" / "render_gltf_thumbnail.py"
+
+
 def render_model_thumbnail(model_path: Path, out_path: Path, size: int = 256) -> bool:
-    """Render an offscreen thumbnail. Returns True on success, False otherwise."""
-    try:
-        import trimesh  # heavy import; keep local
-        scene = trimesh.load(str(model_path), force="scene")
-        png = scene.save_image(resolution=(size, size), visible=False)
-        if not png:
-            return False
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_bytes(png)
-        return True
-    except Exception:
+    """Render a thumbnail via headless Blender. Returns True on success."""
+    import subprocess
+    blender = find_blender()
+    if not blender:
         return False
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        result = subprocess.run(
+            [blender, "-b", "-P", str(RENDER_SCRIPT), "--",
+             str(model_path), str(out_path), str(size)],
+            capture_output=True, timeout=120, check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return result.returncode == 0 and out_path.is_file() and out_path.stat().st_size > 0
 
 
 PACK_PREVIEW_NAMES = ("contents.png", "contents.jpg", "preview.png", "preview.gif")
@@ -158,18 +185,6 @@ def find_pack_preview(pack_root: Path) -> Optional[Path]:
     return None
 
 
-def _walk_up_for_pack_preview(start: Path, pack_root: Path) -> Optional[Path]:
-    """Search for a pack-convention preview at each directory from start up to pack_root."""
-    cur = start
-    while True:
-        found = find_pack_preview(cur)
-        if found:
-            return found
-        if cur == pack_root or cur.parent == cur:
-            return None
-        cur = cur.parent
-
-
 def resolve_thumbnail(
     model_path: Path,
     pack_root: Path,
@@ -178,10 +193,10 @@ def resolve_thumbnail(
 ) -> Optional[Path]:
     """Resolve a thumbnail for a 3D asset.
 
-    1. Sample match in pack/Samples (returns its absolute path).
-    2. Rendered fallback into cache_dir/<cache_key>.png.
-    3. Nearest pack-convention image walking up from model_path to pack_root.
-    4. None.
+    1. Sample match in pack/Samples.
+    2. Cached render at cache_dir/<cache_key>.png.
+    3. Fresh render via Blender into the cache.
+    4. None — caller decides what to do (do not paper over with pack imagery).
     """
     sample = find_sample_thumbnail(model_path, pack_root)
     if sample:
@@ -191,4 +206,4 @@ def resolve_thumbnail(
         return rendered
     if render_model_thumbnail(model_path, rendered):
         return rendered
-    return _walk_up_for_pack_preview(model_path.parent, pack_root)
+    return None

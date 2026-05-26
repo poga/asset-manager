@@ -14,6 +14,7 @@
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 from datetime import datetime
@@ -846,9 +847,7 @@ def index(
             )
     conn.commit()
 
-    # Re-resolve 3D thumbnails per-asset so existing rows pick up Sample matches
-    # or pack-convention fallbacks added later, not just newly-indexed files.
-    console.print("Resolving 3D asset thumbnails...")
+    # Re-resolve 3D thumbnails per-asset (parallel Blender renders for misses).
     db_root = db.parent
     cache_dir = db_root / ".index" / "thumbs"
     rows = conn.execute("""
@@ -856,18 +855,34 @@ def index(
         FROM assets a LEFT JOIN packs p ON a.pack_id = p.id
         WHERE a.asset_kind IN ('model', 'animation_bundle')
     """).fetchall()
-    for r in rows:
+
+    def _resolve_one(r):
         asset_path = asset_root / r["path"]
         pack_root = asset_root / r["pack_path"] if r["pack_path"] else asset_root
         cache_key = hashlib.sha256(r["path"].encode()).hexdigest()[:16]
         thumb = model_indexer.resolve_thumbnail(asset_path, pack_root, cache_dir, cache_key)
         if thumb is None:
-            continue
+            return r["id"], None
         try:
             new_path = str(thumb.relative_to(db_root))
         except ValueError:
             new_path = str(thumb)
-        conn.execute("UPDATE assets SET thumbnail_path = ? WHERE id = ?", [new_path, r["id"]])
+        return r["id"], new_path
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    workers = max(1, (os.cpu_count() or 4))
+    with Progress(
+        SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
+        BarColumn(), TaskProgressColumn(), console=console,
+    ) as progress:
+        task = progress.add_task(f"Resolving 3D thumbnails (×{workers})...", total=len(rows))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(_resolve_one, r) for r in rows]
+            for fut in as_completed(futures):
+                rid, new_path = fut.result()
+                if new_path is not None:
+                    conn.execute("UPDATE assets SET thumbnail_path = ? WHERE id = ?", [new_path, rid])
+                progress.advance(task)
     conn.commit()
 
     console.print(f"\n[green]Done![/green] Indexed {new_count} new/changed, skipped {skip_count} unchanged.")

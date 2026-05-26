@@ -1270,25 +1270,28 @@ class TestPackContentsConvention:
         # And it's the SAME content as contents.png (copied verbatim for png)
         assert copied.read_bytes() == contents.read_bytes()
 
-    def test_reindex_upgrades_stale_fallback_to_sample_match(self, tmp_path):
+    def test_reindex_upgrades_rendered_thumb_to_sample_match(self, tmp_path, monkeypatch):
+        # First index: no Sample, render mocked to fail → NULL.
+        # Add Samples/knight.png and reindex → Sample match wins.
+        import model_indexer
         from PIL import Image as PILImage
         pack = tmp_path / "assets" / "TestKayKitPack 1.0"
         chars = pack / "Characters" / "gltf"
         chars.mkdir(parents=True)
         shutil.copy(FIXTURES_3D / "Knight.glb", chars / "Knight.glb")
-        contents = pack / "contents.png"
-        PILImage.new("RGBA", (32, 32), (1, 2, 3, 255)).save(contents)
-        # First index: no Samples — Knight falls back to contents.png
+        (pack / "contents.png").write_bytes(b"\x89PNG")  # must NOT be used as fallback
+
+        monkeypatch.setattr(model_indexer, "render_model_thumbnail", lambda *a, **k: False)
+
         db_path = tmp_path / "assets.db"
         runner = typer.testing.CliRunner()
         from index import app
         runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
         conn = index.get_db(db_path)
         knight = conn.execute("SELECT thumbnail_path FROM assets WHERE filename='Knight.glb'").fetchone()
-        assert knight["thumbnail_path"].endswith("contents.png")
+        assert knight["thumbnail_path"] is None
         conn.close()
 
-        # Add Samples/knight.png; reindex should upgrade Knight's thumb
         samples = pack / "Samples"
         samples.mkdir()
         PILImage.new("RGBA", (32, 32), (9, 8, 7, 255)).save(samples / "knight.png")
@@ -1297,16 +1300,23 @@ class TestPackContentsConvention:
         knight = conn.execute("SELECT thumbnail_path FROM assets WHERE filename='Knight.glb'").fetchone()
         assert knight["thumbnail_path"].endswith("Samples/knight.png")
 
-    def test_3d_asset_without_sample_falls_back_to_pack_contents(self, tmp_path):
-        from PIL import Image as PILImage
+    def test_3d_asset_without_sample_renders_unique_thumbnail(self, tmp_path, monkeypatch):
+        # No Sample for axe → renderer is called and produces a cached thumbnail,
+        # NOT a fallback to pack contents.png.
+        import model_indexer
         pack = tmp_path / "assets" / "TestKayKitPack 1.0"
         models = pack / "Assets" / "gltf"
         models.mkdir(parents=True)
-        # axe has no matching Samples/axe.png — should fall back to contents
         shutil.copy(FIXTURES_3D / "axe_1handed.gltf", models / "axe_1handed.gltf")
         shutil.copy(FIXTURES_3D / "axe_1handed.bin", models / "axe_1handed.bin")
-        contents = pack / "contents.png"
-        PILImage.new("RGBA", (32, 32), (1, 2, 3, 255)).save(contents)
+        (pack / "contents.png").write_bytes(b"\x89PNG")  # must NOT be used as fallback
+
+        # Fake renderer writes a tiny PNG to wherever it's told
+        def fake_render(model_path, out_path, size=256):
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)
+            return True
+        monkeypatch.setattr(model_indexer, "render_model_thumbnail", fake_render)
 
         db_path = tmp_path / "assets.db"
         runner = typer.testing.CliRunner()
@@ -1314,11 +1324,11 @@ class TestPackContentsConvention:
         runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
 
         conn = index.get_db(db_path)
-        row = conn.execute(
-            "SELECT thumbnail_path FROM assets WHERE filename='axe_1handed.gltf'"
-        ).fetchone()
+        row = conn.execute("SELECT thumbnail_path FROM assets WHERE filename='axe_1handed.gltf'").fetchone()
         assert row["thumbnail_path"] is not None
-        assert row["thumbnail_path"].endswith("contents.png")
+        # Cache path lives under .index/thumbs/, NOT contents.png
+        assert "/.index/thumbs/" in row["thumbnail_path"] or row["thumbnail_path"].startswith(".index/thumbs/")
+        assert "contents.png" not in row["thumbnail_path"]
 
 
 # =============================================================================

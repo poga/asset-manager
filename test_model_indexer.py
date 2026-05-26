@@ -113,17 +113,26 @@ class TestFindSampleThumbnail:
 
 class TestRenderModelThumbnail:
     def test_renders_png(self, tmp_path):
+        if not model_indexer.find_blender():
+            pytest.skip("Blender not installed on this host")
         out = tmp_path / "thumb.png"
         ok = model_indexer.render_model_thumbnail(FIXTURES / "BoxAnimated.glb", out, size=128)
-        if not ok:
-            pytest.skip("trimesh offscreen render unavailable on this host")
+        assert ok is True
         from PIL import Image
         with Image.open(out) as img:
             assert img.size == (128, 128)
 
     def test_returns_false_on_garbage(self, tmp_path):
+        if not model_indexer.find_blender():
+            pytest.skip("Blender not installed on this host")
         bad = tmp_path / "bad.glb"; bad.write_bytes(b"not a glb")
         ok = model_indexer.render_model_thumbnail(bad, tmp_path / "out.png", size=128)
+        assert ok is False
+
+    def test_returns_false_when_blender_unavailable(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(model_indexer, "find_blender", lambda: None)
+        ok = model_indexer.render_model_thumbnail(FIXTURES / "BoxAnimated.glb",
+                                                  tmp_path / "x.png", size=64)
         assert ok is False
 
 
@@ -144,27 +153,15 @@ class TestResolveThumbnail:
         result = model_indexer.resolve_thumbnail(model, pack, cache, "k")
         assert result == cached
 
-    def test_falls_back_to_pack_contents(self, tmp_path):
+    def test_returns_none_when_render_fails(self, tmp_path, monkeypatch):
+        # No Sample, no cache, render fails → must return None (no fallback to pack imagery)
         pack = tmp_path / "p"; pack.mkdir()
-        contents = pack / "contents.png"; contents.write_bytes(b"\x89PNG")
+        (pack / "contents.png").write_bytes(b"\x89PNG")  # not used as fallback
         model = pack / "Box.glb"; model.write_bytes(b"")
         cache = tmp_path / "cache"
+        monkeypatch.setattr(model_indexer, "render_model_thumbnail", lambda *a, **k: False)
         result = model_indexer.resolve_thumbnail(model, pack, cache, "k")
-        assert result == contents
-
-    def test_finds_nearest_contents_for_nested_pack(self, tmp_path):
-        # KayKit Mystery Monthly layout: pack > monthly > character > model
-        pack = tmp_path / "Pack"; pack.mkdir()
-        monthly = pack / "1 - Orc"
-        (monthly / "character").mkdir(parents=True)
-        monthly_contents = monthly / "contents.png"
-        monthly_contents.write_bytes(b"\x89PNG")
-        # Outer pack also has a (stale) contents.png — nested one must win
-        (pack / "contents.png").write_bytes(b"\x89PNG")
-        model = monthly / "character" / "Orc.glb"
-        model.write_bytes(b"")
-        result = model_indexer.resolve_thumbnail(model, pack, tmp_path / "cache", "k")
-        assert result == monthly_contents
+        assert result is None
 
 
 class TestFindPackPreview:
