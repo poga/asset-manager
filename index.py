@@ -281,6 +281,30 @@ def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]
         return None
 
 
+def stage_pack_convention_preview(
+    src: Path, preview_dir: Path, pack_name: str
+) -> Optional[str]:
+    """Copy or convert a pack's root-level preview image into preview_dir.
+
+    PNG and GIF are copied as-is; other formats (jpg/jpeg) are converted to PNG.
+    Returns the preview_path string to store in the packs table, or None.
+    """
+    import shutil
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    ext = src.suffix.lower()
+    if ext in (".png", ".gif"):
+        dest = preview_dir / f"{pack_name}{ext}"
+        shutil.copy2(src, dest)
+    else:
+        dest = preview_dir / f"{pack_name}.png"
+        try:
+            with Image.open(src) as img:
+                img.convert("RGBA").save(dest, format="PNG")
+        except Exception:
+            return None
+    return f"previews/{dest.name}"
+
+
 def generate_pack_preview(
     conn: sqlite3.Connection,
     pack_id: int,
@@ -806,15 +830,40 @@ def index(
     # Generate pack previews
     preview_dir = db.parent / ".index" / "previews"
     console.print("Generating pack previews...")
-    for row in conn.execute("SELECT id, name, preview_path FROM packs"):
+    for row in conn.execute("SELECT id, name, path, preview_path FROM packs"):
         if row["preview_path"]:
-            continue  # Already has preview
-        preview_path = generate_pack_preview(conn, row["id"], asset_root, preview_dir)
+            continue
+        pack_dir = asset_root / row["path"]
+        convention = model_indexer.find_pack_preview(pack_dir)
+        if convention:
+            preview_path = stage_pack_convention_preview(convention, preview_dir, row["name"])
+        else:
+            preview_path = generate_pack_preview(conn, row["id"], asset_root, preview_dir)
         if preview_path:
             conn.execute(
                 "UPDATE packs SET preview_path = ?, preview_generated = TRUE WHERE id = ?",
                 [preview_path, row["id"]]
             )
+    conn.commit()
+
+    # Backfill 3D-asset thumbnails with pack convention preview where missing
+    console.print("Backfilling 3D asset thumbnails...")
+    db_root = db.parent
+    for pack_row in conn.execute("SELECT id, path FROM packs"):
+        pack_dir = asset_root / pack_row["path"]
+        convention = model_indexer.find_pack_preview(pack_dir)
+        if not convention:
+            continue
+        try:
+            fallback = str(convention.relative_to(db_root))
+        except ValueError:
+            fallback = str(convention)
+        conn.execute(
+            """UPDATE assets SET thumbnail_path = ?
+               WHERE pack_id = ? AND asset_kind IN ('model', 'animation_bundle')
+                 AND thumbnail_path IS NULL""",
+            [fallback, pack_row["id"]]
+        )
     conn.commit()
 
     console.print(f"\n[green]Done![/green] Indexed {new_count} new/changed, skipped {skip_count} unchanged.")

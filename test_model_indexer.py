@@ -144,6 +144,32 @@ class TestResolveThumbnail:
         result = model_indexer.resolve_thumbnail(model, pack, cache, "k")
         assert result == cached
 
+    def test_falls_back_to_pack_contents(self, tmp_path):
+        pack = tmp_path / "p"; pack.mkdir()
+        contents = pack / "contents.png"; contents.write_bytes(b"\x89PNG")
+        model = pack / "Box.glb"; model.write_bytes(b"")
+        cache = tmp_path / "cache"
+        result = model_indexer.resolve_thumbnail(model, pack, cache, "k")
+        assert result == contents
+
+
+class TestFindPackPreview:
+    def test_finds_contents_png(self, tmp_path):
+        (tmp_path / "contents.png").write_bytes(b"\x89PNG")
+        assert model_indexer.find_pack_preview(tmp_path) == tmp_path / "contents.png"
+
+    def test_finds_contents_jpg(self, tmp_path):
+        (tmp_path / "contents.jpg").write_bytes(b"\xff\xd8\xff")
+        assert model_indexer.find_pack_preview(tmp_path) == tmp_path / "contents.jpg"
+
+    def test_prefers_png_over_jpg(self, tmp_path):
+        png = tmp_path / "contents.png"; png.write_bytes(b"\x89PNG")
+        (tmp_path / "contents.jpg").write_bytes(b"\xff\xd8\xff")
+        assert model_indexer.find_pack_preview(tmp_path) == png
+
+    def test_returns_none_when_missing(self, tmp_path):
+        assert model_indexer.find_pack_preview(tmp_path) is None
+
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

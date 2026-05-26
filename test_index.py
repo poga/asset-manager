@@ -1242,6 +1242,58 @@ class TestAnimationBundleLinking:
         assert cross["n"] == 0
 
 
+class TestPackContentsConvention:
+    def test_pack_with_contents_png_uses_it_not_montage(self, tmp_path):
+        from PIL import Image as PILImage
+        pack = tmp_path / "assets" / "TestKayKitPack 1.0"
+        models = pack / "Assets" / "gltf"
+        models.mkdir(parents=True)
+        shutil.copy(FIXTURES_3D / "axe_1handed.gltf", models / "axe_1handed.gltf")
+        shutil.copy(FIXTURES_3D / "axe_1handed.bin", models / "axe_1handed.bin")
+        # Pack contents.png exists; tests should pick it up for pack preview
+        contents = pack / "contents.png"
+        PILImage.new("RGBA", (32, 32), (1, 2, 3, 255)).save(contents)
+
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+
+        conn = index.get_db(db_path)
+        # Pack preview path stored under previews/
+        pack_row = conn.execute("SELECT preview_path FROM packs WHERE name=?", ["TestKayKitPack 1.0"]).fetchone()
+        assert pack_row["preview_path"] == "previews/TestKayKitPack 1.0.png"
+        # File exists in .index/previews
+        copied = tmp_path / ".index" / "previews" / "TestKayKitPack 1.0.png"
+        assert copied.exists()
+        # And it's the SAME content as contents.png (copied verbatim for png)
+        assert copied.read_bytes() == contents.read_bytes()
+
+    def test_3d_asset_without_sample_falls_back_to_pack_contents(self, tmp_path):
+        from PIL import Image as PILImage
+        pack = tmp_path / "assets" / "TestKayKitPack 1.0"
+        models = pack / "Assets" / "gltf"
+        models.mkdir(parents=True)
+        # axe has no matching Samples/axe.png — should fall back to contents
+        shutil.copy(FIXTURES_3D / "axe_1handed.gltf", models / "axe_1handed.gltf")
+        shutil.copy(FIXTURES_3D / "axe_1handed.bin", models / "axe_1handed.bin")
+        contents = pack / "contents.png"
+        PILImage.new("RGBA", (32, 32), (1, 2, 3, 255)).save(contents)
+
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+
+        conn = index.get_db(db_path)
+        row = conn.execute(
+            "SELECT thumbnail_path FROM assets WHERE filename='axe_1handed.gltf'"
+        ).fetchone()
+        assert row["thumbnail_path"] is not None
+        assert row["thumbnail_path"].endswith("contents.png")
+
+
 # =============================================================================
 # Entry point
 # =============================================================================

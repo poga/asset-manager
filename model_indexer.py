@@ -127,6 +127,18 @@ def render_model_thumbnail(model_path: Path, out_path: Path, size: int = 256) ->
         return False
 
 
+PACK_PREVIEW_NAMES = ("contents.png", "contents.jpg", "preview.png", "preview.gif")
+
+
+def find_pack_preview(pack_root: Path) -> Optional[Path]:
+    """Find a pack-level conventional preview image at pack_root."""
+    for name in PACK_PREVIEW_NAMES:
+        candidate = pack_root / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def resolve_thumbnail(
     model_path: Path,
     pack_root: Path,
@@ -137,7 +149,8 @@ def resolve_thumbnail(
 
     1. Sample match in pack/Samples (returns its absolute path).
     2. Rendered fallback into cache_dir/<cache_key>.png.
-    3. None.
+    3. Pack-level convention image (contents.png at pack root).
+    4. None.
     """
     sample = find_sample_thumbnail(model_path, pack_root)
     if sample:
@@ -147,4 +160,4 @@ def resolve_thumbnail(
         return rendered
     if render_model_thumbnail(model_path, rendered):
         return rendered
-    return None
+    return find_pack_preview(pack_root)
