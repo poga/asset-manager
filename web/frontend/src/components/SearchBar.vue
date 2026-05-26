@@ -51,6 +51,10 @@
         </button>
       </div>
     </div>
+    <label class="filter-chip">
+      <input type="checkbox" v-model="modelOnly" @change="emitSearch" />
+      Models only
+    </label>
     <div v-if="tags.length" class="tags-row">
       <span v-for="t in tags" :key="t" class="tag" :title="t" @click="removeTag(t)">
         <span class="tag-text">{{ t }}</span>
@@ -77,6 +81,7 @@ const emit = defineEmits(['search'])
 const query = ref('')
 const color = ref('')
 const tags = ref([])
+const modelOnly = ref(false)
 const colorDropdownOpen = ref(false)
 const tagDropdownOpen = ref(false)
 
@@ -112,7 +117,8 @@ function emitSearch() {
     q: query.value || null,
     tag: tags.value,
     color: color.value || null,
-    type: null
+    type: null,
+    modelOnly: modelOnly.value
   })
 }
 
@@ -288,5 +294,30 @@ defineExpose({ addTagExternal })
 
 .dropdown-option:hover {
   background: var(--color-bg-elevated);
+}
+
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filter-chip input[type="checkbox"] {
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.filter-chip:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-light);
 }
 </style>
