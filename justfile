@@ -1,6 +1,7 @@
 # Run all tests
 test:
     uv run --script test_index.py
+    uv run --script test_model_indexer.py
     uv run --script web/test_api.py
 
 # Run index tests only
@@ -10,6 +11,10 @@ test-index:
 # Run API tests only
 test-api:
     uv run --script web/test_api.py
+
+# Run model indexer tests only
+test-model:
+    uv run --script test_model_indexer.py
 
 # Index all assets in assets/ directory (incremental)
 index-assets:

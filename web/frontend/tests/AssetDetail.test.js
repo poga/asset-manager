@@ -1,5 +1,5 @@
 // web/frontend/tests/AssetDetail.test.js
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AssetDetail from '../src/components/AssetDetail.vue'
 
@@ -115,6 +115,41 @@ describe('AssetDetail', () => {
     await tags[0].trigger('click')
     expect(wrapper.emitted('tag-click')).toBeTruthy()
     expect(wrapper.emitted('tag-click')[0][0]).toBe('character')
+  })
+
+  describe('kind-based rendering', () => {
+    const base = { id: 1, filename: 'x', path: 'x', tags: [], colors: [], width: 64, height: 64 }
+
+    beforeEach(() => {
+      // ModelViewer fetches animations on mount; stub to avoid invalid-URL errors in jsdom
+      vi.stubGlobal('fetch', () => Promise.resolve({ ok: false }))
+    })
+
+    afterEach(() => { vi.unstubAllGlobals() })
+
+    it('renders <img> for image asset', () => {
+      const w = mount(AssetDetail, { props: { asset: { ...base, kind: 'image' } } })
+      expect(w.find('img.asset-image').exists()).toBe(true)
+      expect(w.find('model-viewer').exists()).toBe(false)
+    })
+
+    it('renders <model-viewer> for model asset', () => {
+      const w = mount(AssetDetail, { props: { asset: { ...base, kind: 'model' } } })
+      expect(w.find('model-viewer').exists()).toBe(true)
+      expect(w.find('img.asset-image').exists()).toBe(false)
+    })
+
+    it('renders <model-viewer> for animation_bundle asset', () => {
+      const w = mount(AssetDetail, { props: { asset: { ...base, kind: 'animation_bundle' } } })
+      expect(w.find('model-viewer').exists()).toBe(true)
+      expect(w.find('img.asset-image').exists()).toBe(false)
+    })
+
+    it('renders <img> when kind is absent (legacy)', () => {
+      const w = mount(AssetDetail, { props: { asset: { ...base } } })
+      expect(w.find('img.asset-image').exists()).toBe(true)
+      expect(w.find('model-viewer').exists()).toBe(false)
+    })
   })
 
   describe('Preview Override', () => {

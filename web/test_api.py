@@ -60,7 +60,10 @@ def test_db():
             preview_y INTEGER,
             preview_width INTEGER,
             preview_height INTEGER,
-            category TEXT
+            category TEXT,
+            asset_kind TEXT,
+            rig TEXT,
+            thumbnail_path TEXT
         );
         CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
         CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, source TEXT, PRIMARY KEY (asset_id, tag_id));
@@ -70,6 +73,18 @@ def test_db():
             path TEXT PRIMARY KEY,
             use_full_image BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE asset_relations (
+            from_asset_id INTEGER NOT NULL,
+            to_asset_id INTEGER NOT NULL,
+            relation_type TEXT NOT NULL,
+            PRIMARY KEY (from_asset_id, to_asset_id, relation_type)
+        );
+        CREATE TABLE asset_animations (
+            id INTEGER PRIMARY KEY,
+            asset_id INTEGER NOT NULL,
+            clip_index INTEGER NOT NULL,
+            name TEXT NOT NULL
         );
 
         INSERT INTO packs (id, name, path) VALUES (1, 'creatures', '/assets/creatures');
@@ -722,6 +737,212 @@ def test_preview_override_full_workflow(test_db):
     # 6. Verify removed
     response = client.get("/api/asset/1")
     assert response.json()["use_full_image"] is None
+
+
+class Test3DSerialization:
+    def test_search_returns_asset_kind(self, test_db):
+        from api import set_db_path
+        set_db_path(test_db)
+        conn = sqlite3.connect(test_db)
+        conn.execute(
+            "INSERT INTO assets (path, filename, filetype, file_hash, asset_kind, rig, thumbnail_path) "
+            "VALUES ('Knight.glb', 'Knight.glb', 'glb', 'h1', 'model', 'Rig_Medium', 'Samples/knight.png')"
+        )
+        conn.commit(); conn.close()
+        r = _client.get("/api/search")
+        assert r.status_code == 200
+        knight = next(a for a in r.json()["assets"] if a["filename"] == "Knight.glb")
+        assert knight["kind"] == "model"
+        assert knight["rig"] == "Rig_Medium"
+        assert knight["thumbnail_path"] == "Samples/knight.png"
+
+    def test_asset_detail_returns_asset_kind(self, test_db):
+        from api import set_db_path
+        set_db_path(test_db)
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute(
+            "INSERT INTO assets (path, filename, filetype, file_hash, asset_kind, rig) "
+            "VALUES ('M.glb', 'M.glb', 'glb', 'h2', 'model', 'Rig_Large')"
+        )
+        aid = cur.lastrowid; conn.commit(); conn.close()
+        r = _client.get(f"/api/asset/{aid}")
+        body = r.json()
+        assert body["kind"] == "model"
+        assert body["rig"] == "Rig_Large"
+
+    def test_search_kind_filter(self, test_db):
+        from api import set_db_path
+        set_db_path(test_db)
+        conn = sqlite3.connect(test_db)
+        conn.execute("INSERT INTO assets (path, filename, filetype, file_hash, asset_kind) VALUES ('a.png','a.png','png','h3','image')")
+        conn.execute("INSERT INTO assets (path, filename, filetype, file_hash, asset_kind) VALUES ('b.glb','b.glb','glb','h4','model')")
+        conn.commit(); conn.close()
+        r = _client.get("/api/search?kind=model")
+        kinds = {a["filename"]: a["kind"] for a in r.json()["assets"]}
+        assert "b.glb" in kinds and "a.png" not in kinds
+
+
+class TestModelEndpoint:
+    def test_serves_glb(self, test_db, tmp_path):
+        from api import set_db_path, set_assets_path
+        set_db_path(test_db)
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        src = Path(__file__).parent.parent / "tests" / "fixtures" / "3d" / "Knight.glb"
+        (assets_dir / "Knight.glb").write_bytes(src.read_bytes())
+        set_assets_path(assets_dir)
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) VALUES ('Knight.glb','Knight.glb','glb','h','model')")
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/asset/{aid}/model")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "model/gltf-binary"
+        assert r.content[:4] == b"glTF"
+
+    def test_serves_gltf_and_sibling_bin(self, test_db, tmp_path):
+        from api import set_db_path, set_assets_path
+        set_db_path(test_db)
+        assets_dir = tmp_path / "assets"; assets_dir.mkdir()
+        fx = Path(__file__).parent.parent / "tests" / "fixtures" / "3d"
+        (assets_dir / "axe_1handed.gltf").write_bytes((fx / "axe_1handed.gltf").read_bytes())
+        (assets_dir / "axe_1handed.bin").write_bytes((fx / "axe_1handed.bin").read_bytes())
+        set_assets_path(assets_dir)
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) VALUES ('axe_1handed.gltf','axe_1handed.gltf','gltf','h','model')")
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/asset/{aid}/model")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "model/gltf+json"
+        r2 = _client.get(f"/api/asset/{aid}/model/axe_1handed.bin")
+        assert r2.status_code == 200
+
+    def test_rejects_path_traversal(self, test_db, tmp_path):
+        from api import set_db_path, set_assets_path
+        set_db_path(test_db)
+        assets_dir = tmp_path / "assets"; assets_dir.mkdir()
+        (assets_dir / "a.gltf").write_text("{}")
+        set_assets_path(assets_dir)
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) VALUES ('a.gltf','a.gltf','gltf','h','model')")
+        aid = cur.lastrowid; conn.commit(); conn.close()
+        r = _client.get(f"/api/asset/{aid}/model/../../../etc/passwd")
+        assert r.status_code in (400, 404)
+
+
+class TestAnimationsEndpoint:
+    def _setup(self, test_db):
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind,rig) VALUES ('Knight.glb','Knight.glb','glb','h1','model','Rig_Medium')")
+        char_id = cur.lastrowid
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind,rig) VALUES ('Rig_Medium_General.glb','Rig_Medium_General.glb','glb','h2','animation_bundle','Rig_Medium')")
+        bundle_id = cur.lastrowid
+        conn.execute("INSERT INTO asset_animations (asset_id, clip_index, name) VALUES (?,0,'Idle')", [bundle_id])
+        conn.execute("INSERT INTO asset_animations (asset_id, clip_index, name) VALUES (?,1,'Walk')", [bundle_id])
+        conn.execute("INSERT INTO asset_relations (from_asset_id,to_asset_id,relation_type) VALUES (?,?,'animation_for_rig')", [char_id, bundle_id])
+        conn.commit(); conn.close()
+        return char_id, bundle_id
+
+    def test_returns_clips_from_linked_bundles(self, test_db):
+        from api import set_db_path
+        set_db_path(test_db)
+        char_id, bundle_id = self._setup(test_db)
+        r = _client.get(f"/api/asset/{char_id}/animations")
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body) == 1
+        assert body[0]["bundle_id"] == bundle_id
+        assert body[0]["bundle_name"] == "Rig_Medium_General.glb"
+        clip_names = [c["name"] for c in body[0]["clips"]]
+        assert clip_names == ["Idle", "Walk"]
+
+
+class TestCart3D:
+    def test_cart_zip_includes_gltf_bin(self, test_client, sample_db, tmp_path):
+        from pathlib import Path
+        fx = Path(__file__).parent.parent / "tests" / "fixtures" / "3d"
+        assets_dir = tmp_path / "assets3d"; assets_dir.mkdir()
+        (assets_dir / "axe_1handed.gltf").write_bytes((fx / "axe_1handed.gltf").read_bytes())
+        (assets_dir / "axe_1handed.bin").write_bytes((fx / "axe_1handed.bin").read_bytes())
+        import api
+        api.set_assets_path(assets_dir)
+
+        conn = sqlite3.connect(sample_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) VALUES ('axe_1handed.gltf','axe_1handed.gltf','gltf','h','model')")
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = test_client.post("/api/download-cart", json={"asset_ids": [aid]})
+        assert r.status_code == 200
+        import zipfile, io
+        with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
+            names = zf.namelist()
+            assert "axe_1handed.gltf" in names
+            assert "axe_1handed.bin" in names
+
+
+class TestImageEndpointFor3D:
+    def test_serves_thumbnail_png_for_model(self, test_db, tmp_path):
+        from pathlib import Path
+        import api
+        api.set_db_path(test_db)
+        assets_dir = tmp_path / "assets"
+        samples_dir = assets_dir / "pack" / "Samples"
+        samples_dir.mkdir(parents=True)
+        sample_png = samples_dir / "knight.png"
+        sample_png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)
+        api.set_assets_path(assets_dir)
+
+        # thumbnail_path stored relative to assets_dir.parent (db_dir)
+        thumb_rel = str(sample_png.relative_to(tmp_path))
+
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute(
+            "INSERT INTO assets (path,filename,filetype,file_hash,asset_kind,thumbnail_path) "
+            "VALUES ('pack/Knight.glb','Knight.glb','glb','h','model',?)",
+            [thumb_rel]
+        )
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/image/{aid}")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "image/png"
+        assert r.content.startswith(b"\x89PNG")
+
+    def test_returns_404_when_3d_has_no_thumbnail(self, test_db, tmp_path):
+        import api
+        api.set_db_path(test_db)
+        assets_dir = tmp_path / "assets"; assets_dir.mkdir()
+        api.set_assets_path(assets_dir)
+
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute(
+            "INSERT INTO assets (path,filename,filetype,file_hash,asset_kind,thumbnail_path) "
+            "VALUES ('Mage.glb','Mage.glb','glb','h2','model', NULL)"
+        )
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/image/{aid}")
+        assert r.status_code == 404
+
+    def test_2d_image_unchanged(self, test_db, tmp_path):
+        import api
+        from PIL import Image
+        api.set_db_path(test_db)
+        assets_dir = tmp_path / "assets"; assets_dir.mkdir()
+        png = assets_dir / "sprite.png"
+        Image.new("RGBA", (16, 16), (255, 0, 0)).save(png)
+        api.set_assets_path(assets_dir)
+
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute(
+            "INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) "
+            "VALUES ('sprite.png','sprite.png','png','h3','image')"
+        )
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/image/{aid}")
+        assert r.status_code == 200
 
 
 if __name__ == "__main__":

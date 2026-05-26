@@ -7,6 +7,7 @@
 #     "rich>=13.0",
 #     "typer>=0.9",
 #     "python-dotenv>=1.0",
+#     "trimesh[easy]>=4.0",
 # ]
 # ///
 """Build and update the game asset index."""
@@ -30,6 +31,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 import aseprite_parser
+import model_indexer
 
 app = typer.Typer(help="Build and update the game asset index")
 console = Console()
@@ -37,6 +39,7 @@ console = Console()
 # Supported image types for indexing
 IMAGE_EXTENSIONS = {".png", ".gif", ".jpg", ".jpeg", ".webp"}
 ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
+MODEL_EXTENSIONS = {".glb", ".gltf"}
 
 # Noise words to skip in tag extraction
 NOISE_WORDS = {
@@ -82,6 +85,9 @@ CREATE TABLE IF NOT EXISTS assets (
     preview_width INTEGER,
     preview_height INTEGER,
     category TEXT,
+    asset_kind TEXT NOT NULL DEFAULT 'image',
+    rig TEXT,
+    thumbnail_path TEXT,
     indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -120,6 +126,21 @@ CREATE TABLE IF NOT EXISTS asset_preview_overrides (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS asset_animations (
+    id INTEGER PRIMARY KEY,
+    asset_id INTEGER NOT NULL REFERENCES assets(id),
+    clip_index INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    UNIQUE(asset_id, clip_index)
+);
+
+CREATE TABLE IF NOT EXISTS asset_relations (
+    from_asset_id INTEGER REFERENCES assets(id),
+    to_asset_id INTEGER REFERENCES assets(id),
+    relation_type TEXT,
+    PRIMARY KEY (from_asset_id, to_asset_id, relation_type)
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_filename ON assets(filename);
 CREATE INDEX IF NOT EXISTS idx_assets_filetype ON assets(filetype);
 CREATE INDEX IF NOT EXISTS idx_assets_pack_id ON assets(pack_id);
@@ -127,13 +148,33 @@ CREATE INDEX IF NOT EXISTS idx_assets_file_hash ON assets(file_hash);
 CREATE INDEX IF NOT EXISTS idx_asset_tags_asset_id ON asset_tags(asset_id);
 CREATE INDEX IF NOT EXISTS idx_asset_tags_tag_id ON asset_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_asset_colors_color ON asset_colors(color_hex);
+CREATE INDEX IF NOT EXISTS idx_asset_animations_asset ON asset_animations(asset_id);
+CREATE INDEX IF NOT EXISTS idx_assets_kind ON assets(asset_kind);
+CREATE INDEX IF NOT EXISTS idx_assets_rig ON assets(rig);
 """
+
+
+def migrate_schema(conn: sqlite3.Connection) -> None:
+    # Only migrate if the assets table already exists (legacy DB)
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "assets" not in tables:
+        return
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
+    if "asset_kind" not in existing:
+        conn.execute("ALTER TABLE assets ADD COLUMN asset_kind TEXT NOT NULL DEFAULT 'image'")
+    if "rig" not in existing:
+        conn.execute("ALTER TABLE assets ADD COLUMN rig TEXT")
+    if "thumbnail_path" not in existing:
+        conn.execute("ALTER TABLE assets ADD COLUMN thumbnail_path TEXT")
+    conn.commit()
 
 
 def get_db(db_path: Path) -> sqlite3.Connection:
     """Get database connection, creating schema if needed."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    # migrate first: SCHEMA's CREATE INDEX on asset_kind/rig would fail on legacy DBs
+    migrate_schema(conn)
     conn.executescript(SCHEMA)
     return conn
 
@@ -492,11 +533,15 @@ def add_tags(conn: sqlite3.Connection, asset_id: int, tags: list[str], source: s
 
 
 def scan_assets(asset_root: Path) -> list[Path]:
-    """Scan directory for image and Aseprite files."""
-    assets = []
+    """Scan directory for image, Aseprite, and 3D model files."""
+    image_assets: list[Path] = []
+    model_assets: list[Path] = []
     for ext in IMAGE_EXTENSIONS | ASEPRITE_EXTENSIONS:
-        assets.extend(asset_root.rglob(f"*{ext}"))
-    return sorted(assets)
+        image_assets.extend(asset_root.rglob(f"*{ext}"))
+    for ext in MODEL_EXTENSIONS:
+        model_assets.extend(asset_root.rglob(f"*{ext}"))
+    model_assets = model_indexer.filter_canonical_models(sorted(model_assets))
+    return sorted(image_assets + model_assets)
 
 
 def set_pack_preview(
@@ -632,13 +677,40 @@ def index(
                 packs_seen[pack_name] = pack_id
             pack_id = packs_seen.get(pack_name)
 
-            # Get image info
-            img_info = get_image_info(file_path) if file_path.suffix.lower() in IMAGE_EXTENSIONS else {}
+            suffix = file_path.suffix.lower()
+            is_model = suffix in MODEL_EXTENSIONS
+            is_image = suffix in IMAGE_EXTENSIONS
 
-            # Detect preview bounds for spritesheets
+            img_info: dict = {}
             preview_bounds = None
-            if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+            asset_kind = "image"
+            rig: Optional[str] = None
+            thumbnail_path: Optional[str] = None
+            clip_names: list[str] = []
+
+            if is_image:
+                img_info = get_image_info(file_path)
                 preview_bounds = detect_first_sprite_bounds(file_path)
+            elif is_model:
+                info = model_indexer.extract_model_info(file_path)
+                # KayKit animation bundles ship mannequin meshes, so has_mesh
+                # is unreliable. Use filename prefix + animations instead.
+                is_bundle = file_path.stem.startswith("Rig_") and bool(info.animations)
+                asset_kind = "animation_bundle" if is_bundle else "model"
+                rig = info.rig
+                clip_names = info.animations
+                pack_root = pack_path if pack_name else asset_root
+                cache_dir = db.parent / ".index" / "thumbs"
+                thumb_key = hashlib.sha256(rel_path.encode()).hexdigest()[:16]
+                thumb = model_indexer.resolve_thumbnail(file_path, pack_root, cache_dir, thumb_key)
+                if thumb:
+                    try:
+                        thumbnail_path = str(thumb.relative_to(db.parent))
+                    except ValueError:
+                        thumbnail_path = str(thumb)
+            elif suffix in ASEPRITE_EXTENSIONS:
+                ase_info = aseprite_parser.parse_aseprite(file_path)
+                img_info = {"width": ase_info["width"], "height": ase_info["height"]}
 
             # Category
             category = get_category(file_path, pack_path) if pack_name else ""
@@ -648,13 +720,13 @@ def index(
                 """INSERT OR REPLACE INTO assets
                    (pack_id, path, filename, filetype, file_hash, file_size,
                     width, height, preview_x, preview_y, preview_width, preview_height,
-                    category, indexed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    category, asset_kind, rig, thumbnail_path, indexed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [
                     pack_id,
                     rel_path,
                     file_path.name,
-                    file_path.suffix.lower().lstrip("."),
+                    suffix.lstrip("."),
                     current_hash,
                     file_path.stat().st_size,
                     img_info.get("width"),
@@ -663,7 +735,7 @@ def index(
                     preview_bounds[1] if preview_bounds else None,
                     preview_bounds[2] if preview_bounds else None,
                     preview_bounds[3] if preview_bounds else None,
-                    category,
+                    category, asset_kind, rig, thumbnail_path,
                     datetime.now().isoformat(),
                 ]
             )
@@ -673,8 +745,14 @@ def index(
             tags = extract_tags_from_path(file_path, asset_root)
             add_tags(conn, asset_id, tags, "path")
 
-            # Extract colors for images
-            if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+            if is_model:
+                add_tags(conn, asset_id, ["3d"], "kind")
+                for i, name in enumerate(clip_names):
+                    conn.execute(
+                        "INSERT OR REPLACE INTO asset_animations (asset_id, clip_index, name) VALUES (?, ?, ?)",
+                        [asset_id, i, name]
+                    )
+            elif is_image:
                 colors = extract_colors(file_path)
                 for hex_color, percentage in colors:
                     conn.execute(
@@ -682,7 +760,6 @@ def index(
                            VALUES (?, ?, ?)""",
                         [asset_id, hex_color, percentage]
                     )
-
                 # Compute perceptual hash
                 phash = compute_phash(file_path)
                 if phash:
@@ -696,6 +773,25 @@ def index(
             progress.advance(index_task)
 
         conn.commit()
+
+    # Link character meshes to animation bundles within each pack
+    for pack_id_seen in set(packs_seen.values()):
+        chars = conn.execute(
+            "SELECT id, rig FROM assets WHERE pack_id = ? AND asset_kind='model' AND rig IS NOT NULL",
+            [pack_id_seen]
+        ).fetchall()
+        bundles = conn.execute(
+            "SELECT id, rig FROM assets WHERE pack_id = ? AND asset_kind='animation_bundle' AND rig IS NOT NULL",
+            [pack_id_seen]
+        ).fetchall()
+        for c in chars:
+            for b in bundles:
+                if c["rig"] == b["rig"]:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO asset_relations (from_asset_id, to_asset_id, relation_type) VALUES (?, ?, 'animation_for_rig')",
+                        [c["id"], b["id"]]
+                    )
+    conn.commit()
 
     # Update pack asset counts
     conn.execute("""

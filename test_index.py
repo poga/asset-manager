@@ -1078,6 +1078,171 @@ class TestSetPreviewCLI:
 
 
 # =============================================================================
+# Schema migration tests
+# =============================================================================
+
+
+class TestSchemaMigration:
+    def test_existing_db_gets_asset_kind_column(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        # Create a "legacy" DB without the new columns
+        conn = sqlite3.connect(db_path)
+        conn.execute("""
+            CREATE TABLE assets (
+                id INTEGER PRIMARY KEY,
+                pack_id INTEGER,
+                path TEXT NOT NULL UNIQUE,
+                filename TEXT NOT NULL,
+                filetype TEXT NOT NULL,
+                file_hash TEXT NOT NULL
+            )
+        """)
+        conn.execute("INSERT INTO assets (pack_id, path, filename, filetype, file_hash) VALUES (1, 'a.png', 'a.png', 'png', 'h')")
+        conn.commit()
+        conn.close()
+
+        conn = index.get_db(db_path)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
+        assert "asset_kind" in cols
+        assert "rig" in cols
+        assert "thumbnail_path" in cols
+        # Existing row defaulted correctly
+        row = conn.execute("SELECT asset_kind FROM assets WHERE path='a.png'").fetchone()
+        assert row["asset_kind"] == "image"
+
+    def test_asset_animations_table_created(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        conn = index.get_db(db_path)
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "asset_animations" in tables
+
+    def test_migration_is_idempotent(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        index.get_db(db_path).close()
+        # Second call must not raise
+        conn = index.get_db(db_path)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
+        assert "asset_kind" in cols
+
+
+# =============================================================================
+# 3D End-to-End Tests
+# =============================================================================
+
+import shutil
+import typer.testing
+
+FIXTURES_3D = Path(__file__).parent / "tests" / "fixtures" / "3d"
+
+
+@pytest.fixture
+def kaykit_like_pack(tmp_path):
+    """Build a fake pack that mirrors KayKit Adventurers structure."""
+    pack = tmp_path / "assets" / "KayKit Test 1.0"
+    chars = pack / "Characters" / "gltf"
+    anims = pack / "Animations" / "gltf" / "Rig_Medium"
+    samples = pack / "Samples"
+    chars.mkdir(parents=True)
+    anims.mkdir(parents=True)
+    samples.mkdir(parents=True)
+    shutil.copy(FIXTURES_3D / "Knight.glb", chars / "Knight.glb")
+    shutil.copy(FIXTURES_3D / "Rig_Medium_General.glb", anims / "Rig_Medium_General.glb")
+    # Matching sample for Knight
+    (samples / "knight.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    return tmp_path / "assets"
+
+
+class Test3DEndToEnd:
+    def test_index_3d_pack_creates_correct_rows(self, kaykit_like_pack, tmp_path):
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(kaykit_like_pack), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+
+        conn = index.get_db(db_path)
+        rows = conn.execute(
+            "SELECT path, asset_kind, rig, thumbnail_path FROM assets ORDER BY path"
+        ).fetchall()
+        # Knight should be 'model'
+        knight = next(r for r in rows if r["path"].endswith("Knight.glb"))
+        assert knight["asset_kind"] == "model"
+        assert knight["rig"] == "Rig_Medium"
+        assert knight["thumbnail_path"] is not None
+        # Animation bundle classified
+        bundle = next(r for r in rows if r["path"].endswith("Rig_Medium_General.glb"))
+        assert bundle["asset_kind"] == "animation_bundle"
+
+    def test_animation_clips_populated(self, kaykit_like_pack, tmp_path):
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(kaykit_like_pack), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        clips = conn.execute("""
+            SELECT name FROM asset_animations aa
+            JOIN assets a ON a.id = aa.asset_id
+            WHERE a.path LIKE '%Rig_Medium_General.glb'
+        """).fetchall()
+        assert len(clips) >= 1
+
+    def test_3d_assets_get_3d_tag(self, kaykit_like_pack, tmp_path):
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(kaykit_like_pack), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        rows = conn.execute("""
+            SELECT a.path FROM assets a
+            JOIN asset_tags at ON at.asset_id = a.id
+            JOIN tags t ON t.id = at.tag_id
+            WHERE t.name = '3d'
+        """).fetchall()
+        assert len(rows) == 2  # Knight + bundle
+
+
+class TestAnimationBundleLinking:
+    def test_character_linked_to_matching_bundle(self, kaykit_like_pack, tmp_path):
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(kaykit_like_pack), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        rels = conn.execute("""
+            SELECT a.path AS from_path, b.path AS to_path
+            FROM asset_relations r
+            JOIN assets a ON a.id = r.from_asset_id
+            JOIN assets b ON b.id = r.to_asset_id
+            WHERE r.relation_type = 'animation_for_rig'
+        """).fetchall()
+        assert any(
+            r["from_path"].endswith("Knight.glb") and r["to_path"].endswith("Rig_Medium_General.glb")
+            for r in rels
+        )
+
+    def test_no_cross_pack_links(self, tmp_path):
+        # Two packs with the same rig should NOT link across packs
+        a = tmp_path / "assets" / "PackA"
+        b = tmp_path / "assets" / "PackB"
+        (a / "Characters" / "gltf").mkdir(parents=True)
+        (b / "Animations" / "gltf" / "Rig_Medium").mkdir(parents=True)
+        shutil.copy(FIXTURES_3D / "Knight.glb", a / "Characters" / "gltf" / "Knight.glb")
+        shutil.copy(FIXTURES_3D / "Rig_Medium_General.glb", b / "Animations" / "gltf" / "Rig_Medium" / "Rig_Medium_General.glb")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        cross = conn.execute("""
+            SELECT COUNT(*) AS n FROM asset_relations r
+            JOIN assets a ON a.id = r.from_asset_id
+            JOIN assets b ON b.id = r.to_asset_id
+            WHERE a.pack_id != b.pack_id AND r.relation_type='animation_for_rig'
+        """).fetchone()
+        assert cross["n"] == 0
+
+
+# =============================================================================
 # Entry point
 # =============================================================================
 

@@ -22,9 +22,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
-# Add parent directory to path for aseprite_parser import
+# Add parent directory to path for local module imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import aseprite_parser
+import model_indexer
 
 app = FastAPI(title="Asset Search API")
 
@@ -137,6 +138,7 @@ def search(
     color: Optional[str] = None,
     pack: list[str] = Query(default=[]),
     type: Optional[str] = None,
+    kind: Optional[str] = None,
     limit: int = 100,
 ):
     """Search assets by name, tags, or filters."""
@@ -160,6 +162,10 @@ def search(
     if type:
         conditions.append("a.filetype = ?")
         params.append(type.lower().lstrip("."))
+
+    if kind:
+        conditions.append("a.asset_kind = ?")
+        params.append(kind)
 
     for t in tag:
         conditions.append("""
@@ -203,6 +209,7 @@ def search(
     sql = f"""
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
                a.preview_x, a.preview_y, a.preview_width, a.preview_height,
+               a.asset_kind, a.rig, a.thumbnail_path,
                p.name as pack_name,
                GROUP_CONCAT(DISTINCT tg.name) as tags,
                po.use_full_image
@@ -239,6 +246,9 @@ def search(
             "preview_width": row["preview_width"],
             "preview_height": row["preview_height"],
             "use_full_image": use_full_image,
+            "kind": row["asset_kind"],
+            "rig": row["rig"],
+            "thumbnail_path": row["thumbnail_path"],
         })
 
     return {"assets": assets, "total": len(assets)}
@@ -357,6 +367,9 @@ def asset_detail(asset_id: int):
         "tags": [t["name"] for t in tags],
         "colors": [{"hex": c["color_hex"], "percentage": c["percentage"]} for c in colors],
         "use_full_image": bool(override["use_full_image"]) if override else None,
+        "kind": row["asset_kind"],
+        "rig": row["rig"],
+        "thumbnail_path": row["thumbnail_path"],
     }
 
 
@@ -437,15 +450,31 @@ def filters():
 ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
 
 
+_3D_KINDS = {"model", "animation_bundle"}
+
+
 @app.get("/api/image/{asset_id}")
 def image(asset_id: int):
     """Serve asset image file. Renders Aseprite files as PNG."""
     conn = get_db()
-    row = conn.execute("SELECT path FROM assets WHERE id = ?", [asset_id]).fetchone()
+    row = conn.execute(
+        "SELECT path, asset_kind, thumbnail_path FROM assets WHERE id = ?",
+        [asset_id],
+    ).fetchone()
     conn.close()
 
     if not row:
         raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Serve thumbnail PNG for 3D assets; raw file has no visual representation
+    if row["asset_kind"] in _3D_KINDS:
+        if not row["thumbnail_path"]:
+            raise HTTPException(status_code=404, detail="No thumbnail")
+        thumb = Path(row["thumbnail_path"])
+        serve_path = thumb if thumb.is_absolute() else get_assets_path().parent / thumb
+        if not serve_path.exists():
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+        return FileResponse(serve_path, media_type="image/png")
 
     # Paths in DB are relative to assets folder
     assets_dir = get_assets_path()
@@ -462,6 +491,87 @@ def image(asset_id: int):
         return Response(content=buffer.getvalue(), media_type="image/png")
 
     return FileResponse(image_path)
+
+
+MODEL_CONTENT_TYPES = {
+    ".glb": "model/gltf-binary",
+    ".gltf": "model/gltf+json",
+}
+
+
+@app.get("/api/asset/{asset_id}/animations")
+def asset_animations(asset_id: int):
+    conn = get_db()
+    row = conn.execute("SELECT id FROM assets WHERE id = ?", [asset_id]).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+
+    # Bundles: asset itself (if it has embedded clips) plus linked animation bundles
+    bundle_ids: list[int] = []
+    self_clips = conn.execute(
+        "SELECT clip_index, name FROM asset_animations WHERE asset_id = ? ORDER BY clip_index",
+        [asset_id]
+    ).fetchall()
+    if self_clips:
+        bundle_ids.append(asset_id)
+    linked = conn.execute(
+        "SELECT to_asset_id FROM asset_relations WHERE from_asset_id = ? AND relation_type='animation_for_rig'",
+        [asset_id]
+    ).fetchall()
+    bundle_ids.extend(r["to_asset_id"] for r in linked)
+
+    out = []
+    for bid in bundle_ids:
+        b = conn.execute("SELECT filename FROM assets WHERE id = ?", [bid]).fetchone()
+        clips = conn.execute(
+            "SELECT clip_index, name FROM asset_animations WHERE asset_id = ? ORDER BY clip_index",
+            [bid]
+        ).fetchall()
+        out.append({
+            "bundle_id": bid,
+            "bundle_name": b["filename"],
+            "clips": [{"name": c["name"], "gltf_name": c["name"]} for c in clips],
+        })
+    conn.close()
+    return out
+
+
+@app.get("/api/asset/{asset_id}/model")
+def asset_model(asset_id: int):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT path, asset_kind FROM assets WHERE id = ?", [asset_id]
+    ).fetchone()
+    conn.close()
+    if not row or row["asset_kind"] not in ("model", "animation_bundle"):
+        raise HTTPException(404, "Model not found")
+    p = (get_assets_path() / row["path"]).resolve()
+    if not p.exists():
+        raise HTTPException(404, "Model file missing")
+    ct = MODEL_CONTENT_TYPES.get(p.suffix.lower(), "application/octet-stream")
+    return FileResponse(p, media_type=ct)
+
+
+@app.get("/api/asset/{asset_id}/model/{filename}")
+def asset_model_sibling(asset_id: int, filename: str):
+    if "/" in filename or filename.startswith(".."):
+        raise HTTPException(400, "Invalid filename")
+    conn = get_db()
+    row = conn.execute(
+        "SELECT path, asset_kind FROM assets WHERE id = ?", [asset_id]
+    ).fetchone()
+    conn.close()
+    if not row or row["asset_kind"] not in ("model", "animation_bundle"):
+        raise HTTPException(404)
+    assets_dir = get_assets_path().resolve()
+    asset_dir = (assets_dir / row["path"]).parent.resolve()
+    target = (asset_dir / filename).resolve()
+    # Reject resolved paths that escape the asset's directory
+    if asset_dir not in target.parents and target.parent != asset_dir:
+        raise HTTPException(400, "Path traversal")
+    if not target.exists():
+        raise HTTPException(404)
+    return FileResponse(target)
 
 
 @app.get("/api/pack-preview/{pack_name:path}")
@@ -502,7 +612,7 @@ def download_cart(request: DownloadCartRequest):
     # Get asset info with pack name
     placeholders = ",".join("?" * len(request.asset_ids))
     rows = conn.execute(
-        f"""SELECT a.id, a.path, a.filename, a.width, a.height, p.name as pack_name
+        f"""SELECT a.id, a.path, a.filename, a.width, a.height, a.asset_kind, p.name as pack_name
             FROM assets a
             LEFT JOIN packs p ON a.pack_id = p.id
             WHERE a.id IN ({placeholders})""",
@@ -569,6 +679,15 @@ def download_cart(request: DownloadCartRequest):
             if file_path.exists():
                 # Use filename to avoid path issues
                 zf.write(file_path, row["filename"])
+            if row["asset_kind"] in ("model", "animation_bundle") and file_path.suffix.lower() == ".gltf":
+                try:
+                    info = model_indexer.extract_model_info(file_path)
+                    for ref in info.referenced_files:
+                        ref_path = (file_path.parent / ref).resolve()
+                        if ref_path.exists() and ref_path.is_relative_to(assets_dir.resolve()):
+                            zf.write(ref_path, ref_path.name)
+                except Exception:
+                    pass
         # Add metadata file
         zf.writestr("metadata.txt", "\n".join(metadata_lines))
 
@@ -587,6 +706,9 @@ def download_cart(request: DownloadCartRequest):
 @app.get("/{full_path:path}")
 def spa_fallback(full_path: str):
     """Serve static files or fallback to index.html for SPA routing."""
+    # API routes that didn't match a handler → 404, not SPA
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not found")
     static_path = get_static_path()
     if not static_path:
         raise HTTPException(status_code=404, detail="Frontend not built")

@@ -203,6 +203,7 @@ async function search(params) {
       query.append('pack', p)
     }
   }
+  if (params.modelOnly) query.set('kind', 'model')
 
   const res = await fetch(`${API_BASE}/search?${query}`)
   if (!res) return
