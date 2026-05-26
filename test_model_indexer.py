@@ -170,6 +170,28 @@ class TestFindPackPreview:
     def test_returns_none_when_missing(self, tmp_path):
         assert model_indexer.find_pack_preview(tmp_path) is None
 
+    def test_finds_prefixed_contents_jpg(self, tmp_path):
+        target = tmp_path / "CityBuilder_Contents.jpg"
+        target.write_bytes(b"\xff\xd8\xff")
+        assert model_indexer.find_pack_preview(tmp_path) == target
+
+    def test_skips_alternate_texture_variant(self, tmp_path):
+        main = tmp_path / "Furniture_Contents.jpg"
+        alt = tmp_path / "Furniture_Contents_AlternateTexture.jpg"
+        main.write_bytes(b"\xff\xd8\xff")
+        alt.write_bytes(b"\xff\xd8\xff")
+        assert model_indexer.find_pack_preview(tmp_path) == main
+
+    def test_picks_alphabetically_first_when_multiple_prefixed(self, tmp_path):
+        (tmp_path / "Z_Contents.jpg").write_bytes(b"\xff\xd8\xff")
+        a = tmp_path / "A_Contents.jpg"; a.write_bytes(b"\xff\xd8\xff")
+        assert model_indexer.find_pack_preview(tmp_path) == a
+
+    def test_exact_contents_png_beats_prefixed_jpg(self, tmp_path):
+        (tmp_path / "Whatever_Contents.jpg").write_bytes(b"\xff\xd8\xff")
+        exact = tmp_path / "contents.png"; exact.write_bytes(b"\x89PNG")
+        assert model_indexer.find_pack_preview(tmp_path) == exact
+
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

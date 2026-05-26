@@ -131,11 +131,30 @@ PACK_PREVIEW_NAMES = ("contents.png", "contents.jpg", "preview.png", "preview.gi
 
 
 def find_pack_preview(pack_root: Path) -> Optional[Path]:
-    """Find a pack-level conventional preview image at pack_root."""
+    """Find a pack-level conventional preview image at pack_root.
+
+    Tier 1: exact match for contents.{png,jpg} / preview.{png,gif}.
+    Tier 2: <prefix>_Contents.{png,jpg} (KayKit naming for packs without a
+    bare contents.* file), excluding *AlternateTexture* variants.
+    """
     for name in PACK_PREVIEW_NAMES:
         candidate = pack_root / name
         if candidate.is_file():
             return candidate
+    matches = []
+    for p in pack_root.iterdir():
+        if not p.is_file():
+            continue
+        if p.suffix.lower() not in (".png", ".jpg"):
+            continue
+        stem_lower = p.stem.lower()
+        if "contents" not in stem_lower:
+            continue
+        if "alternate" in stem_lower:
+            continue
+        matches.append(p)
+    if matches:
+        return sorted(matches)[0]
     return None
 
 
