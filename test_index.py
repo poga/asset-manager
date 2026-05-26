@@ -1270,6 +1270,33 @@ class TestPackContentsConvention:
         # And it's the SAME content as contents.png (copied verbatim for png)
         assert copied.read_bytes() == contents.read_bytes()
 
+    def test_reindex_upgrades_stale_fallback_to_sample_match(self, tmp_path):
+        from PIL import Image as PILImage
+        pack = tmp_path / "assets" / "TestKayKitPack 1.0"
+        chars = pack / "Characters" / "gltf"
+        chars.mkdir(parents=True)
+        shutil.copy(FIXTURES_3D / "Knight.glb", chars / "Knight.glb")
+        contents = pack / "contents.png"
+        PILImage.new("RGBA", (32, 32), (1, 2, 3, 255)).save(contents)
+        # First index: no Samples — Knight falls back to contents.png
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        knight = conn.execute("SELECT thumbnail_path FROM assets WHERE filename='Knight.glb'").fetchone()
+        assert knight["thumbnail_path"].endswith("contents.png")
+        conn.close()
+
+        # Add Samples/knight.png; reindex should upgrade Knight's thumb
+        samples = pack / "Samples"
+        samples.mkdir()
+        PILImage.new("RGBA", (32, 32), (9, 8, 7, 255)).save(samples / "knight.png")
+        runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        knight = conn.execute("SELECT thumbnail_path FROM assets WHERE filename='Knight.glb'").fetchone()
+        assert knight["thumbnail_path"].endswith("Samples/knight.png")
+
     def test_3d_asset_without_sample_falls_back_to_pack_contents(self, tmp_path):
         from PIL import Image as PILImage
         pack = tmp_path / "assets" / "TestKayKitPack 1.0"

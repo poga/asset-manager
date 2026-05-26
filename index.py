@@ -846,24 +846,28 @@ def index(
             )
     conn.commit()
 
-    # Backfill 3D-asset thumbnails with pack convention preview where missing
-    console.print("Backfilling 3D asset thumbnails...")
+    # Re-resolve 3D thumbnails per-asset so existing rows pick up Sample matches
+    # or pack-convention fallbacks added later, not just newly-indexed files.
+    console.print("Resolving 3D asset thumbnails...")
     db_root = db.parent
-    for pack_row in conn.execute("SELECT id, path FROM packs"):
-        pack_dir = asset_root / pack_row["path"]
-        convention = model_indexer.find_pack_preview(pack_dir)
-        if not convention:
+    cache_dir = db_root / ".index" / "thumbs"
+    rows = conn.execute("""
+        SELECT a.id, a.path, p.path AS pack_path
+        FROM assets a LEFT JOIN packs p ON a.pack_id = p.id
+        WHERE a.asset_kind IN ('model', 'animation_bundle')
+    """).fetchall()
+    for r in rows:
+        asset_path = asset_root / r["path"]
+        pack_root = asset_root / r["pack_path"] if r["pack_path"] else asset_root
+        cache_key = hashlib.sha256(r["path"].encode()).hexdigest()[:16]
+        thumb = model_indexer.resolve_thumbnail(asset_path, pack_root, cache_dir, cache_key)
+        if thumb is None:
             continue
         try:
-            fallback = str(convention.relative_to(db_root))
+            new_path = str(thumb.relative_to(db_root))
         except ValueError:
-            fallback = str(convention)
-        conn.execute(
-            """UPDATE assets SET thumbnail_path = ?
-               WHERE pack_id = ? AND asset_kind IN ('model', 'animation_bundle')
-                 AND thumbnail_path IS NULL""",
-            [fallback, pack_row["id"]]
-        )
+            new_path = str(thumb)
+        conn.execute("UPDATE assets SET thumbnail_path = ? WHERE id = ?", [new_path, r["id"]])
     conn.commit()
 
     console.print(f"\n[green]Done![/green] Indexed {new_count} new/changed, skipped {skip_count} unchanged.")
