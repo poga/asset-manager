@@ -60,7 +60,10 @@ def test_db():
             preview_y INTEGER,
             preview_width INTEGER,
             preview_height INTEGER,
-            category TEXT
+            category TEXT,
+            asset_kind TEXT,
+            rig TEXT,
+            thumbnail_path TEXT
         );
         CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
         CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, source TEXT, PRIMARY KEY (asset_id, tag_id));
@@ -722,6 +725,49 @@ def test_preview_override_full_workflow(test_db):
     # 6. Verify removed
     response = client.get("/api/asset/1")
     assert response.json()["use_full_image"] is None
+
+
+class Test3DSerialization:
+    def test_search_returns_asset_kind(self, test_db):
+        from api import set_db_path
+        set_db_path(test_db)
+        conn = sqlite3.connect(test_db)
+        conn.execute(
+            "INSERT INTO assets (path, filename, filetype, file_hash, asset_kind, rig, thumbnail_path) "
+            "VALUES ('Knight.glb', 'Knight.glb', 'glb', 'h1', 'model', 'Rig_Medium', 'Samples/knight.png')"
+        )
+        conn.commit(); conn.close()
+        r = _client.get("/api/search")
+        assert r.status_code == 200
+        knight = next(a for a in r.json()["assets"] if a["filename"] == "Knight.glb")
+        assert knight["kind"] == "model"
+        assert knight["rig"] == "Rig_Medium"
+        assert knight["thumbnail_path"] == "Samples/knight.png"
+
+    def test_asset_detail_returns_asset_kind(self, test_db):
+        from api import set_db_path
+        set_db_path(test_db)
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute(
+            "INSERT INTO assets (path, filename, filetype, file_hash, asset_kind, rig) "
+            "VALUES ('M.glb', 'M.glb', 'glb', 'h2', 'model', 'Rig_Large')"
+        )
+        aid = cur.lastrowid; conn.commit(); conn.close()
+        r = _client.get(f"/api/asset/{aid}")
+        body = r.json()
+        assert body["kind"] == "model"
+        assert body["rig"] == "Rig_Large"
+
+    def test_search_kind_filter(self, test_db):
+        from api import set_db_path
+        set_db_path(test_db)
+        conn = sqlite3.connect(test_db)
+        conn.execute("INSERT INTO assets (path, filename, filetype, file_hash, asset_kind) VALUES ('a.png','a.png','png','h3','image')")
+        conn.execute("INSERT INTO assets (path, filename, filetype, file_hash, asset_kind) VALUES ('b.glb','b.glb','glb','h4','model')")
+        conn.commit(); conn.close()
+        r = _client.get("/api/search?kind=model")
+        kinds = {a["filename"]: a["kind"] for a in r.json()["assets"]}
+        assert "b.glb" in kinds and "a.png" not in kinds
 
 
 if __name__ == "__main__":

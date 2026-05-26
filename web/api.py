@@ -137,6 +137,7 @@ def search(
     color: Optional[str] = None,
     pack: list[str] = Query(default=[]),
     type: Optional[str] = None,
+    kind: Optional[str] = None,
     limit: int = 100,
 ):
     """Search assets by name, tags, or filters."""
@@ -160,6 +161,10 @@ def search(
     if type:
         conditions.append("a.filetype = ?")
         params.append(type.lower().lstrip("."))
+
+    if kind:
+        conditions.append("a.asset_kind = ?")
+        params.append(kind)
 
     for t in tag:
         conditions.append("""
@@ -203,6 +208,7 @@ def search(
     sql = f"""
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
                a.preview_x, a.preview_y, a.preview_width, a.preview_height,
+               a.asset_kind, a.rig, a.thumbnail_path,
                p.name as pack_name,
                GROUP_CONCAT(DISTINCT tg.name) as tags,
                po.use_full_image
@@ -239,6 +245,9 @@ def search(
             "preview_width": row["preview_width"],
             "preview_height": row["preview_height"],
             "use_full_image": use_full_image,
+            "kind": row["asset_kind"],
+            "rig": row["rig"],
+            "thumbnail_path": row["thumbnail_path"],
         })
 
     return {"assets": assets, "total": len(assets)}
@@ -357,6 +366,9 @@ def asset_detail(asset_id: int):
         "tags": [t["name"] for t in tags],
         "colors": [{"hex": c["color_hex"], "percentage": c["percentage"]} for c in colors],
         "use_full_image": bool(override["use_full_image"]) if override else None,
+        "kind": row["asset_kind"],
+        "rig": row["rig"],
+        "thumbnail_path": row["thumbnail_path"],
     }
 
 
