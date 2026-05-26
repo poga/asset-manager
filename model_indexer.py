@@ -158,6 +158,18 @@ def find_pack_preview(pack_root: Path) -> Optional[Path]:
     return None
 
 
+def _walk_up_for_pack_preview(start: Path, pack_root: Path) -> Optional[Path]:
+    """Search for a pack-convention preview at each directory from start up to pack_root."""
+    cur = start
+    while True:
+        found = find_pack_preview(cur)
+        if found:
+            return found
+        if cur == pack_root or cur.parent == cur:
+            return None
+        cur = cur.parent
+
+
 def resolve_thumbnail(
     model_path: Path,
     pack_root: Path,
@@ -168,7 +180,7 @@ def resolve_thumbnail(
 
     1. Sample match in pack/Samples (returns its absolute path).
     2. Rendered fallback into cache_dir/<cache_key>.png.
-    3. Pack-level convention image (contents.png at pack root).
+    3. Nearest pack-convention image walking up from model_path to pack_root.
     4. None.
     """
     sample = find_sample_thumbnail(model_path, pack_root)
@@ -179,4 +191,4 @@ def resolve_thumbnail(
         return rendered
     if render_model_thumbnail(model_path, rendered):
         return rendered
-    return find_pack_preview(pack_root)
+    return _walk_up_for_pack_preview(model_path.parent, pack_root)

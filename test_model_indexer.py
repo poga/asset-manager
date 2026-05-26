@@ -152,6 +152,20 @@ class TestResolveThumbnail:
         result = model_indexer.resolve_thumbnail(model, pack, cache, "k")
         assert result == contents
 
+    def test_finds_nearest_contents_for_nested_pack(self, tmp_path):
+        # KayKit Mystery Monthly layout: pack > monthly > character > model
+        pack = tmp_path / "Pack"; pack.mkdir()
+        monthly = pack / "1 - Orc"
+        (monthly / "character").mkdir(parents=True)
+        monthly_contents = monthly / "contents.png"
+        monthly_contents.write_bytes(b"\x89PNG")
+        # Outer pack also has a (stale) contents.png — nested one must win
+        (pack / "contents.png").write_bytes(b"\x89PNG")
+        model = monthly / "character" / "Orc.glb"
+        model.write_bytes(b"")
+        result = model_indexer.resolve_thumbnail(model, pack, tmp_path / "cache", "k")
+        assert result == monthly_contents
+
 
 class TestFindPackPreview:
     def test_finds_contents_png(self, tmp_path):
