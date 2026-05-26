@@ -624,6 +624,8 @@ def index(
         console.print(f"[red]Not a directory: {asset_root}[/red]")
         raise typer.Exit(1)
 
+    # resolve so db.parent is absolute — thumbnail_path is stored relative to it
+    db = db.resolve()
     conn = get_db(db)
     console.print(f"Indexing [cyan]{asset_root}[/cyan] -> [green]{db}[/green]")
 
@@ -880,7 +882,7 @@ def set_preview(
             raise typer.Exit(1)
 
     conn = get_db(db)
-    preview_dir = db.parent / ".assetindex" / "previews"
+    preview_dir = db.parent / ".index" / "previews"
 
     # Infer asset root from pack paths
     asset_root = db.parent

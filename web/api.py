@@ -577,9 +577,8 @@ def asset_model_sibling(asset_id: int, filename: str):
 @app.get("/api/pack-preview/{pack_name:path}")
 def pack_preview(pack_name: str):
     """Serve pack preview image."""
-    # Find previews directory (in .assetindex/previews/)
     db_path = find_db()
-    previews_dir = db_path.parent / ".assetindex" / "previews"
+    previews_dir = db_path.parent / ".index" / "previews"
 
     # URL decode the pack name
     from urllib.parse import unquote
