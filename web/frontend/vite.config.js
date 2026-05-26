@@ -19,7 +19,7 @@ export default defineConfig({
     allowedHosts: ['dev.taileea02.ts.net'],
     proxy: {
       '/assets/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:38471',
         rewrite: (path) => path.replace(/^\/assets/, '')
       }
     }

@@ -109,6 +109,15 @@ def test_health_check():
     assert response.json() == {"status": "ok"}
 
 
+def test_health_check_under_vite_base():
+    """Frontend calls /assets/api/... because of Vite's base config; the API
+    must respond there too, not fall through to the SPA fallback (which
+    returns HTML and breaks JSON parsing in the browser)."""
+    response = client.get("/assets/api/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_search_returns_all_assets(test_db):
     """Search with no filters returns all assets."""
     from api import app, set_db_path

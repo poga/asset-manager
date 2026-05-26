@@ -36,6 +36,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# Frontend is served at base /assets/ so API calls go to /assets/api/...
+# Strip the prefix so the same handlers respond at /api/... and /assets/api/...
+@app.middleware("http")
+async def strip_vite_base_for_api(request, call_next):
+    p = request.scope.get("path", "")
+    if p.startswith("/assets/api/") or p == "/assets/api":
+        request.scope["path"] = p[len("/assets"):]
+    return await call_next(request)
+
 # Database path - can be overridden for testing
 _db_path: Optional[Path] = None
 # Assets path - can be overridden for testing
