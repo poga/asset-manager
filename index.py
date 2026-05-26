@@ -82,6 +82,9 @@ CREATE TABLE IF NOT EXISTS assets (
     preview_width INTEGER,
     preview_height INTEGER,
     category TEXT,
+    asset_kind TEXT NOT NULL DEFAULT 'image',
+    rig TEXT,
+    thumbnail_path TEXT,
     indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -120,6 +123,14 @@ CREATE TABLE IF NOT EXISTS asset_preview_overrides (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS asset_animations (
+    id INTEGER PRIMARY KEY,
+    asset_id INTEGER NOT NULL REFERENCES assets(id),
+    clip_index INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    UNIQUE(asset_id, clip_index)
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_filename ON assets(filename);
 CREATE INDEX IF NOT EXISTS idx_assets_filetype ON assets(filetype);
 CREATE INDEX IF NOT EXISTS idx_assets_pack_id ON assets(pack_id);
@@ -127,13 +138,32 @@ CREATE INDEX IF NOT EXISTS idx_assets_file_hash ON assets(file_hash);
 CREATE INDEX IF NOT EXISTS idx_asset_tags_asset_id ON asset_tags(asset_id);
 CREATE INDEX IF NOT EXISTS idx_asset_tags_tag_id ON asset_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_asset_colors_color ON asset_colors(color_hex);
+CREATE INDEX IF NOT EXISTS idx_asset_animations_asset ON asset_animations(asset_id);
+CREATE INDEX IF NOT EXISTS idx_assets_kind ON assets(asset_kind);
+CREATE INDEX IF NOT EXISTS idx_assets_rig ON assets(rig);
 """
+
+
+def migrate_schema(conn: sqlite3.Connection) -> None:
+    # Only migrate if the assets table already exists (legacy DB)
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "assets" not in tables:
+        return
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
+    if "asset_kind" not in existing:
+        conn.execute("ALTER TABLE assets ADD COLUMN asset_kind TEXT NOT NULL DEFAULT 'image'")
+    if "rig" not in existing:
+        conn.execute("ALTER TABLE assets ADD COLUMN rig TEXT")
+    if "thumbnail_path" not in existing:
+        conn.execute("ALTER TABLE assets ADD COLUMN thumbnail_path TEXT")
+    conn.commit()
 
 
 def get_db(db_path: Path) -> sqlite3.Connection:
     """Get database connection, creating schema if needed."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    migrate_schema(conn)
     conn.executescript(SCHEMA)
     return conn
 

@@ -1078,6 +1078,54 @@ class TestSetPreviewCLI:
 
 
 # =============================================================================
+# Schema migration tests
+# =============================================================================
+
+
+class TestSchemaMigration:
+    def test_existing_db_gets_asset_kind_column(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        # Create a "legacy" DB without the new columns
+        conn = sqlite3.connect(db_path)
+        conn.execute("""
+            CREATE TABLE assets (
+                id INTEGER PRIMARY KEY,
+                pack_id INTEGER,
+                path TEXT NOT NULL UNIQUE,
+                filename TEXT NOT NULL,
+                filetype TEXT NOT NULL,
+                file_hash TEXT NOT NULL
+            )
+        """)
+        conn.execute("INSERT INTO assets (pack_id, path, filename, filetype, file_hash) VALUES (1, 'a.png', 'a.png', 'png', 'h')")
+        conn.commit()
+        conn.close()
+
+        conn = index.get_db(db_path)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
+        assert "asset_kind" in cols
+        assert "rig" in cols
+        assert "thumbnail_path" in cols
+        # Existing row defaulted correctly
+        row = conn.execute("SELECT asset_kind FROM assets WHERE path='a.png'").fetchone()
+        assert row["asset_kind"] == "image"
+
+    def test_asset_animations_table_created(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        conn = index.get_db(db_path)
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "asset_animations" in tables
+
+    def test_migration_is_idempotent(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        index.get_db(db_path).close()
+        # Second call must not raise
+        conn = index.get_db(db_path)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
+        assert "asset_kind" in cols
+
+
+# =============================================================================
 # Entry point
 # =============================================================================
 
