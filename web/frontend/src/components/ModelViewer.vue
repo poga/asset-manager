@@ -52,7 +52,15 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.model-viewer-wrap { display: flex; flex-direction: column; gap: 8px; }
+.model-viewer-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* AssetDetail nests us in a column flex with align-items:center, which
+     would collapse our width to intrinsic 0 without an explicit size. */
+  width: 100%;
+  max-width: 600px;
+}
 model-viewer { width: 100%; height: 480px; background: #1a1a1a; border-radius: 8px; }
 .anim-controls { display: flex; gap: 8px; align-items: center; }
 </style>
