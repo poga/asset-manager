@@ -212,7 +212,8 @@ def _parse_layer_chunk(data: bytes) -> Layer:
     opacity = data[12]
     # Skip 3 future bytes
     name_len = struct.unpack_from("<H", data, 16)[0]
-    name = data[18 : 18 + name_len].decode("utf-8")
+    # tolerate non-UTF-8: some .aseprite files ship bytes from CJK/Latin-1 encodings
+    name = data[18 : 18 + name_len].decode("utf-8", errors="replace")
 
     return Layer(
         name=name,
@@ -307,7 +308,7 @@ def _parse_tags_chunk(data: bytes) -> list[Tag]:
         # Skip: repeat (2) + reserved (6) + deprecated color (3) = 11 bytes
         # So name_len is at offset + 4 + 1 + 11 = offset + 16
         name_len = struct.unpack_from("<H", data, offset + 16)[0]
-        name = data[offset + 18 : offset + 18 + name_len].decode("utf-8")
+        name = data[offset + 18 : offset + 18 + name_len].decode("utf-8", errors="replace")
 
         tags.append(Tag(
             name=name,
