@@ -430,6 +430,22 @@ def test_spa_static_files_served(test_db, tmp_path):
     assert "console.log" in response.text
 
 
+def test_spa_serves_public_file_at_base_prefixed_url(test_db, tmp_path):
+    """A file at dist/foo.js (e.g. from public/) must be reachable at /assets/foo.js."""
+    from api import set_db_path, set_static_path
+
+    set_db_path(test_db)
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    (dist_dir / "index.html").write_text("<!DOCTYPE html><html></html>")
+    (dist_dir / "model-viewer.min.js").write_text("// model-viewer code")
+    set_static_path(dist_dir)
+
+    r = client.get("/assets/model-viewer.min.js")
+    assert r.status_code == 200
+    assert "model-viewer code" in r.text
+
+
 @pytest.fixture
 def sample_db(test_db, tmp_path):
     """Create test database with actual files for download tests."""

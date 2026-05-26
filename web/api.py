@@ -702,22 +702,28 @@ def download_cart(request: DownloadCartRequest):
     )
 
 
+VITE_BASE_PREFIX = "assets/"  # mirrors web/frontend/vite.config.js `base: '/assets/'`
+
+
 @app.get("/{full_path:path}")
 def spa_fallback(full_path: str):
     """Serve static files or fallback to index.html for SPA routing."""
-    # API routes that didn't match a handler → 404, not SPA
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
     static_path = get_static_path()
     if not static_path:
         raise HTTPException(status_code=404, detail="Frontend not built")
 
-    # Try to serve the exact file first
-    file_path = static_path / full_path
-    if file_path.is_file():
-        return FileResponse(file_path)
+    # URL may carry the Vite base prefix (built bundle paths look like
+    # /assets/foo.js but the file on disk is dist/foo.js — base maps the
+    # URL prefix onto dist/). Probe both forms.
+    candidates = [static_path / full_path]
+    if full_path.startswith(VITE_BASE_PREFIX):
+        candidates.append(static_path / full_path[len(VITE_BASE_PREFIX):])
+    for p in candidates:
+        if p.is_file():
+            return FileResponse(p)
 
-    # Fallback to index.html for SPA routing
     index_path = static_path / "index.html"
     if index_path.exists():
         return FileResponse(index_path)
