@@ -135,10 +135,10 @@ CREATE TABLE IF NOT EXISTS asset_animations (
 );
 
 CREATE TABLE IF NOT EXISTS asset_relations (
-    from_asset_id INTEGER REFERENCES assets(id),
-    to_asset_id INTEGER REFERENCES assets(id),
+    asset_id INTEGER REFERENCES assets(id),
+    related_id INTEGER REFERENCES assets(id),
     relation_type TEXT,
-    PRIMARY KEY (from_asset_id, to_asset_id, relation_type)
+    PRIMARY KEY (asset_id, related_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_assets_filename ON assets(filename);
@@ -788,7 +788,7 @@ def index(
             for b in bundles:
                 if c["rig"] == b["rig"]:
                     conn.execute(
-                        "INSERT OR IGNORE INTO asset_relations (from_asset_id, to_asset_id, relation_type) VALUES (?, ?, 'animation_for_rig')",
+                        "INSERT OR IGNORE INTO asset_relations (asset_id, related_id, relation_type) VALUES (?, ?, 'animation_for_rig')",
                         [c["id"], b["id"]]
                     )
     conn.commit()

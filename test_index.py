@@ -1211,8 +1211,8 @@ class TestAnimationBundleLinking:
         rels = conn.execute("""
             SELECT a.path AS from_path, b.path AS to_path
             FROM asset_relations r
-            JOIN assets a ON a.id = r.from_asset_id
-            JOIN assets b ON b.id = r.to_asset_id
+            JOIN assets a ON a.id = r.asset_id
+            JOIN assets b ON b.id = r.related_id
             WHERE r.relation_type = 'animation_for_rig'
         """).fetchall()
         assert any(
@@ -1235,8 +1235,8 @@ class TestAnimationBundleLinking:
         conn = index.get_db(db_path)
         cross = conn.execute("""
             SELECT COUNT(*) AS n FROM asset_relations r
-            JOIN assets a ON a.id = r.from_asset_id
-            JOIN assets b ON b.id = r.to_asset_id
+            JOIN assets a ON a.id = r.asset_id
+            JOIN assets b ON b.id = r.related_id
             WHERE a.pack_id != b.pack_id AND r.relation_type='animation_for_rig'
         """).fetchone()
         assert cross["n"] == 0

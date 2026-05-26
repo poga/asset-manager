@@ -75,10 +75,10 @@ def test_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE asset_relations (
-            from_asset_id INTEGER NOT NULL,
-            to_asset_id INTEGER NOT NULL,
+            asset_id INTEGER NOT NULL,
+            related_id INTEGER NOT NULL,
             relation_type TEXT NOT NULL,
-            PRIMARY KEY (from_asset_id, to_asset_id, relation_type)
+            PRIMARY KEY (asset_id, related_id)
         );
         CREATE TABLE asset_animations (
             id INTEGER PRIMARY KEY,
@@ -840,7 +840,7 @@ class TestAnimationsEndpoint:
         bundle_id = cur.lastrowid
         conn.execute("INSERT INTO asset_animations (asset_id, clip_index, name) VALUES (?,0,'Idle')", [bundle_id])
         conn.execute("INSERT INTO asset_animations (asset_id, clip_index, name) VALUES (?,1,'Walk')", [bundle_id])
-        conn.execute("INSERT INTO asset_relations (from_asset_id,to_asset_id,relation_type) VALUES (?,?,'animation_for_rig')", [char_id, bundle_id])
+        conn.execute("INSERT INTO asset_relations (asset_id,related_id,relation_type) VALUES (?,?,'animation_for_rig')", [char_id, bundle_id])
         conn.commit(); conn.close()
         return char_id, bundle_id
 

@@ -515,10 +515,10 @@ def asset_animations(asset_id: int):
     if self_clips:
         bundle_ids.append(asset_id)
     linked = conn.execute(
-        "SELECT to_asset_id FROM asset_relations WHERE from_asset_id = ? AND relation_type='animation_for_rig'",
+        "SELECT related_id FROM asset_relations WHERE asset_id = ? AND relation_type='animation_for_rig'",
         [asset_id]
     ).fetchall()
-    bundle_ids.extend(r["to_asset_id"] for r in linked)
+    bundle_ids.extend(r["related_id"] for r in linked)
 
     out = []
     for bid in bundle_ids:
