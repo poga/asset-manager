@@ -163,6 +163,7 @@ def get_db(db_path: Path) -> sqlite3.Connection:
     """Get database connection, creating schema if needed."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    # migrate first: SCHEMA's CREATE INDEX on asset_kind/rig would fail on legacy DBs
     migrate_schema(conn)
     conn.executescript(SCHEMA)
     return conn
