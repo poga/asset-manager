@@ -95,3 +95,56 @@ def extract_model_info(path: Path) -> ModelInfo:
         has_mesh=has_mesh,
         referenced_files=_collect_referenced_files(gltf),
     )
+
+
+def find_sample_thumbnail(model_path: Path, pack_root: Path) -> Optional[Path]:
+    """Walk up from model_path toward pack_root, looking for Samples/<stem>.png (case-insensitive)."""
+    target = model_path.stem.lower() + ".png"
+    cur = model_path.parent
+    while True:
+        samples = cur / "Samples"
+        if samples.is_dir():
+            for f in samples.iterdir():
+                if f.is_file() and f.name.lower() == target:
+                    return f
+        if cur == pack_root or cur.parent == cur:
+            return None
+        cur = cur.parent
+
+
+def render_model_thumbnail(model_path: Path, out_path: Path, size: int = 256) -> bool:
+    """Render an offscreen thumbnail. Returns True on success, False otherwise."""
+    try:
+        import trimesh  # heavy import; keep local
+        scene = trimesh.load(str(model_path), force="scene")
+        png = scene.save_image(resolution=(size, size), visible=False)
+        if not png:
+            return False
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(png)
+        return True
+    except Exception:
+        return False
+
+
+def resolve_thumbnail(
+    model_path: Path,
+    pack_root: Path,
+    cache_dir: Path,
+    cache_key: str,
+) -> Optional[Path]:
+    """Resolve a thumbnail for a 3D asset.
+
+    1. Sample match in pack/Samples (returns its absolute path).
+    2. Rendered fallback into cache_dir/<cache_key>.png.
+    3. None.
+    """
+    sample = find_sample_thumbnail(model_path, pack_root)
+    if sample:
+        return sample
+    rendered = cache_dir / f"{cache_key}.png"
+    if rendered.exists():
+        return rendered
+    if render_model_thumbnail(model_path, rendered):
+        return rendered
+    return None

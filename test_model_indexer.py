@@ -94,5 +94,56 @@ class TestCanonicalFormatFilter:
         assert set(kept) == set(files)
 
 
+class TestFindSampleThumbnail:
+    def test_finds_sample_one_level_up(self, tmp_path):
+        # pack/Characters/gltf/Knight.glb  ←  pack/Samples/knight.png
+        pack = tmp_path / "pack"
+        models = pack / "Characters" / "gltf"
+        samples = pack / "Samples"
+        models.mkdir(parents=True); samples.mkdir()
+        model = models / "Knight.glb"; model.write_bytes(b"")
+        sample = samples / "knight.png"; sample.write_bytes(b"\x89PNG")
+        assert model_indexer.find_sample_thumbnail(model, pack) == sample
+
+    def test_returns_none_when_no_match(self, tmp_path):
+        pack = tmp_path / "pack"; (pack / "Samples").mkdir(parents=True)
+        model = pack / "Mage.glb"; model.write_bytes(b"")
+        assert model_indexer.find_sample_thumbnail(model, pack) is None
+
+
+class TestRenderModelThumbnail:
+    def test_renders_png(self, tmp_path):
+        out = tmp_path / "thumb.png"
+        ok = model_indexer.render_model_thumbnail(FIXTURES / "BoxAnimated.glb", out, size=128)
+        if not ok:
+            pytest.skip("trimesh offscreen render unavailable on this host")
+        from PIL import Image
+        with Image.open(out) as img:
+            assert img.size == (128, 128)
+
+    def test_returns_false_on_garbage(self, tmp_path):
+        bad = tmp_path / "bad.glb"; bad.write_bytes(b"not a glb")
+        ok = model_indexer.render_model_thumbnail(bad, tmp_path / "out.png", size=128)
+        assert ok is False
+
+
+class TestResolveThumbnail:
+    def test_prefers_sample_over_render(self, tmp_path):
+        pack = tmp_path / "p"; (pack / "Samples").mkdir(parents=True)
+        sample = pack / "Samples" / "box.png"; sample.write_bytes(b"\x89PNG")
+        model = pack / "Box.glb"; model.write_bytes(b"")
+        cache = tmp_path / "cache"
+        result = model_indexer.resolve_thumbnail(model, pack, cache, "k")
+        assert result == sample
+
+    def test_uses_cache_when_present(self, tmp_path):
+        pack = tmp_path / "p"; pack.mkdir()
+        model = pack / "Box.glb"; model.write_bytes(b"")
+        cache = tmp_path / "cache"; cache.mkdir()
+        cached = cache / "k.png"; cached.write_bytes(b"\x89PNG")
+        result = model_indexer.resolve_thumbnail(model, pack, cache, "k")
+        assert result == cached
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
