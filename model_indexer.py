@@ -17,7 +17,7 @@ def load_gltf_json(path: Path) -> dict:
             return json.load(f)
     if suffix == ".glb":
         with open(path, "rb") as f:
-            magic, version, _ = struct.unpack("<III", f.read(12))
+            magic, _version, _length = struct.unpack("<III", f.read(12))
             if magic != GLB_MAGIC:
                 raise ValueError(f"not a glTF binary: {path}")
             chunk_len, chunk_type = struct.unpack("<II", f.read(8))
