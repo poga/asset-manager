@@ -70,5 +70,29 @@ class TestExtractModelInfo:
         assert info.rig is None
 
 
+class TestCanonicalFormatFilter:
+    def test_glb_wins_over_gltf_same_stem(self, tmp_path):
+        (tmp_path / "Knight.glb").write_bytes(b"glTF\x02\x00\x00\x00\x10\x00\x00\x00")
+        (tmp_path / "Knight.gltf").write_text("{}")
+        (tmp_path / "Knight.bin").write_bytes(b"")
+        files = [tmp_path / "Knight.glb", tmp_path / "Knight.gltf"]
+        kept = model_indexer.filter_canonical_models(files)
+        assert tmp_path / "Knight.glb" in kept
+        assert tmp_path / "Knight.gltf" not in kept
+
+    def test_keeps_gltf_when_no_glb_sibling(self, tmp_path):
+        files = [tmp_path / "axe.gltf"]
+        kept = model_indexer.filter_canonical_models(files)
+        assert files == kept
+
+    def test_different_directories_independent(self, tmp_path):
+        a = tmp_path / "a"
+        b = tmp_path / "b"
+        a.mkdir(); b.mkdir()
+        files = [a / "Knight.glb", b / "Knight.gltf"]
+        kept = model_indexer.filter_canonical_models(files)
+        assert set(kept) == set(files)
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

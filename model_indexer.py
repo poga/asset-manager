@@ -66,6 +66,22 @@ def _collect_referenced_files(gltf: dict) -> list[str]:
     return out
 
 
+def filter_canonical_models(paths: list[Path]) -> list[Path]:
+    """Drop .gltf entries that have a sibling .glb with the same stem."""
+    by_key: dict[tuple[Path, str], list[Path]] = {}
+    for p in paths:
+        by_key.setdefault((p.parent, p.stem), []).append(p)
+
+    keep: list[Path] = []
+    for group in by_key.values():
+        if len(group) == 1:
+            keep.append(group[0])
+            continue
+        glb = next((p for p in group if p.suffix.lower() == ".glb"), None)
+        keep.append(glb if glb else group[0])
+    return [p for p in paths if p in set(keep)]
+
+
 def extract_model_info(path: Path) -> ModelInfo:
     gltf = load_gltf_json(path)
     animations = [
