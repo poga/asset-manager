@@ -9,6 +9,7 @@
       <ModelViewer
         v-if="asset.kind === 'model' || asset.kind === 'animation_bundle'"
         :asset-id="asset.id"
+        :filename="asset.filename"
         :api-base="API_BASE"
       />
       <!-- inline style needed for jsdom test compatibility (scoped CSS not processed) -->

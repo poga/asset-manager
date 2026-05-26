@@ -571,7 +571,8 @@ def asset_model_sibling(asset_id: int, filename: str):
         raise HTTPException(400, "Path traversal")
     if not target.exists():
         raise HTTPException(404)
-    return FileResponse(target)
+    ct = MODEL_CONTENT_TYPES.get(target.suffix.lower())
+    return FileResponse(target, media_type=ct) if ct else FileResponse(target)
 
 
 @app.get("/api/pack-preview/{pack_name:path}")

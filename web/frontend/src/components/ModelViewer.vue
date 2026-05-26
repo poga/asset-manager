@@ -27,10 +27,16 @@ import { ref, computed, onMounted } from 'vue'
 
 const props = defineProps({
   assetId: { type: Number, required: true },
+  filename: { type: String, required: true },
   apiBase: { type: String, default: '/api' },
 })
 
-const modelUrl = computed(() => `${props.apiBase}/asset/${props.assetId}/model`)
+// Filename in the path makes the .gltf URL look like a file so model-viewer
+// resolves relative buffer/texture URIs against /api/asset/{id}/model/, not
+// /api/asset/{id}/, hitting the sibling endpoint.
+const modelUrl = computed(
+  () => `${props.apiBase}/asset/${props.assetId}/model/${encodeURIComponent(props.filename)}`,
+)
 const clips = ref([])
 const selectedClip = ref(null)
 const isPlaying = ref(false)

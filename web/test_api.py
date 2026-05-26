@@ -834,6 +834,23 @@ class TestModelEndpoint:
         r2 = _client.get(f"/api/asset/{aid}/model/axe_1handed.bin")
         assert r2.status_code == 200
 
+    def test_sibling_endpoint_serves_gltf_with_correct_content_type(self, test_db, tmp_path):
+        """The sibling endpoint serves the asset's own .gltf with model/gltf+json type
+        — this URL form (with the filename) is what the frontend uses so that the
+        browser resolves relative buffer URIs against /api/asset/{id}/model/."""
+        from api import set_db_path, set_assets_path
+        set_db_path(test_db)
+        assets_dir = tmp_path / "assets"; assets_dir.mkdir()
+        fx = Path(__file__).parent.parent / "tests" / "fixtures" / "3d"
+        (assets_dir / "axe_1handed.gltf").write_bytes((fx / "axe_1handed.gltf").read_bytes())
+        set_assets_path(assets_dir)
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute("INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) VALUES ('axe_1handed.gltf','axe_1handed.gltf','gltf','h','model')")
+        aid = cur.lastrowid; conn.commit(); conn.close()
+        r = _client.get(f"/api/asset/{aid}/model/axe_1handed.gltf")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "model/gltf+json"
+
     def test_rejects_path_traversal(self, test_db, tmp_path):
         from api import set_db_path, set_assets_path
         set_db_path(test_db)
