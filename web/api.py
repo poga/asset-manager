@@ -450,15 +450,31 @@ def filters():
 ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
 
 
+_3D_KINDS = {"model", "animation_bundle"}
+
+
 @app.get("/api/image/{asset_id}")
 def image(asset_id: int):
     """Serve asset image file. Renders Aseprite files as PNG."""
     conn = get_db()
-    row = conn.execute("SELECT path FROM assets WHERE id = ?", [asset_id]).fetchone()
+    row = conn.execute(
+        "SELECT path, asset_kind, thumbnail_path FROM assets WHERE id = ?",
+        [asset_id],
+    ).fetchone()
     conn.close()
 
     if not row:
         raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Serve thumbnail PNG for 3D assets; raw file has no visual representation
+    if row["asset_kind"] in _3D_KINDS:
+        if not row["thumbnail_path"]:
+            raise HTTPException(status_code=404, detail="No thumbnail")
+        thumb = Path(row["thumbnail_path"])
+        serve_path = thumb if thumb.is_absolute() else get_assets_path().parent / thumb
+        if not serve_path.exists():
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+        return FileResponse(serve_path, media_type="image/png")
 
     # Paths in DB are relative to assets folder
     assets_dir = get_assets_path()

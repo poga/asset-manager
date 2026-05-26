@@ -881,5 +881,69 @@ class TestCart3D:
             assert "axe_1handed.bin" in names
 
 
+class TestImageEndpointFor3D:
+    def test_serves_thumbnail_png_for_model(self, test_db, tmp_path):
+        from pathlib import Path
+        import api
+        api.set_db_path(test_db)
+        assets_dir = tmp_path / "assets"
+        samples_dir = assets_dir / "pack" / "Samples"
+        samples_dir.mkdir(parents=True)
+        sample_png = samples_dir / "knight.png"
+        sample_png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)
+        api.set_assets_path(assets_dir)
+
+        # thumbnail_path stored relative to assets_dir.parent (db_dir)
+        thumb_rel = str(sample_png.relative_to(tmp_path))
+
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute(
+            "INSERT INTO assets (path,filename,filetype,file_hash,asset_kind,thumbnail_path) "
+            "VALUES ('pack/Knight.glb','Knight.glb','glb','h','model',?)",
+            [thumb_rel]
+        )
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/image/{aid}")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "image/png"
+        assert r.content.startswith(b"\x89PNG")
+
+    def test_returns_404_when_3d_has_no_thumbnail(self, test_db, tmp_path):
+        import api
+        api.set_db_path(test_db)
+        assets_dir = tmp_path / "assets"; assets_dir.mkdir()
+        api.set_assets_path(assets_dir)
+
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute(
+            "INSERT INTO assets (path,filename,filetype,file_hash,asset_kind,thumbnail_path) "
+            "VALUES ('Mage.glb','Mage.glb','glb','h2','model', NULL)"
+        )
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/image/{aid}")
+        assert r.status_code == 404
+
+    def test_2d_image_unchanged(self, test_db, tmp_path):
+        import api
+        from PIL import Image
+        api.set_db_path(test_db)
+        assets_dir = tmp_path / "assets"; assets_dir.mkdir()
+        png = assets_dir / "sprite.png"
+        Image.new("RGBA", (16, 16), (255, 0, 0)).save(png)
+        api.set_assets_path(assets_dir)
+
+        conn = sqlite3.connect(test_db)
+        cur = conn.execute(
+            "INSERT INTO assets (path,filename,filetype,file_hash,asset_kind) "
+            "VALUES ('sprite.png','sprite.png','png','h3','image')"
+        )
+        aid = cur.lastrowid; conn.commit(); conn.close()
+
+        r = _client.get(f"/api/image/{aid}")
+        assert r.status_code == 200
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
