@@ -6,15 +6,21 @@
     </button>
 
     <div class="detail-content">
+      <ModelViewer
+        v-if="asset.kind === 'model' || asset.kind === 'animation_bundle'"
+        :asset-id="asset.id"
+        :api-base="API_BASE"
+      />
       <!-- inline style needed for jsdom test compatibility (scoped CSS not processed) -->
       <img
+        v-else
         :src="`${API_BASE}/image/${asset.id}`"
         :alt="asset.filename"
         class="asset-image"
         :style="{ minWidth: '300px', minHeight: '300px' }"
       />
         <label
-          v-if="asset.preview_x !== null && asset.preview_x !== undefined"
+          v-if="(asset.kind === 'image' || !asset.kind) && asset.preview_x !== null && asset.preview_x !== undefined"
           class="preview-override-checkbox"
         >
           <input
@@ -85,6 +91,8 @@
 </template>
 
 <script setup>
+import ModelViewer from './ModelViewer.vue'
+
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
 defineProps({
