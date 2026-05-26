@@ -5,6 +5,7 @@
       :src="modelUrl"
       camera-controls
       auto-rotate
+      loading="eager"
       shadow-intensity="1"
       exposure="1"
       :animation-name="selectedClip?.name"
