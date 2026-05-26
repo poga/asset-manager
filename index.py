@@ -134,6 +134,13 @@ CREATE TABLE IF NOT EXISTS asset_animations (
     UNIQUE(asset_id, clip_index)
 );
 
+CREATE TABLE IF NOT EXISTS asset_relations (
+    from_asset_id INTEGER REFERENCES assets(id),
+    to_asset_id INTEGER REFERENCES assets(id),
+    relation_type TEXT,
+    PRIMARY KEY (from_asset_id, to_asset_id, relation_type)
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_filename ON assets(filename);
 CREATE INDEX IF NOT EXISTS idx_assets_filetype ON assets(filetype);
 CREATE INDEX IF NOT EXISTS idx_assets_pack_id ON assets(pack_id);
@@ -766,6 +773,25 @@ def index(
             progress.advance(index_task)
 
         conn.commit()
+
+    # Link character meshes to animation bundles within each pack
+    for pack_id_seen in set(packs_seen.values()):
+        chars = conn.execute(
+            "SELECT id, rig FROM assets WHERE pack_id = ? AND asset_kind='model' AND rig IS NOT NULL",
+            [pack_id_seen]
+        ).fetchall()
+        bundles = conn.execute(
+            "SELECT id, rig FROM assets WHERE pack_id = ? AND asset_kind='animation_bundle' AND rig IS NOT NULL",
+            [pack_id_seen]
+        ).fetchall()
+        for c in chars:
+            for b in bundles:
+                if c["rig"] == b["rig"]:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO asset_relations (from_asset_id, to_asset_id, relation_type) VALUES (?, ?, 'animation_for_rig')",
+                        [c["id"], b["id"]]
+                    )
+    conn.commit()
 
     # Update pack asset counts
     conn.execute("""

@@ -1201,6 +1201,47 @@ class Test3DEndToEnd:
         assert len(rows) == 2  # Knight + bundle
 
 
+class TestAnimationBundleLinking:
+    def test_character_linked_to_matching_bundle(self, kaykit_like_pack, tmp_path):
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(kaykit_like_pack), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        rels = conn.execute("""
+            SELECT a.path AS from_path, b.path AS to_path
+            FROM asset_relations r
+            JOIN assets a ON a.id = r.from_asset_id
+            JOIN assets b ON b.id = r.to_asset_id
+            WHERE r.relation_type = 'animation_for_rig'
+        """).fetchall()
+        assert any(
+            r["from_path"].endswith("Knight.glb") and r["to_path"].endswith("Rig_Medium_General.glb")
+            for r in rels
+        )
+
+    def test_no_cross_pack_links(self, tmp_path):
+        # Two packs with the same rig should NOT link across packs
+        a = tmp_path / "assets" / "PackA"
+        b = tmp_path / "assets" / "PackB"
+        (a / "Characters" / "gltf").mkdir(parents=True)
+        (b / "Animations" / "gltf" / "Rig_Medium").mkdir(parents=True)
+        shutil.copy(FIXTURES_3D / "Knight.glb", a / "Characters" / "gltf" / "Knight.glb")
+        shutil.copy(FIXTURES_3D / "Rig_Medium_General.glb", b / "Animations" / "gltf" / "Rig_Medium" / "Rig_Medium_General.glb")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        cross = conn.execute("""
+            SELECT COUNT(*) AS n FROM asset_relations r
+            JOIN assets a ON a.id = r.from_asset_id
+            JOIN assets b ON b.id = r.to_asset_id
+            WHERE a.pack_id != b.pack_id AND r.relation_type='animation_for_rig'
+        """).fetchone()
+        assert cross["n"] == 0
+
+
 # =============================================================================
 # Entry point
 # =============================================================================
