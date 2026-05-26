@@ -7,6 +7,7 @@
 #     "rich>=13.0",
 #     "typer>=0.9",
 #     "python-dotenv>=1.0",
+#     "trimesh[easy]>=4.0",
 # ]
 # ///
 """Build and update the game asset index."""
@@ -30,6 +31,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 import aseprite_parser
+import model_indexer
 
 app = typer.Typer(help="Build and update the game asset index")
 console = Console()
@@ -37,6 +39,7 @@ console = Console()
 # Supported image types for indexing
 IMAGE_EXTENSIONS = {".png", ".gif", ".jpg", ".jpeg", ".webp"}
 ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
+MODEL_EXTENSIONS = {".glb", ".gltf"}
 
 # Noise words to skip in tag extraction
 NOISE_WORDS = {
@@ -523,11 +526,15 @@ def add_tags(conn: sqlite3.Connection, asset_id: int, tags: list[str], source: s
 
 
 def scan_assets(asset_root: Path) -> list[Path]:
-    """Scan directory for image and Aseprite files."""
-    assets = []
+    """Scan directory for image, Aseprite, and 3D model files."""
+    image_assets: list[Path] = []
+    model_assets: list[Path] = []
     for ext in IMAGE_EXTENSIONS | ASEPRITE_EXTENSIONS:
-        assets.extend(asset_root.rglob(f"*{ext}"))
-    return sorted(assets)
+        image_assets.extend(asset_root.rglob(f"*{ext}"))
+    for ext in MODEL_EXTENSIONS:
+        model_assets.extend(asset_root.rglob(f"*{ext}"))
+    model_assets = model_indexer.filter_canonical_models(sorted(model_assets))
+    return sorted(image_assets + model_assets)
 
 
 def set_pack_preview(
@@ -663,13 +670,40 @@ def index(
                 packs_seen[pack_name] = pack_id
             pack_id = packs_seen.get(pack_name)
 
-            # Get image info
-            img_info = get_image_info(file_path) if file_path.suffix.lower() in IMAGE_EXTENSIONS else {}
+            suffix = file_path.suffix.lower()
+            is_model = suffix in MODEL_EXTENSIONS
+            is_image = suffix in IMAGE_EXTENSIONS
 
-            # Detect preview bounds for spritesheets
+            img_info: dict = {}
             preview_bounds = None
-            if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+            asset_kind = "image"
+            rig: Optional[str] = None
+            thumbnail_path: Optional[str] = None
+            clip_names: list[str] = []
+
+            if is_image:
+                img_info = get_image_info(file_path)
                 preview_bounds = detect_first_sprite_bounds(file_path)
+            elif is_model:
+                info = model_indexer.extract_model_info(file_path)
+                # KayKit animation bundles ship mannequin meshes, so has_mesh
+                # is unreliable. Use filename prefix + animations instead.
+                is_bundle = file_path.stem.startswith("Rig_") and bool(info.animations)
+                asset_kind = "animation_bundle" if is_bundle else "model"
+                rig = info.rig
+                clip_names = info.animations
+                pack_root = pack_path if pack_name else asset_root
+                cache_dir = db.parent / ".index" / "thumbs"
+                thumb_key = hashlib.sha256(rel_path.encode()).hexdigest()[:16]
+                thumb = model_indexer.resolve_thumbnail(file_path, pack_root, cache_dir, thumb_key)
+                if thumb:
+                    try:
+                        thumbnail_path = str(thumb.relative_to(db.parent))
+                    except ValueError:
+                        thumbnail_path = str(thumb)
+            elif suffix in ASEPRITE_EXTENSIONS:
+                ase_info = aseprite_parser.parse_aseprite(file_path)
+                img_info = {"width": ase_info["width"], "height": ase_info["height"]}
 
             # Category
             category = get_category(file_path, pack_path) if pack_name else ""
@@ -679,13 +713,13 @@ def index(
                 """INSERT OR REPLACE INTO assets
                    (pack_id, path, filename, filetype, file_hash, file_size,
                     width, height, preview_x, preview_y, preview_width, preview_height,
-                    category, indexed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    category, asset_kind, rig, thumbnail_path, indexed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [
                     pack_id,
                     rel_path,
                     file_path.name,
-                    file_path.suffix.lower().lstrip("."),
+                    suffix.lstrip("."),
                     current_hash,
                     file_path.stat().st_size,
                     img_info.get("width"),
@@ -694,7 +728,7 @@ def index(
                     preview_bounds[1] if preview_bounds else None,
                     preview_bounds[2] if preview_bounds else None,
                     preview_bounds[3] if preview_bounds else None,
-                    category,
+                    category, asset_kind, rig, thumbnail_path,
                     datetime.now().isoformat(),
                 ]
             )
@@ -704,8 +738,14 @@ def index(
             tags = extract_tags_from_path(file_path, asset_root)
             add_tags(conn, asset_id, tags, "path")
 
-            # Extract colors for images
-            if file_path.suffix.lower() in IMAGE_EXTENSIONS:
+            if is_model:
+                add_tags(conn, asset_id, ["3d"], "kind")
+                for i, name in enumerate(clip_names):
+                    conn.execute(
+                        "INSERT OR REPLACE INTO asset_animations (asset_id, clip_index, name) VALUES (?, ?, ?)",
+                        [asset_id, i, name]
+                    )
+            elif is_image:
                 colors = extract_colors(file_path)
                 for hex_color, percentage in colors:
                     conn.execute(
@@ -713,7 +753,6 @@ def index(
                            VALUES (?, ?, ?)""",
                         [asset_id, hex_color, percentage]
                     )
-
                 # Compute perceptual hash
                 phash = compute_phash(file_path)
                 if phash:

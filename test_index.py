@@ -1126,6 +1126,82 @@ class TestSchemaMigration:
 
 
 # =============================================================================
+# 3D End-to-End Tests
+# =============================================================================
+
+import shutil
+import typer.testing
+
+FIXTURES_3D = Path(__file__).parent / "tests" / "fixtures" / "3d"
+
+
+@pytest.fixture
+def kaykit_like_pack(tmp_path):
+    """Build a fake pack that mirrors KayKit Adventurers structure."""
+    pack = tmp_path / "assets" / "KayKit Test 1.0"
+    chars = pack / "Characters" / "gltf"
+    anims = pack / "Animations" / "gltf" / "Rig_Medium"
+    samples = pack / "Samples"
+    chars.mkdir(parents=True)
+    anims.mkdir(parents=True)
+    samples.mkdir(parents=True)
+    shutil.copy(FIXTURES_3D / "Knight.glb", chars / "Knight.glb")
+    shutil.copy(FIXTURES_3D / "Rig_Medium_General.glb", anims / "Rig_Medium_General.glb")
+    # Matching sample for Knight
+    (samples / "knight.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    return tmp_path / "assets"
+
+
+class Test3DEndToEnd:
+    def test_index_3d_pack_creates_correct_rows(self, kaykit_like_pack, tmp_path):
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(kaykit_like_pack), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+
+        conn = index.get_db(db_path)
+        rows = conn.execute(
+            "SELECT path, asset_kind, rig, thumbnail_path FROM assets ORDER BY path"
+        ).fetchall()
+        # Knight should be 'model'
+        knight = next(r for r in rows if r["path"].endswith("Knight.glb"))
+        assert knight["asset_kind"] == "model"
+        assert knight["rig"] == "Rig_Medium"
+        assert knight["thumbnail_path"] is not None
+        # Animation bundle classified
+        bundle = next(r for r in rows if r["path"].endswith("Rig_Medium_General.glb"))
+        assert bundle["asset_kind"] == "animation_bundle"
+
+    def test_animation_clips_populated(self, kaykit_like_pack, tmp_path):
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(kaykit_like_pack), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        clips = conn.execute("""
+            SELECT name FROM asset_animations aa
+            JOIN assets a ON a.id = aa.asset_id
+            WHERE a.path LIKE '%Rig_Medium_General.glb'
+        """).fetchall()
+        assert len(clips) >= 1
+
+    def test_3d_assets_get_3d_tag(self, kaykit_like_pack, tmp_path):
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(kaykit_like_pack), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        rows = conn.execute("""
+            SELECT a.path FROM assets a
+            JOIN asset_tags at ON at.asset_id = a.id
+            JOIN tags t ON t.id = at.tag_id
+            WHERE t.name = '3d'
+        """).fetchall()
+        assert len(rows) == 2  # Knight + bundle
+
+
+# =============================================================================
 # Entry point
 # =============================================================================
 
