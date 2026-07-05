@@ -1248,6 +1248,43 @@ class TestPackContentsConvention:
         assert "contents.png" not in row["thumbnail_path"]
 
 
+class TestPackThemes:
+    def test_index_assigns_theme_to_packs(self, temp_dir):
+        pack = temp_dir / "Frozen_Forest_v1.0"
+        pack.mkdir()
+        img = Image.new("RGBA", (32, 32), (20, 90, 40, 255))
+        img.save(pack / "tree.png")
+        db_path = temp_dir / "t.db"
+        index.index(temp_dir, db_path, force=False)
+        conn = sqlite3.connect(db_path)
+        theme = conn.execute("SELECT theme FROM packs").fetchone()[0]
+        conn.close()
+        assert theme == "Nature"
+
+    def test_migrate_adds_theme_column_to_legacy_db(self, temp_dir):
+        db_path = temp_dir / "legacy.db"
+        conn = sqlite3.connect(db_path)
+        conn.execute("CREATE TABLE packs (id INTEGER PRIMARY KEY, name TEXT, path TEXT)")
+        # Columns match SCHEMA's assets indexes so executescript(SCHEMA)
+        # doesn't fail on unrelated missing columns during migration.
+        conn.execute("""
+            CREATE TABLE assets (
+                id INTEGER PRIMARY KEY,
+                pack_id INTEGER,
+                path TEXT NOT NULL UNIQUE,
+                filename TEXT NOT NULL,
+                filetype TEXT NOT NULL,
+                file_hash TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+        conn.close()
+        conn = index.get_db(db_path)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(packs)")}
+        conn.close()
+        assert "theme" in cols
+
+
 # =============================================================================
 # Entry point
 # =============================================================================

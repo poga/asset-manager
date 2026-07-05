@@ -34,6 +34,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 import aseprite_parser
 import frame_detect
 import model_indexer
+import pack_themes
 
 app = typer.Typer(help="Build and update the game asset index")
 console = Console()
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS packs (
     name TEXT NOT NULL,
     path TEXT NOT NULL UNIQUE,
     version TEXT,
+    theme TEXT,
     preview_path TEXT,
     preview_generated BOOLEAN DEFAULT FALSE,
     asset_count INTEGER DEFAULT 0,
@@ -157,17 +159,20 @@ CREATE INDEX IF NOT EXISTS idx_assets_rig ON assets(rig);
 
 
 def migrate_schema(conn: sqlite3.Connection) -> None:
-    # Only migrate if the assets table already exists (legacy DB)
+    # Only migrate tables that already exist (legacy DBs)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    if "assets" not in tables:
-        return
-    existing = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
-    if "asset_kind" not in existing:
-        conn.execute("ALTER TABLE assets ADD COLUMN asset_kind TEXT NOT NULL DEFAULT 'image'")
-    if "rig" not in existing:
-        conn.execute("ALTER TABLE assets ADD COLUMN rig TEXT")
-    if "thumbnail_path" not in existing:
-        conn.execute("ALTER TABLE assets ADD COLUMN thumbnail_path TEXT")
+    if "packs" in tables:
+        existing = {r["name"] for r in conn.execute("PRAGMA table_info(packs)")}
+        if "theme" not in existing:
+            conn.execute("ALTER TABLE packs ADD COLUMN theme TEXT")
+    if "assets" in tables:
+        existing = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
+        if "asset_kind" not in existing:
+            conn.execute("ALTER TABLE assets ADD COLUMN asset_kind TEXT NOT NULL DEFAULT 'image'")
+        if "rig" not in existing:
+            conn.execute("ALTER TABLE assets ADD COLUMN rig TEXT")
+        if "thumbnail_path" not in existing:
+            conn.execute("ALTER TABLE assets ADD COLUMN thumbnail_path TEXT")
     conn.commit()
 
 
@@ -760,6 +765,14 @@ def index(
             SELECT COUNT(*) FROM assets WHERE assets.pack_id = packs.id
         )
     """)
+    conn.commit()
+
+    # Reassign themes every run so mapping edits apply without --force
+    for row in conn.execute("SELECT id, name FROM packs").fetchall():
+        conn.execute(
+            "UPDATE packs SET theme = ? WHERE id = ?",
+            [pack_themes.assign_theme(row["name"]), row["id"]],
+        )
     conn.commit()
 
     # Generate pack previews
