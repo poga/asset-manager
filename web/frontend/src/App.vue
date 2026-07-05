@@ -220,6 +220,12 @@ async function search(params) {
 
 function handleSearch(params) {
   currentSearchParams.value = params
+  const hasActive = !!(params.q || (params.tag && params.tag.length) || params.color || params.modelOnly)
+  if (hasActive) {
+    isDefaultHomeView.value = false
+  } else if (selectedPacks.value.length === 0) {
+    isDefaultHomeView.value = true
+  }
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => search(params), 150)
 }
@@ -265,6 +271,8 @@ function goHome() {
   selectedAsset.value = null
   selectedPacks.value = []
   isDefaultHomeView.value = true
+  searchBarRef.value?.clear()
+  currentSearchParams.value = {}
   window.history.pushState({ route: 'home' }, '', buildUrl({ name: 'home' }))
 }
 

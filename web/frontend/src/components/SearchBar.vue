@@ -148,7 +148,15 @@ function addTagExternal(tag) {
   }
 }
 
-defineExpose({ addTagExternal })
+function clear() {
+  query.value = ''
+  tags.value = []
+  color.value = ''
+  modelOnly.value = false
+  emitSearch()
+}
+
+defineExpose({ addTagExternal, clear })
 </script>
 
 <style scoped>
