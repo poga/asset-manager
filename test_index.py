@@ -667,8 +667,8 @@ class TestCLI:
 class TestIndexAssetPreviewBounds:
     """Tests for preview bounds storage during indexing."""
 
-    def test_stores_preview_bounds_for_spritesheet(self, temp_dir):
-        """Indexing stores preview bounds for image with alpha."""
+    def test_gapless_sheet_falls_back_to_whole_image_bounds(self, temp_dir):
+        """No frame gap to infer from, so bounds cover the whole image."""
         img_path = temp_dir / "TestPack" / "sprite.png"
         img_path.parent.mkdir(parents=True)
         # Create 64x32 spritesheet with first sprite at (0,0) size 32x32
@@ -1040,6 +1040,14 @@ class TestSchemaMigration:
         conn = index.get_db(db_path)
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
         assert "asset_kind" in cols
+
+
+class TestSearchSchema:
+    def test_packs_table_has_theme_column(self, tmp_path):
+        # search.py keeps its own SCHEMA copy; it must not drift from index.py
+        conn = search.get_db(tmp_path / "test.db")
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(packs)")}
+        assert "theme" in cols
 
 
 # =============================================================================

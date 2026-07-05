@@ -149,6 +149,12 @@ class TestDetectPreviewBounds:
         # 48 divides neither 64 nor 16; inference finds the 16x16 grid
         assert frame_detect.detect_preview_bounds(path, tmp_path) == (1, 1, 14, 14)
 
+    def test_filename_hint_below_min_edge_falls_through(self, tmp_path):
+        # "2x2" hint is a stray token, not a real frame size; must not crop tiny
+        path = make_sheet(tmp_path, "2x2Trap.png", (32, 32), [(0, 0, 32, 32)])
+        x, y, w, h = frame_detect.detect_preview_bounds(path)
+        assert w > 2
+
     def test_no_alpha_channel_returns_none(self, tmp_path):
         path = tmp_path / "rgb.png"
         Image.new("RGB", (32, 32), (10, 10, 10)).save(path)

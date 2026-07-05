@@ -96,7 +96,10 @@ def infer_grid(img: Image.Image) -> tuple[int, int]:
 def _divides(size: tuple[int, int], sheet: tuple[int, int]) -> bool:
     fw, fh = size
     w, h = sheet
-    return 0 < fw <= w and 0 < fh <= h and w % fw == 0 and h % fh == 0
+    return (
+        fw >= MIN_FRAME_EDGE and fh >= MIN_FRAME_EDGE
+        and 0 < fw <= w and 0 < fh <= h and w % fw == 0 and h % fh == 0
+    )
 
 
 def resolve_frame_size(
