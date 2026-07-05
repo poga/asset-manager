@@ -1265,8 +1265,7 @@ class TestPackThemes:
         db_path = temp_dir / "legacy.db"
         conn = sqlite3.connect(db_path)
         conn.execute("CREATE TABLE packs (id INTEGER PRIMARY KEY, name TEXT, path TEXT)")
-        # Columns match SCHEMA's assets indexes so executescript(SCHEMA)
-        # doesn't fail on unrelated missing columns during migration.
+        # legacy assets needs SCHEMA's indexed columns or executescript fails
         conn.execute("""
             CREATE TABLE assets (
                 id INTEGER PRIMARY KEY,
