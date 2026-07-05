@@ -27,8 +27,7 @@ THEME_ORDER = [
     NATURE, DUNGEONS, TOWNS, CHARACTERS, MAGIC, ITEMS, UI, SCIFI, VEHICLES, OTHER,
 ]
 
-# slug -> theme; slugs come from _slug() (lowercase letters only,
-# vendor prefix and version/filler words removed)
+# slug -> theme; slug = _slug(): letters minus vendor/version/filler
 PACK_THEMES = {
     # KayKit
     "adventurers": CHARACTERS,
