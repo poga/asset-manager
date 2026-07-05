@@ -434,8 +434,16 @@ def filters():
     """Get available filter options."""
     conn = get_db()
 
-    packs = conn.execute("""
-        SELECT p.name, p.asset_count as count
+    has_theme = any(
+        r["name"] == "theme" for r in conn.execute("PRAGMA table_info(packs)")
+    )
+    theme_col = "p.theme" if has_theme else "NULL"
+    packs = conn.execute(f"""
+        SELECT p.name, p.asset_count AS count, {theme_col} AS theme,
+               (SELECT COUNT(*) FROM assets a
+                WHERE a.pack_id = p.id
+                  AND a.asset_kind IN ('model', 'animation_bundle')) * 2
+                 > p.asset_count AS is_3d
         FROM packs p
         ORDER BY p.name
     """).fetchall()
@@ -451,7 +459,15 @@ def filters():
     conn.close()
 
     return {
-        "packs": [{"name": p["name"], "count": p["count"]} for p in packs],
+        "packs": [
+            {
+                "name": p["name"],
+                "count": p["count"],
+                "theme": p["theme"] or "Other",
+                "is_3d": bool(p["is_3d"]),
+            }
+            for p in packs
+        ],
         "tags": [t["name"] for t in tags],
         "colors": list(COLOR_NAMES.keys()),
     }
