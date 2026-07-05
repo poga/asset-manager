@@ -120,8 +120,7 @@ class TestDetectPreviewBounds:
         assert frame_detect.detect_preview_bounds(path) == (11, 11, 10, 10)
 
     def test_internal_gap_does_not_truncate_single_image(self, tmp_path):
-        # two blobs in one 32x32 image; left blob crosses x=16 so no
-        # grid divides it — the crop must span both blobs
+        # left blob crosses x=16: no grid fits, crop must span both blobs
         path = make_sheet(
             tmp_path, "portrait.png", (32, 32), [(4, 4, 17, 28), (20, 4, 28, 28)]
         )
@@ -134,8 +133,7 @@ class TestDetectPreviewBounds:
         assert x >= 32 and x + w <= 64
 
     def test_animation_info_beats_inference(self, tmp_path):
-        # content fills cells edge-to-edge (no transparent grid lines),
-        # but the pack metadata declares the frame size
+        # no transparent grid lines; declared frame size must win
         (tmp_path / "_AnimationInfo.txt").write_text("- 16x16px: all.\n")
         path = make_sheet(tmp_path, "packed.png", (64, 16), [(0, 0, 64, 16)])
         assert frame_detect.detect_preview_bounds(path, tmp_path) == (0, 0, 16, 16)
