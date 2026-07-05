@@ -32,6 +32,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 import aseprite_parser
+import frame_detect
 import model_indexer
 
 app = typer.Typer(help="Build and update the game asset index")
@@ -211,73 +212,6 @@ def compute_phash(path: Path) -> Optional[bytes]:
         with Image.open(path) as img:
             h = imagehash.phash(img)
             return h.hash.tobytes()
-    except Exception:
-        return None
-
-
-def detect_first_sprite_bounds(path: Path) -> Optional[tuple[int, int, int, int]]:
-    """
-    Find the bounding box of the first frame in a spritesheet.
-
-    Detects grid layout by finding transparent column/row gaps,
-    then returns content bounds within the first frame cell.
-
-    Returns (x, y, width, height) or None if no content found or no alpha channel.
-    """
-    # Alpha threshold: pixels with alpha <= this value are considered transparent.
-    # This handles sprites with "ghost" pixels (alpha=1) that are visually invisible
-    # but would otherwise be detected as content.
-    ALPHA_THRESHOLD = 10
-
-    try:
-        with Image.open(path) as img:
-            if img.mode != "RGBA":
-                return None
-
-            alpha = img.split()[3]
-            width, height = img.size
-
-            # Convert to bytes for fast column/row scanning
-            alpha_data = alpha.tobytes()
-
-            # Find first fully transparent column AFTER some content (frame boundary)
-            # A column is "empty" if all pixels have alpha <= ALPHA_THRESHOLD
-            first_gap_col = width
-            found_content_col = False
-            for x in range(width):
-                col_empty = all(alpha_data[y * width + x] <= ALPHA_THRESHOLD for y in range(height))
-                if not col_empty:
-                    found_content_col = True
-                elif found_content_col:
-                    first_gap_col = x
-                    break
-
-            # Find first fully transparent row AFTER some content (frame boundary)
-            first_gap_row = height
-            found_content_row = False
-            for y in range(height):
-                row_start = y * width
-                row_empty = all(alpha_data[row_start + x] <= ALPHA_THRESHOLD for x in range(width))
-                if not row_empty:
-                    found_content_row = True
-                elif found_content_row:
-                    first_gap_row = y
-                    break
-
-            # Crop to first frame, get content bounds
-            first_frame = img.crop((0, 0, first_gap_col, first_gap_row))
-
-            # Apply same threshold for bounding box detection
-            # Create a mask where only pixels with alpha > threshold are considered
-            frame_alpha = first_frame.split()[3]
-            # Use point() to threshold the alpha channel
-            thresholded = frame_alpha.point(lambda p: 255 if p > ALPHA_THRESHOLD else 0)
-            bbox = thresholded.getbbox()
-
-            if bbox is None:
-                return None
-
-            return (bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1])
     except Exception:
         return None
 
@@ -479,7 +413,7 @@ def index_asset(
 
     if file_path.suffix.lower() in IMAGE_EXTENSIONS:
         img_info = get_image_info(file_path)
-        preview_bounds = detect_first_sprite_bounds(file_path)
+        preview_bounds = frame_detect.detect_preview_bounds(file_path, pack_path)
     elif file_path.suffix.lower() in ASEPRITE_EXTENSIONS:
         ase_info = aseprite_parser.parse_aseprite(file_path)
         img_info = {"width": ase_info["width"], "height": ase_info["height"]}
@@ -717,7 +651,7 @@ def index(
 
             if is_image:
                 img_info = get_image_info(file_path)
-                preview_bounds = detect_first_sprite_bounds(file_path)
+                preview_bounds = frame_detect.detect_preview_bounds(file_path, pack_path)
             elif is_model:
                 info = model_indexer.extract_model_info(file_path)
                 # KayKit animation bundles ship mannequin meshes, so has_mesh
@@ -830,6 +764,10 @@ def index(
 
     # Generate pack previews
     preview_dir = db.parent / ".index" / "previews"
+    if force:
+        # stale montages/convention copies were built from old bounds
+        conn.execute("UPDATE packs SET preview_path = NULL WHERE preview_generated = TRUE")
+        conn.commit()
     console.print("Generating pack previews...")
     for row in conn.execute("SELECT id, name, path, preview_path FROM packs"):
         if row["preview_path"]:

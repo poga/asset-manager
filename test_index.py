@@ -229,154 +229,63 @@ class TestExtractColors:
         assert colors == []
 
 
-class TestDetectFirstSpriteBounds:
-    """Tests for detect_first_sprite_bounds function."""
+class TestFrameAwareIndexing:
+    """Indexing stores frame-confined preview bounds."""
 
-    def test_detects_first_frame_in_grid_spritesheet(self, temp_dir):
-        """Detects first frame in a grid-based spritesheet with transparent gaps."""
-        img_path = temp_dir / "grid.png"
-        # Create 65x33 image: 2x2 grid of 32x16 frames with 1px transparent gap between
-        # Frame layout: [32px frame][1px gap][32px frame] x [16px frame][1px gap][16px frame]
-        img = Image.new("RGBA", (65, 33), (0, 0, 0, 0))
+    def _make_pack(self, temp_dir):
+        pack = temp_dir / "TestPack_v1.0" / "Goblin"
+        pack.mkdir(parents=True)
+        (pack / "_AnimationInfo.txt").write_text(
+            "*Frame size*\n- 32x32px: For all the animations.\n"
+        )
+        # 4 frames of 32x32; sprite at (4,4)-(27,27) in every frame
+        img = Image.new("RGBA", (128, 32), (0, 0, 0, 0))
+        for f in range(4):
+            for x in range(4, 28):
+                for y in range(4, 28):
+                    img.putpixel((f * 32 + x, y), (50, 120, 50, 255))
+        img.save(pack / "GoblinIdle.png")
+        return pack
 
-        # Fill first frame cell (0-31, 0-15) with red sprite at (2,2) to (29,13)
-        for x in range(2, 30):
-            for y in range(2, 14):
-                img.putpixel((x, y), (255, 0, 0, 255))
+    def test_bounds_use_declared_frame_size(self, temp_dir):
+        self._make_pack(temp_dir)
+        db_path = temp_dir / "t.db"
+        index.index(temp_dir, db_path, force=False)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT preview_x, preview_y, preview_width, preview_height "
+            "FROM assets WHERE filename = 'GoblinIdle.png'"
+        ).fetchone()
+        conn.close()
+        # content bbox (4,4)-(28,28) padded 1px, confined to first cell
+        assert (row["preview_x"], row["preview_y"]) == (3, 3)
+        assert (row["preview_width"], row["preview_height"]) == (26, 26)
 
-        # Column 32 is transparent gap (already transparent)
-
-        # Fill second frame cell (33-64, 0-15) with blue sprite
-        for x in range(35, 60):
-            for y in range(2, 14):
-                img.putpixel((x, y), (0, 0, 255, 255))
-
-        # Row 16 is transparent gap (already transparent)
-
-        # Fill third frame cell (0-31, 17-32) with green sprite
-        for x in range(2, 30):
-            for y in range(19, 31):
-                img.putpixel((x, y), (0, 255, 0, 255))
-
-        img.save(img_path)
-
-        bounds = index.detect_first_sprite_bounds(img_path)
-        # Should return bounds of content in FIRST frame cell only: (2, 2, 28, 12)
-        assert bounds == (2, 2, 28, 12)
-
-    def test_finds_first_sprite_in_horizontal_strip(self, temp_dir):
-        """Detects first sprite in a horizontal spritesheet."""
-        img_path = temp_dir / "strip.png"
-        img = Image.new("RGBA", (64, 32), (0, 0, 0, 0))
-        for x in range(32):
-            for y in range(32):
-                img.putpixel((x, y), (255, 0, 0, 255))
-        img.save(img_path)
-
-        bounds = index.detect_first_sprite_bounds(img_path)
-        assert bounds == (0, 0, 32, 32)
-
-    def test_finds_sprite_with_internal_transparency(self, temp_dir):
-        """Detects sprite that has transparent pixels inside (like a donut)."""
-        img_path = temp_dir / "donut.png"
-        img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
-        for x in range(32):
-            for y in range(32):
-                dist_from_center = ((x - 16) ** 2 + (y - 16) ** 2) ** 0.5
-                if 8 <= dist_from_center <= 14:
-                    img.putpixel((x, y), (0, 255, 0, 255))
-        img.save(img_path)
-
-        bounds = index.detect_first_sprite_bounds(img_path)
-        assert bounds is not None
-        x, y, w, h = bounds
-        assert w >= 28 and h >= 28
-
-    def test_returns_none_for_fully_transparent(self, temp_dir):
-        """Returns None for fully transparent image."""
-        img_path = temp_dir / "transparent.png"
-        img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
-        img.save(img_path)
-
-        bounds = index.detect_first_sprite_bounds(img_path)
-        assert bounds is None
-
-    def test_returns_none_for_no_alpha_channel(self, temp_dir):
-        """Returns None for images without alpha channel."""
-        img_path = temp_dir / "rgb.png"
-        img = Image.new("RGB", (32, 32), (255, 0, 0))
-        img.save(img_path)
-
-        bounds = index.detect_first_sprite_bounds(img_path)
-        assert bounds is None
-
-    def test_handles_sprite_not_at_origin(self, temp_dir):
-        """Finds sprite that doesn't start at (0,0)."""
-        img_path = temp_dir / "offset.png"
-        img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-        for x in range(16, 36):
-            for y in range(16, 36):
-                img.putpixel((x, y), (0, 0, 255, 255))
-        img.save(img_path)
-
-        bounds = index.detect_first_sprite_bounds(img_path)
-        assert bounds == (16, 16, 20, 20)
-
-    def test_fallback_for_image_without_gaps(self, temp_dir):
-        """Falls back to full content bounds when no transparent gaps exist."""
-        img_path = temp_dir / "no_gaps.png"
-        # Create image where all columns/rows have some content (no full gaps)
-        img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-        # Draw diagonal line so no column or row is fully transparent
-        for i in range(64):
-            img.putpixel((i, i), (255, 0, 0, 255))
-        # Add a blob
-        for x in range(10, 30):
-            for y in range(10, 30):
-                img.putpixel((x, y), (0, 255, 0, 255))
-        img.save(img_path)
-
-        bounds = index.detect_first_sprite_bounds(img_path)
-        # Should return bounding box of all content (the diagonal + blob)
-        assert bounds == (0, 0, 64, 64)
-
-    def test_ignores_nearly_transparent_pixels(self, temp_dir):
-        """Ignores pixels with very low alpha (like alpha=1) when detecting frame boundaries.
-
-        This reproduces a real bug where penusbmic spritesheets have ghost pixels with
-        alpha=1 that cause the preview to show an empty/wrong region instead of the
-        actual visible sprite.
-        """
-        img_path = temp_dir / "low_alpha.png"
-        # Create image mimicking the real bug:
-        # - Nearly transparent pixels (alpha=1) in first 20 columns - these should be IGNORED
-        # - A transparent gap at columns 20-49
-        # - Fully opaque sprite content at x=50-70 - this should be detected
-        img = Image.new("RGBA", (100, 50), (0, 0, 0, 0))
-
-        # Add nearly-invisible "ghost" pixels in first columns (simulates the bug)
-        # These have alpha=1 which is technically non-zero but visually invisible
-        for x in range(20):
-            for y in range(10, 40):
-                img.putpixel((x, y), (100, 50, 50, 1))  # alpha=1, nearly invisible
-
-        # Add actual visible sprite content at x=50-70
-        for x in range(50, 70):
-            for y in range(15, 35):
-                img.putpixel((x, y), (255, 0, 0, 255))  # Fully opaque
-
-        img.save(img_path)
-
-        bounds = index.detect_first_sprite_bounds(img_path)
-        # Should detect the actual visible content, not the ghost pixels
-        assert bounds is not None
-        x, y, w, h = bounds
-
-        # The preview bounds should include the VISIBLE sprite (at x=50-70),
-        # NOT just the ghost pixels (at x=0-20).
-        # If the bug exists, bounds would be (0, 10, 20, 30) - just the ghost pixels
-        # With the fix, bounds should start at or after x=50, or cover the full width
-        assert x >= 40, f"Expected x >= 40 (visible sprite area), got x={x}. Bounds detected ghost pixels only."
+    def test_force_regenerates_generated_pack_previews(self, temp_dir):
+        pack = self._make_pack(temp_dir)
+        # montage generation needs at least 4 png assets in the pack
+        for name in ["A.png", "B.png", "C.png"]:
+            img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+            for x in range(8, 24):
+                for y in range(8, 24):
+                    img.putpixel((x, y), (120, 50, 50, 255))
+            img.save(pack / name)
+        db_path = temp_dir / "t.db"
+        index.index(temp_dir, db_path, force=False)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT preview_path, preview_generated FROM packs"
+        ).fetchone()
+        assert row["preview_path"] is not None
+        assert row["preview_generated"]
+        conn.close()
+        # deleting the montage file proves force re-creates it
+        montage = temp_dir / row["preview_path"].replace("previews/", ".index/previews/")
+        montage.unlink()
+        index.index(temp_dir, db_path, force=True)
+        assert montage.exists()
 
 
 class TestComputePhash:
@@ -771,9 +680,10 @@ class TestIndexAssetPreviewBounds:
             "SELECT preview_x, preview_y, preview_width, preview_height FROM assets WHERE filename = 'sprite.png'"
         ).fetchone()
 
+        # no gap between halves, so it's one frame; open edge pads 1px
         assert row["preview_x"] == 0
         assert row["preview_y"] == 0
-        assert row["preview_width"] == 32
+        assert row["preview_width"] == 33
         assert row["preview_height"] == 32
         conn.close()
 
