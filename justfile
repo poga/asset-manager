@@ -1,6 +1,7 @@
 # Run all tests
 test:
     uv run --script test_index.py
+    uv run --script test_frame_detect.py
     uv run --script test_model_indexer.py
     uv run --script web/test_api.py
 
