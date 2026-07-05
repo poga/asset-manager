@@ -12,6 +12,7 @@
 # ///
 """Test suite for asset index system."""
 
+import re
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -22,6 +23,12 @@ from PIL import Image
 # Import modules under test
 import index
 import search
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def strip_ansi(text):
+    return ANSI_RE.sub("", text)
 
 
 # =============================================================================
@@ -613,7 +620,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(search.app, ["--help"])
         assert result.exit_code == 0
-        assert "Search your game asset index" in result.stdout
+        assert "Search your game asset index" in strip_ansi(result.stdout)
 
     def test_search_stats_empty_db(self, temp_dir):
         """Test stats on empty database."""
@@ -625,7 +632,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(search.app, ["stats", "--db", str(db_path)])
         assert result.exit_code == 0
-        assert "packs\t0" in result.stdout
+        assert "packs\t0" in strip_ansi(result.stdout)
 
     def test_search_packs_empty(self, temp_dir):
         """Test packs command with empty database."""
@@ -637,7 +644,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(search.app, ["packs", "--db", str(db_path)])
         assert result.exit_code == 0
-        assert "No packs indexed" in result.output
+        assert "No packs indexed" in strip_ansi(result.output)
 
     def test_search_tags_empty(self, temp_dir):
         """Test tags command with empty database."""
@@ -649,7 +656,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(search.app, ["tags", "--db", str(db_path)])
         assert result.exit_code == 0
-        assert "No tags found" in result.output
+        assert "No tags found" in strip_ansi(result.output)
 
 
 # =============================================================================
@@ -942,7 +949,7 @@ class TestSetPreviewCLI:
         ])
 
         assert result.exit_code == 0
-        assert "Updated 1 pack(s)" in result.stdout
+        assert "Updated 1 pack(s)" in strip_ansi(result.stdout)
         assert (preview_dir / "TestPack.png").exists()
 
     def test_error_when_image_not_found(self, temp_dir):
@@ -962,7 +969,7 @@ class TestSetPreviewCLI:
         ])
 
         assert result.exit_code == 1
-        assert "File not found" in result.stdout
+        assert "File not found" in strip_ansi(result.stdout)
 
     def test_error_when_invalid_file_type(self, temp_dir):
         """CLI exits with error when image is not png/gif."""
@@ -984,7 +991,7 @@ class TestSetPreviewCLI:
         ])
 
         assert result.exit_code == 1
-        assert "must be .png or .gif" in result.stdout
+        assert "must be .png or .gif" in strip_ansi(result.stdout)
 
 
 # =============================================================================
