@@ -83,7 +83,14 @@ function previewUrl(packName) {
 }
 
 function scrollTo(theme) {
-  sectionEls[theme]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const el = sectionEls[theme]
+  if (!el) return
+  // smooth scroll silently no-ops in nested scroll containers; jump instantly
+  const gallery = el.closest('.pack-gallery')
+  const chips = gallery.querySelector('.theme-chips')
+  gallery.scrollTop += el.getBoundingClientRect().top
+    - gallery.getBoundingClientRect().top
+    - chips.offsetHeight
 }
 </script>
 
