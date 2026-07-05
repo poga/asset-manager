@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS packs (
     name TEXT NOT NULL,
     path TEXT NOT NULL UNIQUE,
     version TEXT,
+    theme TEXT,
     preview_path TEXT,
     preview_generated BOOLEAN DEFAULT FALSE,
     asset_count INTEGER DEFAULT 0,

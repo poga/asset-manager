@@ -5,6 +5,7 @@ import PackList from '../src/components/PackList.vue'
 import Cart from '../src/components/Cart.vue'
 import AssetDetail from '../src/components/AssetDetail.vue'
 import AssetGrid from '../src/components/AssetGrid.vue'
+import SearchBar from '../src/components/SearchBar.vue'
 
 // Mock fetch globally
 const mockFetch = vi.fn()
@@ -599,5 +600,69 @@ describe('Preview Override', () => {
         body: JSON.stringify({ use_full_image: true })
       })
     )
+  })
+})
+
+describe('Home search visibility', () => {
+  beforeEach(() => {
+    mockFetch.mockImplementation((url) => {
+      if (url === '/assets/api/filters') {
+        return Promise.resolve({
+          json: () => Promise.resolve({ packs: [{ name: 'pack1', count: 10 }], tags: [], colors: [] })
+        })
+      }
+      if (url.startsWith('/assets/api/search')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({ assets: [{ id: 1, filename: 'a.png', path: '/a.png', pack: 'pack1', tags: [], width: 32, height: 32 }] })
+        })
+      }
+      return Promise.resolve({ json: () => Promise.resolve({}) })
+    })
+  })
+
+  afterEach(() => {
+    mockFetch.mockReset()
+  })
+
+  it('switches from gallery to results when a search is active, and back when cleared', async () => {
+    const wrapper = mount(App, {
+      global: { stubs: ['PackList', 'Cart', 'AssetDetail', 'PackGallery'] }
+    })
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(true)
+    expect(wrapper.findComponent(AssetGrid).exists()).toBe(false)
+
+    wrapper.findComponent(SearchBar).vm.$emit('search', { q: 'tree', tag: [] })
+    await new Promise(r => setTimeout(r, 200))
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(false)
+    expect(wrapper.findComponent(AssetGrid).exists()).toBe(true)
+
+    wrapper.findComponent(SearchBar).vm.$emit('search', { q: '', tag: [] })
+    await new Promise(r => setTimeout(r, 200))
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(true)
+    expect(wrapper.findComponent(AssetGrid).exists()).toBe(false)
+  })
+
+  it('goHome clears stale search state from the SearchBar and params', async () => {
+    const wrapper = mount(App, {
+      global: { stubs: ['PackList', 'Cart', 'AssetDetail', 'PackGallery'] }
+    })
+    await flushPromises()
+
+    await wrapper.find('input[type="text"]').setValue('tree')
+    await new Promise(r => setTimeout(r, 200))
+    await flushPromises()
+    expect(wrapper.vm.currentSearchParams.q).toBe('tree')
+
+    wrapper.vm.goHome()
+    await flushPromises()
+
+    expect(wrapper.find('input[type="text"]').element.value).toBe('')
+    expect(wrapper.vm.currentSearchParams).toEqual({})
   })
 })

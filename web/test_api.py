@@ -43,6 +43,7 @@ def test_db():
             name TEXT NOT NULL,
             path TEXT NOT NULL UNIQUE,
             version TEXT,
+            theme TEXT,
             preview_path TEXT,
             asset_count INTEGER DEFAULT 0
         );
@@ -251,6 +252,61 @@ def test_filters_returns_options(test_db):
     pack_names = [p["name"] for p in data["packs"]]
     assert "creatures" in pack_names
     assert "creature" in data["tags"]
+
+
+def test_filters_include_theme_and_is_3d(test_db):
+    conn = sqlite3.connect(test_db)
+    conn.execute(
+        "INSERT INTO packs (id, name, path, theme, asset_count) "
+        "VALUES (10, 'Forest3D', 'Forest3D', 'Nature', 2)"
+    )
+    conn.execute(
+        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, asset_kind) "
+        "VALUES (100, 10, 'Forest3D/a.glb', 'a.glb', 'glb', 'h1', 'model')"
+    )
+    conn.execute(
+        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, asset_kind) "
+        "VALUES (101, 10, 'Forest3D/b.glb', 'b.glb', 'glb', 'h2', 'model')"
+    )
+    conn.execute(
+        "INSERT INTO packs (id, name, path, asset_count) "
+        "VALUES (11, 'Sprites2D', 'Sprites2D', 1)"
+    )
+    conn.execute(
+        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, asset_kind) "
+        "VALUES (102, 11, 'Sprites2D/s.png', 's.png', 'png', 'h3', 'image')"
+    )
+    conn.commit()
+    conn.close()
+
+    import api
+    api.set_db_path(test_db)
+    resp = client.get("/api/filters")
+    assert resp.status_code == 200
+    packs = {p["name"]: p for p in resp.json()["packs"]}
+    assert packs["Forest3D"]["theme"] == "Nature"
+    assert packs["Forest3D"]["is_3d"] is True
+    assert packs["Sprites2D"]["theme"] == "Other"  # NULL theme -> Other
+    assert packs["Sprites2D"]["is_3d"] is False
+
+
+def test_filters_tolerate_db_without_theme_column(tmp_path):
+    # live DBs are only migrated by the indexer; the API must not 500
+    db_path = tmp_path / "legacy.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE packs (id INTEGER PRIMARY KEY, name TEXT, path TEXT, asset_count INTEGER DEFAULT 0)")
+    conn.execute("CREATE TABLE assets (id INTEGER PRIMARY KEY, pack_id INTEGER, path TEXT, asset_kind TEXT)")
+    conn.execute("CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT)")
+    conn.execute("CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER)")
+    conn.execute("INSERT INTO packs (name, path) VALUES ('Old', 'Old')")
+    conn.commit()
+    conn.close()
+
+    import api
+    api.set_db_path(db_path)
+    resp = client.get("/api/filters")
+    assert resp.status_code == 200
+    assert resp.json()["packs"][0]["theme"] == "Other"
 
 
 def test_image_not_found(test_db):

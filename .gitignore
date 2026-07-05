@@ -1,6 +1,7 @@
 # Asset index cache
 .assetindex/
 assets.db
+.index/
 
 # Python
 __pycache__/

@@ -3,9 +3,6 @@
     <div class="pack-header">
       <span class="pack-title">Packs<span v-if="selectedPacks.length > 0"> ({{ selectedPacks.length }} selected)</span></span>
       <div class="header-actions">
-        <button class="icon-btn" @click="showSearch = !showSearch" title="Search packs">
-          <span>&#x1F50D;</span>
-        </button>
         <button
           class="icon-btn"
           data-testid="mode-toggle"
@@ -23,7 +20,6 @@
     </div>
 
     <input
-      v-if="showSearch"
       type="text"
       class="pack-search"
       v-model="searchQuery"
@@ -35,7 +31,7 @@
       <button class="action-btn" @click="clearAll" :disabled="noneSelected">Clear</button>
     </div>
 
-    <div class="pack-grid" :class="{ expanded: panelState === 'expanded' }">
+    <div v-if="panelState === 'expanded'" class="pack-grid expanded">
       <div
         v-for="pack in filteredPacks"
         :key="pack.name"
@@ -44,12 +40,7 @@
         @click="togglePack(pack.name)"
       >
         <div class="pack-preview-container">
-          <img
-            :src="getPreviewUrl(pack.name)"
-            :alt="pack.name"
-            class="pack-preview"
-            loading="lazy"
-          />
+          <img :src="getPreviewUrl(pack.name)" :alt="pack.name" class="pack-preview" loading="lazy" />
         </div>
         <div class="pack-info">
           <span class="pack-name">{{ formatPackName(pack.name) }}</span>
@@ -57,11 +48,26 @@
         </div>
       </div>
     </div>
+
+    <div v-else class="pack-rows">
+      <div
+        v-for="pack in filteredPacks"
+        :key="pack.name"
+        class="pack-row"
+        :class="{ selected: selectedPacks.includes(pack.name) }"
+        @click="togglePack(pack.name)"
+      >
+        <img :src="getPreviewUrl(pack.name)" :alt="pack.name" class="row-thumb" loading="lazy" />
+        <span class="row-name">{{ formatPackName(pack.name) }}</span>
+        <span class="row-count">{{ pack.count }}</span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+import { formatPackName } from '../utils/packName.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
@@ -74,7 +80,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:selectedPacks', 'update:selectionMode', 'toggle-panel', 'view-pack'])
 
-const showSearch = ref(false)
 const searchQuery = ref('')
 
 const filteredPacks = computed(() => {
@@ -121,14 +126,6 @@ function toggleMode() {
 
 function getPreviewUrl(packName) {
   return `${API_BASE}/pack-preview/${encodeURIComponent(packName)}`
-}
-
-function formatPackName(name) {
-  let formatted = name
-    .replace(/^Minifantasy_/, '')
-    .replace(/_v\.?\d+\.?\d*(_Commercial_Version)?$/, '')
-    .replace(/_/g, ' ')
-  return formatted
 }
 </script>
 
@@ -217,6 +214,55 @@ function formatPackName(name) {
 .action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.pack-rows {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.pack-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.375rem;
+  border-radius: 4px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.pack-row:hover {
+  background: var(--color-bg-elevated);
+}
+
+.pack-row.selected {
+  border-left-color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+.row-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  background: #1a1a2e;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.row-name {
+  flex: 1;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-count {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
 }
 
 .pack-grid {

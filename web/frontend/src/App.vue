@@ -1,7 +1,7 @@
 <template>
   <div class="app">
     <header class="app-header">
-      <h1>Asset Manager</h1>
+      <h1 class="home-link" @click="goHome">Asset Manager</h1>
       <button
         class="theme-toggle"
         data-testid="theme-toggle"
@@ -49,6 +49,12 @@
           @toggle-preview-override="handleTogglePreviewOverride"
         />
 
+        <PackGallery
+          v-else-if="isDefaultHomeView"
+          :packs="packList"
+          @view-pack="viewPack"
+        />
+
         <AssetGrid
           v-else
           :assets="assets"
@@ -81,6 +87,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import PackList from './components/PackList.vue'
 import SearchBar from './components/SearchBar.vue'
 import AssetGrid from './components/AssetGrid.vue'
+import PackGallery from './components/PackGallery.vue'
 import AssetDetail from './components/AssetDetail.vue'
 import Cart from './components/Cart.vue'
 import { parseRoute, buildUrl } from './router.js'
@@ -213,6 +220,12 @@ async function search(params) {
 
 function handleSearch(params) {
   currentSearchParams.value = params
+  const hasActive = !!(params.q || (params.tag && params.tag.length) || params.color || params.modelOnly)
+  if (hasActive) {
+    isDefaultHomeView.value = false
+  } else if (selectedPacks.value.length === 0) {
+    isDefaultHomeView.value = true
+  }
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => search(params), 150)
 }
@@ -251,6 +264,16 @@ async function loadPack(packName) {
   isDefaultHomeView.value = false
   selectedPacks.value = [packName]
   await search(currentSearchParams.value)
+}
+
+function goHome() {
+  skipNextPush = true
+  selectedAsset.value = null
+  selectedPacks.value = []
+  isDefaultHomeView.value = true
+  searchBarRef.value?.clear()
+  currentSearchParams.value = {}
+  window.history.pushState({ route: 'home' }, '', buildUrl({ name: 'home' }))
 }
 
 function viewPack(packName) {
@@ -496,6 +519,10 @@ body {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+.home-link {
+  cursor: pointer;
 }
 
 .theme-toggle {
