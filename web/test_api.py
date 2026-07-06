@@ -248,10 +248,44 @@ def test_filters_returns_options(test_db):
     data = response.json()
     assert "packs" in data
     assert "tags" in data
-    assert "colors" in data
+    assert "colors" not in data
     pack_names = [p["name"] for p in data["packs"]]
     assert "creatures" in pack_names
-    assert "creature" in data["tags"]
+    tag_names = [t["name"] for t in data["tags"]]
+    assert "creature" in tag_names
+
+
+def test_filters_tags_full_vocabulary_merges_pack_tags(test_db):
+    conn = sqlite3.connect(test_db)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS pack_tags ("
+        "pack_id INTEGER REFERENCES packs(id), tag TEXT NOT NULL, "
+        "PRIMARY KEY (pack_id, tag))"
+    )
+    # pack 1 ('creatures') has 2 assets in the fixture
+    conn.execute("UPDATE packs SET asset_count = 2 WHERE id = 1")
+    conn.execute("INSERT INTO pack_tags (pack_id, tag) VALUES (1, 'forest')")
+    # collides with the 1-asset 'goblin' asset tag; pack reach (2) must win
+    conn.execute("INSERT INTO pack_tags (pack_id, tag) VALUES (1, 'goblin')")
+    conn.commit()
+    conn.close()
+
+    import api
+    api.set_db_path(test_db)
+    resp = client.get("/api/filters")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "colors" not in data
+    vocab = {t["name"]: t["count"] for t in data["tags"]}
+    assert vocab["forest"] == 2   # pure pack tag: reach = pack asset_count
+    assert vocab["goblin"] == 2   # collision keeps the larger count
+    assert vocab["creature"] == 2 # pure asset tag: asset count
+    counts = [t["count"] for t in data["tags"]]
+    assert counts == sorted(counts, reverse=True)
+    # name-asc tiebreak within equal counts
+    for a, b in zip(data["tags"], data["tags"][1:]):
+        if a["count"] == b["count"]:
+            assert a["name"] <= b["name"]
 
 
 def test_filters_include_is_3d(test_db):

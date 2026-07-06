@@ -477,19 +477,31 @@ def filters():
         FROM packs p
         ORDER BY p.name
     """).fetchall()
-    tags = conn.execute("""
-        SELECT t.name, COUNT(at.asset_id) as count
-        FROM tags t
-        JOIN asset_tags at ON t.id = at.tag_id
-        GROUP BY t.id
-        ORDER BY count DESC
-        LIMIT 100
-    """).fetchall()
-
     _ensure_pack_tags(conn)
     pack_tag_map: dict[int, list[str]] = {}
     for r in conn.execute("SELECT pack_id, tag FROM pack_tags ORDER BY tag"):
         pack_tag_map.setdefault(r["pack_id"], []).append(r["tag"])
+
+    # one vocabulary: asset tags plus pack tags (pack tags reach all assets)
+    tag_counts: dict[str, int] = {}
+    for r in conn.execute("""
+        SELECT t.name AS name, COUNT(at.asset_id) AS count
+        FROM tags t
+        JOIN asset_tags at ON t.id = at.tag_id
+        GROUP BY t.id
+    """):
+        tag_counts[r["name"]] = r["count"]
+    for r in conn.execute("""
+        SELECT pt.tag AS name, SUM(p.asset_count) AS count
+        FROM pack_tags pt
+        JOIN packs p ON pt.pack_id = p.id
+        GROUP BY pt.tag
+    """):
+        tag_counts[r["name"]] = max(tag_counts.get(r["name"], 0), r["count"] or 0)
+    vocabulary = [
+        {"name": name, "count": count}
+        for name, count in sorted(tag_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
 
     conn.commit()
     conn.close()
@@ -504,8 +516,7 @@ def filters():
             }
             for p in packs
         ],
-        "tags": [t["name"] for t in tags],
-        "colors": list(COLOR_NAMES.keys()),
+        "tags": vocabulary,
     }
 
 
