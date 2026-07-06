@@ -410,8 +410,12 @@ def index_asset(
         pack_rel = str(pack_path.relative_to(asset_root))
         version = extract_version(pack_name)
         conn.execute(
-            """INSERT OR REPLACE INTO packs (name, path, version, indexed_at)
-               VALUES (?, ?, ?, ?)""",
+            """INSERT INTO packs (name, path, version, indexed_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(path) DO UPDATE SET
+                   name = excluded.name,
+                   version = excluded.version,
+                   indexed_at = excluded.indexed_at""",
             [pack_name, pack_rel, version, datetime.now().isoformat()]
         )
         pack_id = conn.execute("SELECT id FROM packs WHERE path = ?", [pack_rel]).fetchone()[0]
@@ -640,8 +644,12 @@ def index(
                 pack_rel = str(pack_path.relative_to(asset_root))
                 version = extract_version(pack_name)
                 conn.execute(
-                    """INSERT OR REPLACE INTO packs (name, path, version, indexed_at)
-                       VALUES (?, ?, ?, ?)""",
+                    """INSERT INTO packs (name, path, version, indexed_at)
+                       VALUES (?, ?, ?, ?)
+                       ON CONFLICT(path) DO UPDATE SET
+                           name = excluded.name,
+                           version = excluded.version,
+                           indexed_at = excluded.indexed_at""",
                     [pack_name, pack_rel, version, datetime.now().isoformat()]
                 )
                 pack_id = conn.execute("SELECT id FROM packs WHERE path = ?", [pack_rel]).fetchone()[0]

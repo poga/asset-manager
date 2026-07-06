@@ -1280,6 +1280,36 @@ class TestSchemaMigrationTheme:
         assert "theme" in cols
 
 
+class TestPackIdStability:
+    def test_reindex_preserves_pack_ids_and_tags(self, temp_dir):
+        pack = temp_dir / "TagKeeper_v1.0"
+        pack.mkdir()
+        img = Image.new("RGBA", (32, 32), (90, 40, 120, 255))
+        img.save(pack / "a.png")
+        db_path = temp_dir / "t.db"
+        index.index(temp_dir, db_path, force=False)
+
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        old_id = conn.execute("SELECT id FROM packs").fetchone()["id"]
+        # user assigns a tag between indexing runs
+        conn.execute("INSERT INTO pack_tags (pack_id, tag) VALUES (?, 'keep')", [old_id])
+        conn.commit()
+        conn.close()
+
+        # forced reindex rewrites every pack row; ids and tags must survive
+        index.index(temp_dir, db_path, force=True)
+
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT id FROM packs").fetchone()
+        assert row["id"] == old_id
+        tags = [r["tag"] for r in conn.execute(
+            "SELECT tag FROM pack_tags WHERE pack_id = ?", [row["id"]])]
+        assert tags == ["keep"]
+        conn.close()
+
+
 # =============================================================================
 # Entry point
 # =============================================================================
