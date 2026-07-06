@@ -86,6 +86,32 @@ describe('PackGallery', () => {
     expect(forestCard.find('.tag-chip').exists()).toBe(false)
   })
 
+  it('clears the active filter when its last tag is removed', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ tags: [] }) })
+    const wrapper = mount(PackGallery, { props: { packs: [packs[0], packs[2]] } })
+
+    await wrapper.find('.chip').trigger('click')
+    expect(wrapper.findAll('.gallery-card').length).toBe(1)
+
+    await wrapper.find('.tag-remove').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.gallery-card').length).toBe(2)
+  })
+
+  it('does not call the API for an empty tag', async () => {
+    const wrapper = mount(PackGallery, { props: { packs } })
+    const card = wrapper.findAll('.gallery-card')[0]
+
+    await card.find('.tag-add').trigger('click')
+    const input = card.find('.tag-input')
+    await input.setValue('   ')
+    await input.trigger('keyup.enter')
+    await flushPromises()
+
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
   it('tag interactions do not navigate to the pack', async () => {
     const wrapper = mount(PackGallery, { props: { packs } })
     const card = wrapper.findAll('.gallery-card')[0]

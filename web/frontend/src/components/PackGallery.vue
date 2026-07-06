@@ -70,7 +70,7 @@ const props = defineProps({
 defineEmits(['view-pack'])
 
 const failedCovers = reactive({})
-// local tag state; seeded from props, updated from API responses
+// overrides pack.tags after edits; tagsOf() falls back to props
 const tagOverrides = reactive({})
 const activeTag = ref(null)
 const editingPack = ref(null)
@@ -123,15 +123,18 @@ function stopEditing() {
 async function addTag(pack) {
   const tag = newTag.value.trim()
   if (!tag) return
-  const res = await fetch(`${API_BASE}/pack/${encodeURIComponent(pack.name)}/tags`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tag })
-  })
-  if (res.ok) {
-    tagOverrides[pack.name] = (await res.json()).tags
+  try {
+    const res = await fetch(`${API_BASE}/pack/${encodeURIComponent(pack.name)}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag })
+    })
+    if (res.ok) {
+      tagOverrides[pack.name] = (await res.json()).tags
+    }
+  } finally {
+    stopEditing()
   }
-  stopEditing()
 }
 
 async function removeTag(pack, tag) {
@@ -141,6 +144,10 @@ async function removeTag(pack, tag) {
   )
   if (res.ok) {
     tagOverrides[pack.name] = (await res.json()).tags
+    // a filter pointing at a tag that no longer exists would blank the gallery
+    if (activeTag.value && !allTags.value.some(t => t.tag === activeTag.value)) {
+      activeTag.value = null
+    }
   }
 }
 </script>
