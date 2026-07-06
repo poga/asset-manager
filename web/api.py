@@ -53,6 +53,7 @@ _assets_path: Optional[Path] = None
 # Static files path (frontend dist) - can be overridden for testing
 _static_path: Optional[Path] = None
 
+
 class PreviewOverrideRequest(BaseModel):
     use_full_image: bool
 
