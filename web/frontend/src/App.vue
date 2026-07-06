@@ -200,7 +200,6 @@ async function fetchFilters() {
 async function search(params) {
   const query = new URLSearchParams()
   if (params.q) query.set('q', params.q)
-  if (params.color) query.set('color', params.color)
   for (const t of params.tag || []) {
     query.append('tag', t)
   }
@@ -217,7 +216,7 @@ async function search(params) {
 }
 
 function hasActiveSearch(params) {
-  return !!(params.q || (params.tag && params.tag.length) || params.color)
+  return !!(params.q || (params.tag && params.tag.length))
 }
 
 function handleSearch(params) {
