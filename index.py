@@ -34,7 +34,6 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 import aseprite_parser
 import frame_detect
 import model_indexer
-import pack_themes
 
 app = typer.Typer(help="Build and update the game asset index")
 console = Console()
@@ -143,6 +142,12 @@ CREATE TABLE IF NOT EXISTS asset_relations (
     related_id INTEGER REFERENCES assets(id),
     relation_type TEXT,
     PRIMARY KEY (asset_id, related_id)
+);
+
+CREATE TABLE IF NOT EXISTS pack_tags (
+    pack_id INTEGER REFERENCES packs(id),
+    tag TEXT NOT NULL,
+    PRIMARY KEY (pack_id, tag)
 );
 
 CREATE INDEX IF NOT EXISTS idx_assets_filename ON assets(filename);
@@ -405,8 +410,12 @@ def index_asset(
         pack_rel = str(pack_path.relative_to(asset_root))
         version = extract_version(pack_name)
         conn.execute(
-            """INSERT OR REPLACE INTO packs (name, path, version, indexed_at)
-               VALUES (?, ?, ?, ?)""",
+            """INSERT INTO packs (name, path, version, indexed_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(path) DO UPDATE SET
+                   name = excluded.name,
+                   version = excluded.version,
+                   indexed_at = excluded.indexed_at""",
             [pack_name, pack_rel, version, datetime.now().isoformat()]
         )
         pack_id = conn.execute("SELECT id FROM packs WHERE path = ?", [pack_rel]).fetchone()[0]
@@ -635,8 +644,12 @@ def index(
                 pack_rel = str(pack_path.relative_to(asset_root))
                 version = extract_version(pack_name)
                 conn.execute(
-                    """INSERT OR REPLACE INTO packs (name, path, version, indexed_at)
-                       VALUES (?, ?, ?, ?)""",
+                    """INSERT INTO packs (name, path, version, indexed_at)
+                       VALUES (?, ?, ?, ?)
+                       ON CONFLICT(path) DO UPDATE SET
+                           name = excluded.name,
+                           version = excluded.version,
+                           indexed_at = excluded.indexed_at""",
                     [pack_name, pack_rel, version, datetime.now().isoformat()]
                 )
                 pack_id = conn.execute("SELECT id FROM packs WHERE path = ?", [pack_rel]).fetchone()[0]
@@ -765,14 +778,6 @@ def index(
             SELECT COUNT(*) FROM assets WHERE assets.pack_id = packs.id
         )
     """)
-    conn.commit()
-
-    # Reassign themes every run so mapping edits apply without --force
-    for row in conn.execute("SELECT id, name FROM packs").fetchall():
-        conn.execute(
-            "UPDATE packs SET theme = ? WHERE id = ?",
-            [pack_themes.assign_theme(row["name"]), row["id"]],
-        )
     conn.commit()
 
     # Generate pack previews

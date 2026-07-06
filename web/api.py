@@ -72,6 +72,10 @@ class PreviewOverrideRequest(BaseModel):
     use_full_image: bool
 
 
+class PackTagRequest(BaseModel):
+    tag: str
+
+
 def set_db_path(path: Path):
     """Set database path (for testing)."""
     global _db_path
@@ -133,6 +137,37 @@ def find_assets() -> Path:
         if assets_path.exists() and assets_path.is_dir():
             return assets_path
     raise FileNotFoundError("No assets folder found")
+
+
+def _ensure_pack_tags(conn: sqlite3.Connection) -> None:
+    """Lazily create pack_tags so pre-existing DBs work without a reindex."""
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS pack_tags (
+            pack_id INTEGER REFERENCES packs(id),
+            tag TEXT NOT NULL,
+            PRIMARY KEY (pack_id, tag)
+        )"""
+    )
+
+
+def _pack_tag_list(conn: sqlite3.Connection, pack_id: int) -> list[str]:
+    return [
+        r["tag"]
+        for r in conn.execute(
+            "SELECT tag FROM pack_tags WHERE pack_id = ? ORDER BY tag", [pack_id]
+        )
+    ]
+
+
+def _pack_id_or_404(conn: sqlite3.Connection, pack_name: str) -> int:
+    from urllib.parse import unquote
+    row = conn.execute(
+        "SELECT id FROM packs WHERE name = ?", [unquote(pack_name)]
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Pack not found")
+    return row["id"]
 
 
 @app.get("/api/health")
@@ -434,12 +469,8 @@ def filters():
     """Get available filter options."""
     conn = get_db()
 
-    has_theme = any(
-        r["name"] == "theme" for r in conn.execute("PRAGMA table_info(packs)")
-    )
-    theme_col = "p.theme" if has_theme else "NULL"
-    packs = conn.execute(f"""
-        SELECT p.name, p.asset_count AS count, {theme_col} AS theme,
+    packs = conn.execute("""
+        SELECT p.id, p.name, p.asset_count AS count,
                EXISTS (SELECT 1 FROM assets a
                        WHERE a.pack_id = p.id
                          AND a.asset_kind IN ('model', 'animation_bundle')) AS is_3d
@@ -455,6 +486,12 @@ def filters():
         LIMIT 100
     """).fetchall()
 
+    _ensure_pack_tags(conn)
+    pack_tag_map: dict[int, list[str]] = {}
+    for r in conn.execute("SELECT pack_id, tag FROM pack_tags ORDER BY tag"):
+        pack_tag_map.setdefault(r["pack_id"], []).append(r["tag"])
+
+    conn.commit()
     conn.close()
 
     return {
@@ -462,8 +499,8 @@ def filters():
             {
                 "name": p["name"],
                 "count": p["count"],
-                "theme": p["theme"] or "Other",
                 "is_3d": bool(p["is_3d"]),
+                "tags": pack_tag_map.get(p["id"], []),
             }
             for p in packs
         ],
@@ -620,6 +657,41 @@ def pack_preview(pack_name: str):
         return FileResponse(png_path, media_type="image/png")
     else:
         raise HTTPException(status_code=404, detail="Pack preview not found")
+
+
+@app.post("/api/pack/{pack_name}/tags")
+def add_pack_tag(pack_name: str, request: PackTagRequest):
+    """Attach a user tag to a pack (idempotent)."""
+    tag = request.tag.strip().lower()
+    if not tag:
+        raise HTTPException(status_code=400, detail="Empty tag")
+    conn = get_db()
+    _ensure_pack_tags(conn)
+    pack_id = _pack_id_or_404(conn, pack_name)
+    conn.execute(
+        "INSERT OR IGNORE INTO pack_tags (pack_id, tag) VALUES (?, ?)",
+        [pack_id, tag],
+    )
+    conn.commit()
+    tags = _pack_tag_list(conn, pack_id)
+    conn.close()
+    return {"tags": tags}
+
+
+@app.delete("/api/pack/{pack_name}/tags/{tag}")
+def remove_pack_tag(pack_name: str, tag: str):
+    """Detach a user tag from a pack (absent tag is a no-op)."""
+    conn = get_db()
+    _ensure_pack_tags(conn)
+    pack_id = _pack_id_or_404(conn, pack_name)
+    conn.execute(
+        "DELETE FROM pack_tags WHERE pack_id = ? AND tag = ?",
+        [pack_id, tag.strip().lower()],
+    )
+    conn.commit()
+    tags = _pack_tag_list(conn, pack_id)
+    conn.close()
+    return {"tags": tags}
 
 
 class DownloadCartRequest(BaseModel):

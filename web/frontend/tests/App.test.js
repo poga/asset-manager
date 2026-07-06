@@ -665,4 +665,21 @@ describe('Home search visibility', () => {
     expect(wrapper.find('input[type="text"]').element.value).toBe('')
     expect(wrapper.vm.currentSearchParams).toEqual({})
   })
+
+  it('returns to the gallery when the pack selection is cleared', async () => {
+    const wrapper = mount(App, {
+      global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail', 'PackGallery'] }
+    })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(true)
+
+    // select a pack (leaves home), then clear it
+    wrapper.findComponent(PackList).vm.$emit('update:selectedPacks', ['SomePack'])
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(false)
+
+    wrapper.findComponent(PackList).vm.$emit('update:selectedPacks', [])
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(true)
+  })
 })

@@ -1,43 +1,123 @@
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import PackGallery from '../src/components/PackGallery.vue'
 
+const mockFetch = vi.fn()
+global.fetch = mockFetch
+
 const packs = [
-  { name: 'Minifantasy_Ancient_Forests', count: 120, theme: 'Nature', is_3d: false },
-  { name: 'KayKit Forest Nature Pack 1.0', count: 80, theme: 'Nature', is_3d: true },
-  { name: 'Minifantasy_Dungeon_v2.3', count: 300, theme: 'Dungeons & Caves', is_3d: false },
+  { name: 'Minifantasy_Ancient_Forests', count: 120, is_3d: false, tags: ['forest'] },
+  { name: 'KayKit Forest Nature Pack 1.0', count: 80, is_3d: true, tags: ['forest'] },
+  { name: 'Minifantasy_Dungeon_v2.3', count: 300, is_3d: false, tags: [] },
 ]
 
+beforeEach(() => {
+  mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ tags: [] }) })
+})
+
+afterEach(() => {
+  mockFetch.mockReset()
+})
+
 describe('PackGallery', () => {
-  it('groups packs into theme sections in canonical order', () => {
+  it('groups packs into 2D and 3D sections', () => {
     const wrapper = mount(PackGallery, { props: { packs } })
-    const titles = wrapper.findAll('.theme-title').map(t => t.text())
-    expect(titles).toEqual(['Nature', 'Dungeons & Caves'])
-    const natureCards = wrapper.findAll('.theme-section')[0].findAll('.gallery-card')
-    expect(natureCards.length).toBe(2)
+    const titles = wrapper.findAll('.dim-title').map(t => t.text())
+    expect(titles).toEqual(['2D', '3D'])
+    const twoD = wrapper.findAll('.dim-section')[0].findAll('.gallery-card')
+    expect(twoD.length).toBe(2)
   })
 
-  it('omits empty themes', () => {
-    const wrapper = mount(PackGallery, { props: { packs } })
-    expect(wrapper.text()).not.toContain('Sci-fi')
+  it('omits an empty dimension section', () => {
+    const wrapper = mount(PackGallery, { props: { packs: packs.filter(p => !p.is_3d) } })
+    expect(wrapper.findAll('.dim-title').map(t => t.text())).toEqual(['2D'])
   })
 
-  it('shows 3D badge only for 3d packs', () => {
+  it('renders tag chips with pack counts and filters on click', async () => {
     const wrapper = mount(PackGallery, { props: { packs } })
-    const badges = wrapper.findAll('.badge-3d')
-    expect(badges.length).toBe(1)
+    const chip = wrapper.findAll('.chip').find(c => c.text().includes('forest'))
+    expect(chip.text()).toContain('2')
+
+    await chip.trigger('click')
+    expect(wrapper.findAll('.gallery-card').length).toBe(2)
+
+    // clicking the active chip clears the filter
+    await chip.trigger('click')
+    expect(wrapper.findAll('.gallery-card').length).toBe(3)
   })
 
-  it('emits view-pack with the raw pack name on card click', async () => {
-    const wrapper = mount(PackGallery, { props: { packs } })
-    await wrapper.find('.gallery-card').trigger('click')
-    expect(wrapper.emitted('view-pack')[0]).toEqual(['Minifantasy_Ancient_Forests'])
+  it('hides the chip row when no pack has tags', () => {
+    const wrapper = mount(PackGallery, { props: { packs: [packs[2]] } })
+    expect(wrapper.find('.tag-chips').exists()).toBe(false)
   })
 
-  it('renders theme jump chips with counts', () => {
+  it('adds a tag through the API and renders it', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ tags: ['cave'] }) })
     const wrapper = mount(PackGallery, { props: { packs } })
-    const chips = wrapper.findAll('.chip').map(c => c.text())
-    expect(chips[0]).toContain('Nature')
-    expect(chips[0]).toContain('2')
+    const dungeonCard = wrapper.findAll('.gallery-card')
+      .find(c => c.text().includes('Dungeon'))
+
+    await dungeonCard.find('.tag-add').trigger('click')
+    const input = dungeonCard.find('.tag-input')
+    await input.setValue('cave')
+    await input.trigger('keyup.enter')
+    await flushPromises()
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/pack/Minifantasy_Dungeon_v2.3/tags'),
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(dungeonCard.text()).toContain('cave')
+  })
+
+  it('removes a tag through the API', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ tags: [] }) })
+    const wrapper = mount(PackGallery, { props: { packs } })
+    const forestCard = wrapper.findAll('.gallery-card')
+      .find(c => c.text().includes('Ancient Forests'))
+
+    await forestCard.find('.tag-remove').trigger('click')
+    await flushPromises()
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/tags/forest'),
+      expect.objectContaining({ method: 'DELETE' })
+    )
+    expect(forestCard.find('.tag-chip').exists()).toBe(false)
+  })
+
+  it('clears the active filter when its last tag is removed', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ tags: [] }) })
+    const wrapper = mount(PackGallery, { props: { packs: [packs[0], packs[2]] } })
+
+    await wrapper.find('.chip').trigger('click')
+    expect(wrapper.findAll('.gallery-card').length).toBe(1)
+
+    await wrapper.find('.tag-remove').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.gallery-card').length).toBe(2)
+  })
+
+  it('does not call the API for an empty tag', async () => {
+    const wrapper = mount(PackGallery, { props: { packs } })
+    const card = wrapper.findAll('.gallery-card')[0]
+
+    await card.find('.tag-add').trigger('click')
+    const input = card.find('.tag-input')
+    await input.setValue('   ')
+    await input.trigger('keyup.enter')
+    await flushPromises()
+
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('tag interactions do not navigate to the pack', async () => {
+    const wrapper = mount(PackGallery, { props: { packs } })
+    const card = wrapper.findAll('.gallery-card')[0]
+    await card.find('.card-tags').trigger('click')
+    expect(wrapper.emitted('view-pack')).toBeFalsy()
+    await card.trigger('click')
+    expect(wrapper.emitted('view-pack')).toBeTruthy()
   })
 })

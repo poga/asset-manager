@@ -51,10 +51,6 @@
         </button>
       </div>
     </div>
-    <label class="filter-chip">
-      <input type="checkbox" v-model="modelOnly" @change="emitSearch" />
-      Models only
-    </label>
     <div v-if="tags.length" class="tags-row">
       <span v-for="t in tags" :key="t" class="tag" :title="t" @click="removeTag(t)">
         <span class="tag-text">{{ t }}</span>
@@ -81,7 +77,6 @@ const emit = defineEmits(['search'])
 const query = ref('')
 const color = ref('')
 const tags = ref([])
-const modelOnly = ref(false)
 const colorDropdownOpen = ref(false)
 const tagDropdownOpen = ref(false)
 
@@ -117,8 +112,7 @@ function emitSearch() {
     q: query.value || null,
     tag: tags.value,
     color: color.value || null,
-    type: null,
-    modelOnly: modelOnly.value
+    type: null
   })
 }
 
@@ -152,7 +146,6 @@ function clear() {
   query.value = ''
   tags.value = []
   color.value = ''
-  modelOnly.value = false
   emitSearch()
 }
 
