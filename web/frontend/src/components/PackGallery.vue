@@ -168,17 +168,19 @@ async function removeTag(pack, tag) {
 .pack-gallery {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem;
+  padding: 0 1.25rem 2rem;
 }
 
 .tag-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding-bottom: 1rem;
+  margin: 0 -1.25rem;
+  padding: 1rem 1.25rem 0.875rem;
   position: sticky;
   top: 0;
-  background: var(--color-bg-base);
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border);
   z-index: 1;
 }
 
@@ -190,6 +192,7 @@ async function removeTag(pack, tag) {
   color: var(--color-text-primary);
   font-size: 0.75rem;
   cursor: pointer;
+  transition: border-color 120ms, background-color 120ms;
 }
 
 .chip:hover {
@@ -202,7 +205,7 @@ async function removeTag(pack, tag) {
 }
 
 .chip-count {
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   margin-left: 0.25rem;
 }
 
@@ -310,17 +313,17 @@ async function removeTag(pack, tag) {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem;
-  padding: 0 0.5rem 0.5rem;
+  padding: 0.5rem 0.75rem 0.75rem;
   cursor: default;
 }
 
 .tag-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.125rem;
-  font-size: 0.625rem;
-  padding: 0.0625rem 0.375rem;
-  border-radius: 4px;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.4375rem;
+  border-radius: 999px;
   background: var(--color-bg-elevated);
   color: var(--color-text-secondary);
 }
@@ -330,24 +333,38 @@ async function removeTag(pack, tag) {
   background: none;
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   padding: 0;
   line-height: 1;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.tag-chip:hover .tag-remove,
+.tag-remove:focus-visible {
+  opacity: 1;
 }
 
 .tag-remove:hover {
-  color: var(--color-text-primary);
+  color: var(--color-danger);
 }
 
 .tag-add {
   border: 1px dashed var(--color-border);
   background: none;
   color: var(--color-text-secondary);
-  border-radius: 4px;
-  font-size: 0.625rem;
-  padding: 0.0625rem 0.375rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.4375rem;
   cursor: pointer;
   line-height: 1.2;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.gallery-card:hover .tag-add,
+.tag-add:focus-visible {
+  opacity: 1;
 }
 
 .tag-add:hover {
@@ -356,11 +373,11 @@ async function removeTag(pack, tag) {
 }
 
 .tag-input {
-  width: 5.5rem;
-  font-size: 0.625rem;
-  padding: 0.0625rem 0.25rem;
+  width: 6rem;
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.4375rem;
   border: 1px solid var(--color-accent);
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
 }
