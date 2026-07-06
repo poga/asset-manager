@@ -1,144 +1,138 @@
-// web/frontend/tests/SearchBar.test.js
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SearchBar from '../src/components/SearchBar.vue'
 
-describe('SearchBar', () => {
-  const mockFilters = {
-    packs: ['icons', 'sprites'],
-    tags: ['character', 'ui'],
-    colors: ['red', 'blue', 'green'],
-  }
+const filters = {
+  packs: [],
+  tags: [
+    { name: 'goblin', count: 120 },
+    { name: 'gold', count: 40 },
+    { name: 'dragon-gold', count: 90 },
+    { name: 'idle', count: 300 },
+  ],
+}
 
-  it('renders search input', () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    expect(wrapper.find('input[type="text"]').exists()).toBe(true)
+function lastSearch(wrapper) {
+  const emitted = wrapper.emitted('search')
+  return emitted[emitted.length - 1][0]
+}
+
+describe('SearchBar smart box', () => {
+  it('emits only q and tag', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    await wrapper.find('input').setValue('sword')
+    const params = lastSearch(wrapper)
+    expect(Object.keys(params).sort()).toEqual(['q', 'tag'])
+    expect(params.q).toBe('sword')
   })
 
-  it('renders color dropdown', () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    expect(wrapper.find('[data-filter="color"]').exists()).toBe(true)
-    expect(wrapper.find('[data-filter="color"]').text()).toContain('Any color')
+  it('renders no color or add-tag dropdowns', () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    expect(wrapper.find('[data-filter="color"]').exists()).toBe(false)
+    expect(wrapper.find('[data-filter="tag"]').exists()).toBe(false)
   })
 
-  it('does not render pack dropdown', () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    expect(wrapper.find('[data-filter="pack"]').exists()).toBe(false)
+  it('suggests prefix matches before substring matches, count-ranked', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    await wrapper.find('input').setValue('go')
+    const names = wrapper.findAll('.suggestion').map(s => s.find('.suggestion-name').text())
+    // prefix: goblin(120), gold(40); substring: dragon-gold(90)
+    expect(names).toEqual(['goblin', 'gold', 'dragon-gold'])
+    expect(wrapper.findAll('.suggestion-count')[0].text()).toBe('120')
   })
 
-  it('emits search on input', async () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    await wrapper.find('input[type="text"]').setValue('hero')
-    expect(wrapper.emitted('search')).toBeTruthy()
+  it('click on a suggestion adds a chip and clears the input', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    await wrapper.find('input').setValue('gob')
+    await wrapper.find('.suggestion').trigger('mousedown')
+    expect(lastSearch(wrapper)).toEqual({ q: null, tag: ['goblin'] })
+    expect(wrapper.find('input').element.value).toBe('')
+    expect(wrapper.find('.tag').text()).toContain('goblin')
   })
 
-  it('renders tag dropdown', () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    expect(wrapper.find('[data-filter="tag"]').exists()).toBe(true)
-    expect(wrapper.find('[data-filter="tag"]').text()).toContain('Add tag')
+  it('arrow down + enter adds the highlighted suggestion', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    const input = wrapper.find('input')
+    await input.setValue('go')
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    await input.trigger('keydown', { key: 'Enter' })
+    expect(lastSearch(wrapper).tag).toEqual(['gold'])
   })
 
-  it('adds and displays tags', async () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    // Open the tag dropdown
-    const tagTrigger = wrapper.find('[data-filter="tag"] .dropdown-trigger')
-    await tagTrigger.trigger('click')
-    // Select a tag from the dropdown options
-    const options = wrapper.findAll('[data-filter="tag"] .dropdown-option')
-    await options[0].trigger('click')
-    expect(wrapper.find('.tag').exists()).toBe(true)
+  it('plain enter with no highlight adds no tag', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    const input = wrapper.find('input')
+    await input.setValue('go')
+    await input.trigger('keydown', { key: 'Enter' })
+    expect(lastSearch(wrapper).tag).toEqual([])
+    expect(lastSearch(wrapper).q).toBe('go')
   })
 
-  it('removes tag when clicked', async () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    // Add a tag via exposed method
-    wrapper.vm.addTagExternal('character')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('.tag').exists()).toBe(true)
-    // Click the tag to remove
+  it('escape closes the suggestion dropdown', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    const input = wrapper.find('input')
+    await input.setValue('go')
+    expect(wrapper.find('.suggestion').exists()).toBe(true)
+    await input.trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('.suggestion').exists()).toBe(false)
+  })
+
+  it('already-chosen tags are not suggested again', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    const input = wrapper.find('input')
+    await input.setValue('gob')
+    await wrapper.find('.suggestion').trigger('mousedown')
+    await input.setValue('gob')
+    const names = wrapper.findAll('.suggestion').map(s => s.find('.suggestion-name').text())
+    expect(names).not.toContain('goblin')
+  })
+
+  it('chips remove on click and re-emit', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    await wrapper.find('input').setValue('gob')
+    await wrapper.find('.suggestion').trigger('mousedown')
     await wrapper.find('.tag').trigger('click')
-    expect(wrapper.find('.tag').exists()).toBe(false)
+    expect(lastSearch(wrapper).tag).toEqual([])
   })
 
-  it('opens and closes dropdown on click', async () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    const dropdownTrigger = wrapper.find('[data-filter="color"] .dropdown-trigger')
-    // Initially closed
-    expect(wrapper.find('[data-filter="color"] .dropdown-panel').exists()).toBe(false)
-    // Click to open
-    await dropdownTrigger.trigger('click')
-    expect(wrapper.find('.dropdown-panel').exists()).toBe(true)
-    // Click again to close
-    await dropdownTrigger.trigger('click')
-    expect(wrapper.find('[data-filter="color"] .dropdown-panel').exists()).toBe(false)
-  })
-
-  it('exposes addTagExternal method', () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    expect(typeof wrapper.vm.addTagExternal).toBe('function')
-  })
-
-  it('addTagExternal adds tag and emits search', async () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    wrapper.vm.addTagExternal('sword')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.emitted('search')).toBeTruthy()
-    expect(wrapper.emitted('search')[0][0].tag).toContain('sword')
-  })
-
-  it('addTagExternal does not add duplicate tags', async () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    wrapper.vm.addTagExternal('sword')
-    wrapper.vm.addTagExternal('sword')
-    await wrapper.vm.$nextTick()
-    const lastEmit = wrapper.emitted('search').slice(-1)[0][0]
-    expect(lastEmit.tag.filter(t => t === 'sword').length).toBe(1)
-  })
-
-  it('clear() resets query, tags, and color', async () => {
-    const wrapper = mount(SearchBar, {
-      props: { filters: mockFilters }
-    })
-    await wrapper.find('input[type="text"]').setValue('hero')
-    wrapper.vm.addTagExternal('sword')
-    await wrapper.vm.$nextTick()
-
+  it('clear() resets query and tags', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    await wrapper.find('input').setValue('gob')
+    await wrapper.find('.suggestion').trigger('mousedown')
     wrapper.vm.clear()
     await wrapper.vm.$nextTick()
-
-    expect(wrapper.find('input[type="text"]').element.value).toBe('')
-    expect(wrapper.find('.tag').exists()).toBe(false)
-    const lastEmit = wrapper.emitted('search').slice(-1)[0][0]
-    expect(lastEmit).toEqual({ q: null, tag: [], color: null, type: null })
+    expect(lastSearch(wrapper)).toEqual({ q: null, tag: [] })
   })
 
-  it('does not render a models-only checkbox and emits no modelOnly', async () => {
-    const wrapper = mount(SearchBar, { props: { filters: { packs: [], tags: [], colors: [] } } })
-    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
-    await wrapper.find('input[type="text"]').setValue('x')
-    const emitted = wrapper.emitted('search')
-    expect(emitted.at(-1)[0]).not.toHaveProperty('modelOnly')
+  it('degrades to plain search when vocabulary is empty', async () => {
+    const wrapper = mount(SearchBar, { props: { filters: { packs: [], tags: [] } } })
+    await wrapper.find('input').setValue('goblin')
+    expect(wrapper.find('.suggestion').exists()).toBe(false)
+    expect(lastSearch(wrapper).q).toBe('goblin')
+  })
+
+  it('outside click then Enter does not add a stale highlight', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    const input = wrapper.find('input')
+    await input.setValue('go')
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    document.body.click()
+    await wrapper.vm.$nextTick()
+    await input.trigger('keydown', { key: 'Enter' })
+    expect(lastSearch(wrapper).tag).toEqual([])
+  })
+
+  it('addTagExternal adds a chip and ignores a duplicate call', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    wrapper.vm.addTagExternal('goblin')
+    await wrapper.vm.$nextTick()
+    expect(lastSearch(wrapper).tag).toContain('goblin')
+    expect(wrapper.emitted('search').length).toBe(1)
+
+    wrapper.vm.addTagExternal('goblin')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('search').length).toBe(1)
+    expect(lastSearch(wrapper).tag).toEqual(['goblin'])
   })
 })

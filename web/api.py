@@ -53,20 +53,6 @@ _assets_path: Optional[Path] = None
 # Static files path (frontend dist) - can be overridden for testing
 _static_path: Optional[Path] = None
 
-COLOR_NAMES = {
-    "red": ("#ff0000", "#cc0000", "#990000", "#ff3333", "#cc3333"),
-    "green": ("#00ff00", "#00cc00", "#009900", "#33ff33", "#33cc33", "#336633", "#669966"),
-    "blue": ("#0000ff", "#0000cc", "#000099", "#3333ff", "#3333cc", "#333366"),
-    "yellow": ("#ffff00", "#cccc00", "#999900", "#ffff33"),
-    "orange": ("#ff8800", "#ff6600", "#cc6600", "#ff9933"),
-    "purple": ("#ff00ff", "#cc00cc", "#990099", "#9900ff", "#6600cc"),
-    "brown": ("#8b4513", "#a0522d", "#cd853f", "#d2691e", "#8b5a2b"),
-    "black": ("#000000", "#111111", "#222222", "#333333"),
-    "white": ("#ffffff", "#eeeeee", "#dddddd", "#cccccc"),
-    "gray": ("#888888", "#999999", "#aaaaaa", "#777777", "#666666"),
-    "grey": ("#888888", "#999999", "#aaaaaa", "#777777", "#666666"),
-}
-
 
 class PreviewOverrideRequest(BaseModel):
     use_full_image: bool
@@ -180,7 +166,6 @@ def health():
 def search(
     q: Optional[str] = None,
     tag: list[str] = Query(default=[]),
-    color: Optional[str] = None,
     pack: list[str] = Query(default=[]),
     type: Optional[str] = None,
     kind: Optional[str] = None,
@@ -188,6 +173,8 @@ def search(
 ):
     """Search assets by name, tags, or filters."""
     conn = get_db()
+    _ensure_pack_tags(conn)
+    conn.commit()
 
     conditions = []
     params = []
@@ -214,41 +201,20 @@ def search(
 
     for t in tag:
         conditions.append("""
-            a.id IN (
+            (a.id IN (
                 SELECT at.asset_id FROM asset_tags at
                 JOIN tags tg ON at.tag_id = tg.id
                 WHERE tg.name = ?
-            )
+            ) OR a.pack_id IN (
+                SELECT pack_id FROM pack_tags WHERE tag = ?
+            ))
         """)
-        params.append(t.lower())
-
-    if color:
-        color_lower = color.lower()
-        if color_lower in COLOR_NAMES:
-            hex_values = COLOR_NAMES[color_lower]
-            placeholders = ",".join("?" * len(hex_values))
-            conditions.append(f"""
-                a.id IN (
-                    SELECT asset_id FROM asset_colors
-                    WHERE color_hex IN ({placeholders})
-                    AND percentage >= 0.1
-                )
-            """)
-            params.extend(hex_values)
-        else:
-            conditions.append("""
-                a.id IN (
-                    SELECT asset_id FROM asset_colors
-                    WHERE color_hex = ?
-                    AND percentage >= 0.1
-                )
-            """)
-            params.append(color if color.startswith("#") else f"#{color}")
+        params.extend([t.lower(), t.lower()])
 
     where = " AND ".join(conditions) if conditions else "1=1"
 
     # Random order for empty search (discoverability), deterministic for filtered
-    is_empty_search = not q and not tag and not color and not pack and not type
+    is_empty_search = not q and not tag and not pack and not type
     order_by = "RANDOM()" if is_empty_search else "a.path"
 
     sql = f"""
@@ -477,19 +443,31 @@ def filters():
         FROM packs p
         ORDER BY p.name
     """).fetchall()
-    tags = conn.execute("""
-        SELECT t.name, COUNT(at.asset_id) as count
-        FROM tags t
-        JOIN asset_tags at ON t.id = at.tag_id
-        GROUP BY t.id
-        ORDER BY count DESC
-        LIMIT 100
-    """).fetchall()
-
     _ensure_pack_tags(conn)
     pack_tag_map: dict[int, list[str]] = {}
     for r in conn.execute("SELECT pack_id, tag FROM pack_tags ORDER BY tag"):
         pack_tag_map.setdefault(r["pack_id"], []).append(r["tag"])
+
+    # one vocabulary: asset tags plus pack tags (pack tags reach all assets)
+    tag_counts: dict[str, int] = {}
+    for r in conn.execute("""
+        SELECT t.name AS name, COUNT(at.asset_id) AS count
+        FROM tags t
+        JOIN asset_tags at ON t.id = at.tag_id
+        GROUP BY t.id
+    """):
+        tag_counts[r["name"]] = r["count"]
+    for r in conn.execute("""
+        SELECT pt.tag AS name, SUM(p.asset_count) AS count
+        FROM pack_tags pt
+        JOIN packs p ON pt.pack_id = p.id
+        GROUP BY pt.tag
+    """):
+        tag_counts[r["name"]] = max(tag_counts.get(r["name"], 0), r["count"] or 0)
+    vocabulary = [
+        {"name": name, "count": count}
+        for name, count in sorted(tag_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
 
     conn.commit()
     conn.close()
@@ -504,8 +482,7 @@ def filters():
             }
             for p in packs
         ],
-        "tags": [t["name"] for t in tags],
-        "colors": list(COLOR_NAMES.keys()),
+        "tags": vocabulary,
     }
 
 
