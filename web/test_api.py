@@ -256,9 +256,10 @@ def test_filters_returns_options(test_db):
 
 def test_filters_include_theme_and_is_3d(test_db):
     conn = sqlite3.connect(test_db)
+    # texture-heavy 3D pack: one model among many pngs must still be 3D
     conn.execute(
         "INSERT INTO packs (id, name, path, theme, asset_count) "
-        "VALUES (10, 'Forest3D', 'Forest3D', 'Nature', 2)"
+        "VALUES (10, 'Forest3D', 'Forest3D', 'Nature', 3)"
     )
     conn.execute(
         "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, asset_kind) "
@@ -266,7 +267,11 @@ def test_filters_include_theme_and_is_3d(test_db):
     )
     conn.execute(
         "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, asset_kind) "
-        "VALUES (101, 10, 'Forest3D/b.glb', 'b.glb', 'glb', 'h2', 'model')"
+        "VALUES (101, 10, 'Forest3D/skin1.png', 'skin1.png', 'png', 'h2', 'image')"
+    )
+    conn.execute(
+        "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, asset_kind) "
+        "VALUES (103, 10, 'Forest3D/skin2.png', 'skin2.png', 'png', 'h4', 'image')"
     )
     conn.execute(
         "INSERT INTO packs (id, name, path, asset_count) "
