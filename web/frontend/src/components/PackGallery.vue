@@ -13,7 +13,11 @@
     </div>
 
     <section v-for="s in sections" :key="s.label" class="dim-section">
-      <h2 class="dim-title">{{ s.label }}</h2>
+      <div class="dim-header">
+        <h2 class="dim-title">{{ s.label }}</h2>
+        <span class="dim-count">{{ s.packs.length }} {{ s.packs.length === 1 ? 'pack' : 'packs' }}</span>
+        <span class="dim-rule" aria-hidden="true"></span>
+      </div>
       <div class="card-grid">
         <div
           v-for="pack in s.packs"
@@ -34,8 +38,8 @@
             <span v-else class="cover-placeholder">📦</span>
           </div>
           <div class="card-meta">
-            <span class="card-name">{{ formatPackName(pack.name) }}</span>
-            <span class="card-count">{{ pack.count }}</span>
+            <span class="card-name" :title="formatPackName(pack.name)">{{ formatPackName(pack.name) }}</span>
+            <span class="card-count">{{ pack.count }} {{ pack.count === 1 ? 'asset' : 'assets' }}</span>
           </div>
           <div class="card-tags" @click.stop>
             <span v-for="tag in tagsOf(pack)" :key="tag" class="tag-chip">
@@ -202,11 +206,36 @@ async function removeTag(pack, tag) {
   margin-left: 0.25rem;
 }
 
+.dim-header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 1.75rem 0 1rem;
+}
+
+.dim-section:first-of-type .dim-header {
+  margin-top: 1.25rem;
+}
+
 .dim-title {
-  font-size: 1rem;
+  margin: 0;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-text-primary);
-  margin: 1rem 0 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.dim-count {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.dim-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
 }
 
 .card-grid {
@@ -256,23 +285,24 @@ async function removeTag(pack, tag) {
 
 .card-meta {
   display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 0.5rem 0.25rem;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.625rem 0.75rem 0;
 }
 
 .card-name {
-  flex: 1;
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 0.875rem;
+  font-weight: 600;
   color: var(--color-text-primary);
-  line-height: 1.25;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-count {
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
 }
 
 .card-tags {
