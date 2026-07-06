@@ -98,14 +98,15 @@ function onScroll(e) {
   color: var(--color-text-muted);
 }
 
+/* grid, not multicol, so appended items don't reflow existing columns */
 .asset-grid {
-  column-width: 155px;
-  column-gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: start;
 }
 
 .asset-item {
-  break-inside: avoid;
-  margin-bottom: 0.75rem;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -120,6 +121,7 @@ function onScroll(e) {
 
 .asset-image-container {
   width: 100%;
+  max-height: 200px;
   cursor: pointer;
   display: flex;
   align-items: center;
