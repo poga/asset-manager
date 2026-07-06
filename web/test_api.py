@@ -934,6 +934,89 @@ class TestModelEndpoint:
         assert r.status_code in (400, 404)
 
 
+def _insert_pack(db_path, pack_id, name):
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "INSERT INTO packs (id, name, path, asset_count) VALUES (?, ?, ?, 1)",
+        [pack_id, name, name],
+    )
+    conn.commit()
+    conn.close()
+
+
+def test_add_and_list_pack_tags(test_db):
+    _insert_pack(test_db, 20, "My Pack 1.0")
+    import api
+    api.set_db_path(test_db)
+
+    resp = client.post("/api/pack/My%20Pack%201.0/tags", json={"tag": " Forest "})
+    assert resp.status_code == 200
+    assert resp.json()["tags"] == ["forest"]  # trimmed + lowercased
+
+    # idempotent add
+    resp = client.post("/api/pack/My%20Pack%201.0/tags", json={"tag": "forest"})
+    assert resp.json()["tags"] == ["forest"]
+
+    resp = client.post("/api/pack/My%20Pack%201.0/tags", json={"tag": "b-side"})
+    assert resp.json()["tags"] == ["b-side", "forest"]  # sorted
+
+    # tags appear in /api/filters
+    resp = client.get("/api/filters")
+    packs = {p["name"]: p for p in resp.json()["packs"]}
+    assert packs["My Pack 1.0"]["tags"] == ["b-side", "forest"]
+
+
+def test_remove_pack_tag(test_db):
+    _insert_pack(test_db, 21, "TagPack")
+    import api
+    api.set_db_path(test_db)
+    client.post("/api/pack/TagPack/tags", json={"tag": "keep"})
+    client.post("/api/pack/TagPack/tags", json={"tag": "drop"})
+
+    resp = client.delete("/api/pack/TagPack/tags/drop")
+    assert resp.status_code == 200
+    assert resp.json()["tags"] == ["keep"]
+
+    # removing an absent tag is a no-op success
+    resp = client.delete("/api/pack/TagPack/tags/ghost")
+    assert resp.status_code == 200
+    assert resp.json()["tags"] == ["keep"]
+
+
+def test_pack_tag_validation(test_db):
+    _insert_pack(test_db, 22, "ValidPack")
+    import api
+    api.set_db_path(test_db)
+
+    resp = client.post("/api/pack/ValidPack/tags", json={"tag": "   "})
+    assert resp.status_code == 400
+
+    resp = client.post("/api/pack/NoSuchPack/tags", json={"tag": "x"})
+    assert resp.status_code == 404
+
+    resp = client.delete("/api/pack/NoSuchPack/tags/x")
+    assert resp.status_code == 404
+
+
+def test_filters_tags_default_empty_without_table(tmp_path):
+    # legacy DB: no pack_tags table; filters must not 500 and default to []
+    db_path = tmp_path / "legacy2.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE packs (id INTEGER PRIMARY KEY, name TEXT, path TEXT, asset_count INTEGER DEFAULT 0)")
+    conn.execute("CREATE TABLE assets (id INTEGER PRIMARY KEY, pack_id INTEGER, path TEXT, asset_kind TEXT)")
+    conn.execute("CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT)")
+    conn.execute("CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER)")
+    conn.execute("INSERT INTO packs (name, path) VALUES ('Old', 'Old')")
+    conn.commit()
+    conn.close()
+
+    import api
+    api.set_db_path(db_path)
+    resp = client.get("/api/filters")
+    assert resp.status_code == 200
+    assert resp.json()["packs"][0]["tags"] == []
+
+
 class TestAnimationsEndpoint:
     def _setup(self, test_db):
         conn = sqlite3.connect(test_db)

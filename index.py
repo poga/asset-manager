@@ -144,6 +144,12 @@ CREATE TABLE IF NOT EXISTS asset_relations (
     PRIMARY KEY (asset_id, related_id)
 );
 
+CREATE TABLE IF NOT EXISTS pack_tags (
+    pack_id INTEGER REFERENCES packs(id),
+    tag TEXT NOT NULL,
+    PRIMARY KEY (pack_id, tag)
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_filename ON assets(filename);
 CREATE INDEX IF NOT EXISTS idx_assets_filetype ON assets(filetype);
 CREATE INDEX IF NOT EXISTS idx_assets_pack_id ON assets(pack_id);
