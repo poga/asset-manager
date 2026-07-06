@@ -243,22 +243,33 @@ async function removeTag(pack, tag) {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.25rem 1rem;
 }
 
 .gallery-card {
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
-  transition: border-color 150ms, box-shadow 150ms;
+  transition: border-color 150ms, box-shadow 150ms, transform 150ms;
 }
 
 .gallery-card:hover {
   border-color: var(--color-accent);
   box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-card {
+    transition: none;
+  }
+
+  .gallery-card:hover {
+    transform: none;
+  }
 }
 
 .card-cover {
