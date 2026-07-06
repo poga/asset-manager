@@ -22,17 +22,17 @@ describe('PackList', () => {
     const wrapper = mount(PackList, {
       props: { packs: mockPacks, selectedPacks: ['icons'] }
     })
-    const rows = wrapper.findAll('.pack-row')
-    const iconRow = rows.find(row => row.text().includes('icons'))
-    expect(iconRow.classes()).toContain('selected')
+    const cards = wrapper.findAll('.pack-card')
+    const iconCard = cards.find(card => card.text().includes('icons'))
+    expect(iconCard.classes()).toContain('selected')
   })
 
   it('emits update:selectedPacks when card clicked', async () => {
     const wrapper = mount(PackList, {
       props: { packs: mockPacks, selectedPacks: [] }
     })
-    const row = wrapper.find('.pack-row')
-    await row.trigger('click')
+    const card = wrapper.find('.pack-card')
+    await card.trigger('click')
     expect(wrapper.emitted('update:selectedPacks')).toBeTruthy()
   })
 
@@ -43,11 +43,12 @@ describe('PackList', () => {
     expect(wrapper.find('.pack-search').exists()).toBe(true)
   })
 
-  it('renders card grid when expanded', () => {
+  it('renders preview cards with images in the default state', () => {
     const wrapper = mount(PackList, {
-      props: { packs: mockPacks, selectedPacks: [], panelState: 'expanded' }
+      props: { packs: mockPacks, selectedPacks: [] }
     })
     expect(wrapper.findAll('.pack-card').length).toBe(3)
+    expect(wrapper.findAll('.pack-preview').length).toBe(3)
     expect(wrapper.findAll('.pack-row').length).toBe(0)
   })
 
@@ -75,8 +76,8 @@ describe('PackList', () => {
     const wrapper = mount(PackList, {
       props: { packs: mockPacks, selectedPacks: ['icons'], selectionMode: 'single' }
     })
-    const spritesRow = wrapper.findAll('.pack-row').find(row => row.text().includes('sprites'))
-    await spritesRow.trigger('click')
+    const spritesCard = wrapper.findAll('.pack-card').find(card => card.text().includes('sprites'))
+    await spritesCard.trigger('click')
     const emitted = wrapper.emitted('update:selectedPacks')
     expect(emitted[0][0]).toEqual(['sprites'])
   })
@@ -85,8 +86,8 @@ describe('PackList', () => {
     const wrapper = mount(PackList, {
       props: { packs: mockPacks, selectedPacks: ['icons'], selectionMode: 'single' }
     })
-    const iconsRow = wrapper.findAll('.pack-row').find(row => row.text().includes('icons'))
-    await iconsRow.trigger('click')
+    const iconsCard = wrapper.findAll('.pack-card').find(card => card.text().includes('icons'))
+    await iconsCard.trigger('click')
     // Should emit view-pack, NOT deselect
     const viewPackEmitted = wrapper.emitted('view-pack')
     expect(viewPackEmitted).toBeTruthy()
@@ -99,8 +100,8 @@ describe('PackList', () => {
     const wrapper = mount(PackList, {
       props: { packs: mockPacks, selectedPacks: ['icons'], selectionMode: 'multi' }
     })
-    const spritesRow = wrapper.findAll('.pack-row').find(row => row.text().includes('sprites'))
-    await spritesRow.trigger('click')
+    const spritesCard = wrapper.findAll('.pack-card').find(card => card.text().includes('sprites'))
+    await spritesCard.trigger('click')
     const emitted = wrapper.emitted('update:selectedPacks')
     expect(emitted[0][0]).toEqual(['icons', 'sprites'])
   })

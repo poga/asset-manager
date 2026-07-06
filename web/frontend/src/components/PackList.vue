@@ -31,7 +31,7 @@
       <button class="action-btn" @click="clearAll" :disabled="noneSelected">Clear</button>
     </div>
 
-    <div v-if="panelState === 'expanded'" class="pack-grid expanded">
+    <div class="pack-grid" :class="{ expanded: panelState === 'expanded' }">
       <div
         v-for="pack in filteredPacks"
         :key="pack.name"
@@ -40,26 +40,17 @@
         @click="togglePack(pack.name)"
       >
         <div class="pack-preview-container">
-          <img :src="getPreviewUrl(pack.name)" :alt="pack.name" class="pack-preview" loading="lazy" />
+          <img
+            :src="getPreviewUrl(pack.name)"
+            :alt="pack.name"
+            class="pack-preview"
+            loading="lazy"
+          />
         </div>
         <div class="pack-info">
           <span class="pack-name">{{ formatPackName(pack.name) }}</span>
           <span class="pack-count">{{ pack.count }}</span>
         </div>
-      </div>
-    </div>
-
-    <div v-else class="pack-rows">
-      <div
-        v-for="pack in filteredPacks"
-        :key="pack.name"
-        class="pack-row"
-        :class="{ selected: selectedPacks.includes(pack.name) }"
-        @click="togglePack(pack.name)"
-      >
-        <img :src="getPreviewUrl(pack.name)" :alt="pack.name" class="row-thumb" loading="lazy" />
-        <span class="row-name">{{ formatPackName(pack.name) }}</span>
-        <span class="row-count">{{ pack.count }}</span>
       </div>
     </div>
   </div>
@@ -214,55 +205,6 @@ function getPreviewUrl(packName) {
 .action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.pack-rows {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.25rem;
-}
-
-.pack-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.375rem;
-  border-radius: 4px;
-  border-left: 3px solid transparent;
-  cursor: pointer;
-}
-
-.pack-row:hover {
-  background: var(--color-bg-elevated);
-}
-
-.pack-row.selected {
-  border-left-color: var(--color-accent);
-  background: var(--color-accent-light);
-}
-
-.row-thumb {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  background: #1a1a2e;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.row-name {
-  flex: 1;
-  font-size: 0.8125rem;
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.row-count {
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
 }
 
 .pack-grid {
