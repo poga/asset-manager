@@ -120,4 +120,17 @@ describe('PackGallery', () => {
     await card.trigger('click')
     expect(wrapper.emitted('view-pack')).toBeTruthy()
   })
+
+  it('upscales small covers crisply, leaves large covers smooth', async () => {
+    const wrapper = mount(PackGallery, { props: { packs } })
+    const imgs = wrapper.findAll('.card-cover img')
+
+    Object.defineProperty(imgs[0].element, 'naturalWidth', { value: 64 })
+    await imgs[0].trigger('load')
+    expect(imgs[0].classes()).toContain('pixelated')
+
+    Object.defineProperty(imgs[1].element, 'naturalWidth', { value: 512 })
+    await imgs[1].trigger('load')
+    expect(imgs[1].classes()).not.toContain('pixelated')
+  })
 })

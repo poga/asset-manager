@@ -26,7 +26,9 @@
               v-if="!failedCovers[pack.name]"
               :src="previewUrl(pack.name)"
               :alt="formatPackName(pack.name)"
+              :class="{ pixelated: smallCovers[pack.name] }"
               loading="lazy"
+              @load="onCoverLoad(pack.name, $event)"
               @error="failedCovers[pack.name] = true"
             />
             <span v-else class="cover-placeholder">📦</span>
@@ -70,6 +72,8 @@ const props = defineProps({
 defineEmits(['view-pack'])
 
 const failedCovers = reactive({})
+// sprites below this width are upscaled; pixelated keeps them crisp
+const smallCovers = reactive({})
 // overrides pack.tags after edits; tagsOf() falls back to props
 const tagOverrides = reactive({})
 const activeTag = ref(null)
@@ -77,6 +81,10 @@ const editingPack = ref(null)
 const newTag = ref('')
 
 const vFocus = { mounted: el => el.focus() }
+
+function onCoverLoad(packName, event) {
+  if (event.target.naturalWidth < 200) smallCovers[packName] = true
+}
 
 function tagsOf(pack) {
   return tagOverrides[pack.name] ?? pack.tags ?? []
@@ -222,23 +230,28 @@ async function removeTag(pack, tag) {
 }
 
 .card-cover {
-  height: 110px;
+  aspect-ratio: 5 / 3;
   background: #1a1a2e;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  padding: 0.5rem;
 }
 
 .card-cover img {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+}
+
+.card-cover img.pixelated {
+  image-rendering: pixelated;
 }
 
 .cover-placeholder {
   font-size: 2rem;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .card-meta {
