@@ -49,7 +49,7 @@ import { formatPackName } from '../utils/packName.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
-// mirrors pack_themes.THEME_ORDER on the backend
+// display order for pack.theme groups (theme field is being phased out)
 const THEME_ORDER = [
   'Nature', 'Dungeons & Caves', 'Towns & Buildings', 'Characters & Creatures',
   'Magic & Effects', 'Items & Icons', 'UI', 'Sci-fi', 'Vehicles', 'Other',

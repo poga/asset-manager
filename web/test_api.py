@@ -254,12 +254,12 @@ def test_filters_returns_options(test_db):
     assert "creature" in data["tags"]
 
 
-def test_filters_include_theme_and_is_3d(test_db):
+def test_filters_include_is_3d(test_db):
     conn = sqlite3.connect(test_db)
     # texture-heavy 3D pack: one model among many pngs must still be 3D
     conn.execute(
-        "INSERT INTO packs (id, name, path, theme, asset_count) "
-        "VALUES (10, 'Forest3D', 'Forest3D', 'Nature', 3)"
+        "INSERT INTO packs (id, name, path, asset_count) "
+        "VALUES (10, 'Forest3D', 'Forest3D', 3)"
     )
     conn.execute(
         "INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, asset_kind) "
@@ -289,9 +289,8 @@ def test_filters_include_theme_and_is_3d(test_db):
     resp = client.get("/api/filters")
     assert resp.status_code == 200
     packs = {p["name"]: p for p in resp.json()["packs"]}
-    assert packs["Forest3D"]["theme"] == "Nature"
+    assert "theme" not in packs["Forest3D"]
     assert packs["Forest3D"]["is_3d"] is True
-    assert packs["Sprites2D"]["theme"] == "Other"  # NULL theme -> Other
     assert packs["Sprites2D"]["is_3d"] is False
 
 
@@ -311,7 +310,8 @@ def test_filters_tolerate_db_without_theme_column(tmp_path):
     api.set_db_path(db_path)
     resp = client.get("/api/filters")
     assert resp.status_code == 200
-    assert resp.json()["packs"][0]["theme"] == "Other"
+    assert resp.json()["packs"][0]["name"] == "Old"
+    assert "theme" not in resp.json()["packs"][0]
 
 
 def test_image_not_found(test_db):

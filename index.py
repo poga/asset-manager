@@ -34,7 +34,6 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 import aseprite_parser
 import frame_detect
 import model_indexer
-import pack_themes
 
 app = typer.Typer(help="Build and update the game asset index")
 console = Console()
@@ -765,14 +764,6 @@ def index(
             SELECT COUNT(*) FROM assets WHERE assets.pack_id = packs.id
         )
     """)
-    conn.commit()
-
-    # Reassign themes every run so mapping edits apply without --force
-    for row in conn.execute("SELECT id, name FROM packs").fetchall():
-        conn.execute(
-            "UPDATE packs SET theme = ? WHERE id = ?",
-            [pack_themes.assign_theme(row["name"]), row["id"]],
-        )
     conn.commit()
 
     # Generate pack previews

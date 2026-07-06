@@ -1256,19 +1256,7 @@ class TestPackContentsConvention:
         assert "contents.png" not in row["thumbnail_path"]
 
 
-class TestPackThemes:
-    def test_index_assigns_theme_to_packs(self, temp_dir):
-        pack = temp_dir / "Frozen_Forest_v1.0"
-        pack.mkdir()
-        img = Image.new("RGBA", (32, 32), (20, 90, 40, 255))
-        img.save(pack / "tree.png")
-        db_path = temp_dir / "t.db"
-        index.index(temp_dir, db_path, force=False)
-        conn = sqlite3.connect(db_path)
-        theme = conn.execute("SELECT theme FROM packs").fetchone()[0]
-        conn.close()
-        assert theme == "Nature"
-
+class TestSchemaMigrationTheme:
     def test_migrate_adds_theme_column_to_legacy_db(self, temp_dir):
         db_path = temp_dir / "legacy.db"
         conn = sqlite3.connect(db_path)
