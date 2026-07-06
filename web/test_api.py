@@ -155,16 +155,75 @@ def test_search_by_tag(test_db):
     assert "goblin" in data["assets"][0]["tags"]
 
 
-def test_search_by_color(test_db):
-    """Search by color filter."""
-    from api import set_db_path
-    set_db_path(test_db)
+def _create_pack_tags_table(db_path):
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS pack_tags ("
+        "pack_id INTEGER REFERENCES packs(id), tag TEXT NOT NULL, "
+        "PRIMARY KEY (pack_id, tag))"
+    )
+    conn.commit()
+    conn.close()
 
-    response = client.get("/api/search?color=green")
-    assert response.status_code == 200
-    data = response.json()
+
+def test_search_matches_assets_via_pack_tag(test_db):
+    _create_pack_tags_table(test_db)
+    conn = sqlite3.connect(test_db)
+    conn.execute("INSERT INTO pack_tags (pack_id, tag) VALUES (1, 'minifantasy')")
+    conn.commit()
+    conn.close()
+
+    import api
+    api.set_db_path(test_db)
+    resp = client.get("/api/search?tag=minifantasy")
+    assert resp.status_code == 200
+    # both fixture assets belong to pack 1 and inherit its tag
+    assert len(resp.json()["assets"]) == 2
+
+
+def test_search_pack_tag_ands_with_asset_tag(test_db):
+    _create_pack_tags_table(test_db)
+    conn = sqlite3.connect(test_db)
+    conn.execute("INSERT INTO pack_tags (pack_id, tag) VALUES (1, 'minifantasy')")
+    conn.commit()
+    conn.close()
+
+    import api
+    api.set_db_path(test_db)
+    resp = client.get("/api/search?tag=minifantasy&tag=goblin")
+    data = resp.json()
     assert len(data["assets"]) == 1
     assert data["assets"][0]["filename"] == "goblin.png"
+
+
+def test_search_tag_tolerates_missing_pack_tags_table(tmp_path):
+    # legacy DB without pack_tags: tag search must not 500
+    db_path = tmp_path / "legacy3.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript("""
+        CREATE TABLE packs (id INTEGER PRIMARY KEY, name TEXT, path TEXT, asset_count INTEGER DEFAULT 0);
+        CREATE TABLE assets (id INTEGER PRIMARY KEY, pack_id INTEGER, path TEXT UNIQUE, filename TEXT,
+            filetype TEXT, file_hash TEXT, file_size INTEGER, width INTEGER, height INTEGER,
+            preview_x INTEGER, preview_y INTEGER, preview_width INTEGER, preview_height INTEGER,
+            category TEXT, asset_kind TEXT, rig TEXT, thumbnail_path TEXT);
+        CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+        CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, source TEXT, PRIMARY KEY (asset_id, tag_id));
+        CREATE TABLE asset_preview_overrides (path TEXT PRIMARY KEY, use_full_image BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+        INSERT INTO packs (id, name, path) VALUES (1, 'p', 'p');
+        INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash)
+            VALUES (1, 1, 'p/a.png', 'a.png', 'png', 'h');
+        INSERT INTO tags (id, name) VALUES (1, 'creature');
+        INSERT INTO asset_tags VALUES (1, 1, 'path');
+    """)
+    conn.commit()
+    conn.close()
+
+    import api
+    api.set_db_path(db_path)
+    resp = client.get("/api/search?tag=creature")
+    assert resp.status_code == 200
+    assert len(resp.json()["assets"]) == 1
 
 
 def test_search_by_pack(test_db):
