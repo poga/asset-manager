@@ -210,8 +210,6 @@ async function search(params) {
       query.append('pack', p)
     }
   }
-  if (params.modelOnly) query.set('kind', 'model')
-
   const res = await fetch(`${API_BASE}/search?${query}`)
   if (!res) return
   const data = await res.json()
@@ -220,7 +218,7 @@ async function search(params) {
 
 function handleSearch(params) {
   currentSearchParams.value = params
-  const hasActive = !!(params.q || (params.tag && params.tag.length) || params.color || params.modelOnly)
+  const hasActive = !!(params.q || (params.tag && params.tag.length) || params.color)
   if (hasActive) {
     isDefaultHomeView.value = false
   } else if (selectedPacks.value.length === 0) {

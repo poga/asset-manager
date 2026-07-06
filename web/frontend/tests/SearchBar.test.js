@@ -117,13 +117,12 @@ describe('SearchBar', () => {
     expect(lastEmit.tag.filter(t => t === 'sword').length).toBe(1)
   })
 
-  it('clear() resets query, tags, color, and modelOnly', async () => {
+  it('clear() resets query, tags, and color', async () => {
     const wrapper = mount(SearchBar, {
       props: { filters: mockFilters }
     })
     await wrapper.find('input[type="text"]').setValue('hero')
     wrapper.vm.addTagExternal('sword')
-    await wrapper.find('input[type="checkbox"]').setValue(true)
     await wrapper.vm.$nextTick()
 
     wrapper.vm.clear()
@@ -131,8 +130,15 @@ describe('SearchBar', () => {
 
     expect(wrapper.find('input[type="text"]').element.value).toBe('')
     expect(wrapper.find('.tag').exists()).toBe(false)
-    expect(wrapper.find('input[type="checkbox"]').element.checked).toBe(false)
     const lastEmit = wrapper.emitted('search').slice(-1)[0][0]
-    expect(lastEmit).toEqual({ q: null, tag: [], color: null, type: null, modelOnly: false })
+    expect(lastEmit).toEqual({ q: null, tag: [], color: null, type: null })
+  })
+
+  it('does not render a models-only checkbox and emits no modelOnly', async () => {
+    const wrapper = mount(SearchBar, { props: { filters: { packs: [], tags: [], colors: [] } } })
+    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
+    await wrapper.find('input[type="text"]').setValue('x')
+    const emitted = wrapper.emitted('search')
+    expect(emitted.at(-1)[0]).not.toHaveProperty('modelOnly')
   })
 })
