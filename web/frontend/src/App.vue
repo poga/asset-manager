@@ -59,9 +59,11 @@
           v-else
           :assets="assets"
           :cart-ids="cartIds"
+          :loading="loadingMore"
           @select="selectAsset"
           @view-pack="viewPack"
           @add-to-cart="addToCart"
+          @load-more="loadMore"
         />
       </main>
 
@@ -96,6 +98,8 @@ const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
 const filters = ref({ packs: [], tags: [] })
 const assets = ref([])
+const hasMore = ref(false)
+const loadingMore = ref(false)
 const selectedAsset = ref(null)
 const searchBarRef = ref(null)
 const selectedPacks = ref([])
@@ -153,6 +157,10 @@ function toggleCartPanel() {
 let debounceTimer = null
 let skipNextPush = false
 let isInitializing = true
+// bumped on every new view; stale in-flight page loads discard against it
+let searchGen = 0
+let searchOffset = 0
+const SEARCH_LIMIT = 100
 
 function getSystemTheme() {
   if (window.matchMedia) {
@@ -197,7 +205,7 @@ async function fetchFilters() {
   selectedPacks.value = []
 }
 
-async function search(params) {
+function buildSearchQuery(params, offset) {
   const query = new URLSearchParams()
   if (params.q) query.set('q', params.q)
   for (const t of params.tag || []) {
@@ -209,10 +217,38 @@ async function search(params) {
       query.append('pack', p)
     }
   }
-  const res = await fetch(`${API_BASE}/search?${query}`)
+  query.set('limit', String(SEARCH_LIMIT))
+  query.set('offset', String(offset))
+  return query
+}
+
+async function search(params) {
+  const gen = ++searchGen
+  searchOffset = 0
+  const res = await fetch(`${API_BASE}/search?${buildSearchQuery(params, 0)}`)
   if (!res) return
   const data = await res.json()
+  if (gen !== searchGen) return
   assets.value = data.assets
+  hasMore.value = data.assets.length === SEARCH_LIMIT
+}
+
+async function loadMore() {
+  if (loadingMore.value || !hasMore.value) return
+  const gen = searchGen
+  loadingMore.value = true
+  try {
+    const nextOffset = searchOffset + SEARCH_LIMIT
+    const res = await fetch(`${API_BASE}/search?${buildSearchQuery(currentSearchParams.value, nextOffset)}`)
+    if (!res) return
+    const data = await res.json()
+    if (gen !== searchGen) return
+    assets.value = [...assets.value, ...data.assets]
+    searchOffset = nextOffset
+    hasMore.value = data.assets.length === SEARCH_LIMIT
+  } finally {
+    loadingMore.value = false
+  }
 }
 
 function hasActiveSearch(params) {
@@ -249,7 +285,9 @@ async function findSimilar(id) {
   isDefaultHomeView.value = false
   const res = await fetch(`${API_BASE}/similar/${id}`)
   const data = await res.json()
+  searchGen++
   assets.value = data.assets
+  hasMore.value = false
   window.history.pushState({ route: 'similar', id }, '', buildUrl({ name: 'similar', params: { id } }))
 }
 
@@ -257,7 +295,9 @@ async function loadSimilarFromUrl(id) {
   isDefaultHomeView.value = false
   const res = await fetch(`${API_BASE}/similar/${id}`)
   const data = await res.json()
+  searchGen++
   assets.value = data.assets
+  hasMore.value = false
 }
 
 async function loadPack(packName) {

@@ -237,6 +237,21 @@ def test_search_by_pack(test_db):
     assert len(data["assets"]) == 2
 
 
+def test_search_offset_paginates_disjoint_pages(test_db):
+    """offset advances the result window so infinite scroll can page a pack."""
+    from api import set_db_path
+    set_db_path(test_db)
+
+    # creatures pack: goblin.png, orc.png ordered by path
+    page1 = client.get("/api/search?pack=creatures&limit=1&offset=0").json()["assets"]
+    page2 = client.get("/api/search?pack=creatures&limit=1&offset=1").json()["assets"]
+    beyond = client.get("/api/search?pack=creatures&limit=1&offset=2").json()["assets"]
+
+    assert [a["filename"] for a in page1] == ["goblin.png"]
+    assert [a["filename"] for a in page2] == ["orc.png"]
+    assert beyond == []
+
+
 def test_similar_returns_similar_assets(test_db):
     """Find similar returns assets by visual similarity."""
     from api import set_db_path

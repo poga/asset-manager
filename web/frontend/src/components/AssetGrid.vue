@@ -1,5 +1,5 @@
 <template>
-  <div class="asset-grid-container">
+  <div class="asset-grid-container" @scroll="onScroll">
     <div class="result-count" v-if="assets.length > 0">
       {{ assets.length }} results
     </div>
@@ -49,7 +49,10 @@
         </div>
       </div>
     </div>
-    <div v-else class="no-results">
+    <div v-if="loading" class="loading-more">
+      Loading…
+    </div>
+    <div v-if="assets.length === 0 && !loading" class="no-results">
       No results
     </div>
   </div>
@@ -69,12 +72,24 @@ defineProps({
   cartIds: {
     type: Array,
     default: () => []
+  },
+  loading: {
+    type: Boolean,
+    default: false
   }
 })
 
-defineEmits(['select', 'view-pack', 'add-to-cart'])
+const emit = defineEmits(['select', 'view-pack', 'add-to-cart', 'load-more'])
 
 const hoveredId = ref(null)
+
+// fire before the user hits the bottom so the next page streams in seamlessly
+function onScroll(e) {
+  const el = e.currentTarget
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
+    emit('load-more')
+  }
+}
 </script>
 
 <style scoped>
@@ -193,5 +208,11 @@ const hoveredId = ref(null)
   color: var(--color-text-muted);
   text-align: center;
   padding: 2rem;
+}
+
+.loading-more {
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 1rem;
 }
 </style>

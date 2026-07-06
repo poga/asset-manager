@@ -170,6 +170,7 @@ def search(
     type: Optional[str] = None,
     kind: Optional[str] = None,
     limit: int = 100,
+    offset: int = 0,
 ):
     """Search assets by name, tags, or filters."""
     conn = get_db()
@@ -232,9 +233,10 @@ def search(
         WHERE {where}
         GROUP BY a.id
         ORDER BY {order_by}
-        LIMIT ?
+        LIMIT ? OFFSET ?
     """
     params.append(limit)
+    params.append(offset)
 
     rows = conn.execute(sql, params).fetchall()
     conn.close()

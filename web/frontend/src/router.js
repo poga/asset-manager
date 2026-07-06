@@ -14,7 +14,7 @@ export function parseRoute(path) {
   }
   const packMatch = normalizedPath.match(/^\/pack\/([^/]+)$/)
   if (packMatch) {
-    return { name: 'pack', params: { name: packMatch[1] } }
+    return { name: 'pack', params: { name: decodeURIComponent(packMatch[1]) } }
   }
   return { name: 'home', params: {} }
 }
@@ -27,7 +27,7 @@ export function buildUrl(route) {
     return `${BASE}/similar/${route.params.id}`
   }
   if (route.name === 'pack' && route.params?.name) {
-    return `${BASE}/pack/${route.params.name}`
+    return `${BASE}/pack/${encodeURIComponent(route.params.name)}`
   }
   return `${BASE}/`
 }
