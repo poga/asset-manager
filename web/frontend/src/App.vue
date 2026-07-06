@@ -216,10 +216,13 @@ async function search(params) {
   assets.value = data.assets
 }
 
+function hasActiveSearch(params) {
+  return !!(params.q || (params.tag && params.tag.length) || params.color)
+}
+
 function handleSearch(params) {
   currentSearchParams.value = params
-  const hasActive = !!(params.q || (params.tag && params.tag.length) || params.color)
-  if (hasActive) {
+  if (hasActiveSearch(params)) {
     isDefaultHomeView.value = false
   } else if (selectedPacks.value.length === 0) {
     isDefaultHomeView.value = true
@@ -353,6 +356,10 @@ watch(selectedAsset, (newVal, oldVal) => {
 watch(selectedPacks, (newPacks, oldPacks) => {
   if (!isInitializing) {
     search(currentSearchParams.value)
+    if (newPacks.length === 0 && oldPacks && oldPacks.length > 0
+        && !hasActiveSearch(currentSearchParams.value)) {
+      isDefaultHomeView.value = true
+    }
     // In single mode, update URL to reflect pack selection
     if (selectionMode.value === 'single' && !skipNextPush) {
       if (newPacks.length === 1) {
