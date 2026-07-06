@@ -42,7 +42,12 @@
             <span class="card-count">{{ pack.count }} {{ pack.count === 1 ? 'asset' : 'assets' }}</span>
           </div>
           <div class="card-tags" @click.stop>
-            <span v-for="tag in tagsOf(pack)" :key="tag" class="tag-chip">
+            <span
+              v-for="tag in tagsOf(pack)"
+              :key="tag"
+              class="tag-chip"
+              :style="{ '--tag-hue': tagHue(tag) }"
+            >
               {{ tag }}<button class="tag-remove" @click="removeTag(pack, tag)">×</button>
             </span>
             <input
@@ -92,6 +97,13 @@ function onCoverLoad(packName, event) {
 
 function tagsOf(pack) {
   return tagOverrides[pack.name] ?? pack.tags ?? []
+}
+
+// deterministic hue per tag name so colors are stable across sessions
+function tagHue(tag) {
+  let h = 0
+  for (const c of tag) h = (h * 31 + c.charCodeAt(0)) % 360
+  return h
 }
 
 const allTags = computed(() => {
@@ -222,11 +234,10 @@ async function removeTag(pack, tag) {
 
 .dim-title {
   margin: 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
 }
 
 .dim-count {
@@ -331,28 +342,37 @@ async function removeTag(pack, tag) {
 .tag-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
   font-size: 0.6875rem;
   padding: 0.125rem 0.4375rem;
   border-radius: 999px;
-  background: var(--color-bg-elevated);
-  color: var(--color-text-secondary);
+  background: hsl(var(--tag-hue, 0), 50%, 92%);
+  color: hsl(var(--tag-hue, 0), 40%, 30%);
 }
 
+[data-theme='dark'] .tag-chip {
+  background: hsl(var(--tag-hue, 0), 30%, 24%);
+  color: hsl(var(--tag-hue, 0), 55%, 78%);
+}
+
+/* collapsed until revealed so the chip carries no phantom right padding */
 .tag-remove {
   border: none;
   background: none;
-  color: var(--color-text-secondary);
+  color: inherit;
   cursor: pointer;
   font-size: 0.75rem;
   padding: 0;
   line-height: 1;
+  width: 0;
+  overflow: hidden;
   opacity: 0;
   transition: opacity 120ms;
 }
 
 .tag-chip:hover .tag-remove,
 .tag-remove:focus-visible {
+  width: auto;
+  margin-left: 0.25rem;
   opacity: 1;
 }
 
