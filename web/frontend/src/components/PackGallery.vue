@@ -1,21 +1,22 @@
 <template>
   <div class="pack-gallery">
-    <div class="theme-chips">
-      <button v-for="t in activeThemes" :key="t" class="chip" @click="scrollTo(t)">
-        {{ t }} <span class="chip-count">{{ grouped[t].length }}</span>
+    <div v-if="allTags.length" class="tag-chips">
+      <button
+        v-for="t in allTags"
+        :key="t.tag"
+        class="chip"
+        :class="{ active: activeTag === t.tag }"
+        @click="toggleTag(t.tag)"
+      >
+        {{ t.tag }} <span class="chip-count">{{ t.count }}</span>
       </button>
     </div>
 
-    <section
-      v-for="t in activeThemes"
-      :key="t"
-      class="theme-section"
-      :ref="el => { sectionEls[t] = el }"
-    >
-      <h2 class="theme-title">{{ t }}</h2>
+    <section v-for="s in sections" :key="s.label" class="dim-section">
+      <h2 class="dim-title">{{ s.label }}</h2>
       <div class="card-grid">
         <div
-          v-for="pack in grouped[t]"
+          v-for="pack in s.packs"
           :key="pack.name"
           class="gallery-card"
           @click="$emit('view-pack', pack.name)"
@@ -24,7 +25,7 @@
             <img
               v-if="!failedCovers[pack.name]"
               :src="previewUrl(pack.name)"
-              :alt="pack.name"
+              :alt="formatPackName(pack.name)"
               loading="lazy"
               @error="failedCovers[pack.name] = true"
             />
@@ -32,10 +33,23 @@
           </div>
           <div class="card-meta">
             <span class="card-name">{{ formatPackName(pack.name) }}</span>
-            <span class="badge" :class="pack.is_3d ? 'badge-3d' : 'badge-2d'">
-              {{ pack.is_3d ? '3D' : '2D' }}
-            </span>
             <span class="card-count">{{ pack.count }}</span>
+          </div>
+          <div class="card-tags" @click.stop>
+            <span v-for="tag in tagsOf(pack)" :key="tag" class="tag-chip">
+              {{ tag }}<button class="tag-remove" @click="removeTag(pack, tag)">×</button>
+            </span>
+            <input
+              v-if="editingPack === pack.name"
+              v-model="newTag"
+              class="tag-input"
+              placeholder="tag"
+              @keyup.enter="addTag(pack)"
+              @keyup.escape="stopEditing"
+              @blur="stopEditing"
+              v-focus
+            />
+            <button v-else class="tag-add" @click="startEditing(pack.name)">+</button>
           </div>
         </div>
       </div>
@@ -44,16 +58,10 @@
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { formatPackName } from '../utils/packName.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
-
-// display order for pack.theme groups (theme field is being phased out)
-const THEME_ORDER = [
-  'Nature', 'Dungeons & Caves', 'Towns & Buildings', 'Characters & Creatures',
-  'Magic & Effects', 'Items & Icons', 'UI', 'Sci-fi', 'Vehicles', 'Other',
-]
 
 const props = defineProps({
   packs: { type: Array, required: true }
@@ -61,36 +69,79 @@ const props = defineProps({
 
 defineEmits(['view-pack'])
 
-const sectionEls = reactive({})
 const failedCovers = reactive({})
+// local tag state; seeded from props, updated from API responses
+const tagOverrides = reactive({})
+const activeTag = ref(null)
+const editingPack = ref(null)
+const newTag = ref('')
 
-const grouped = computed(() => {
-  const groups = {}
+const vFocus = { mounted: el => el.focus() }
+
+function tagsOf(pack) {
+  return tagOverrides[pack.name] ?? pack.tags ?? []
+}
+
+const allTags = computed(() => {
+  const counts = {}
   for (const pack of props.packs) {
-    const theme = THEME_ORDER.includes(pack.theme) ? pack.theme : 'Other'
-    if (!groups[theme]) groups[theme] = []
-    groups[theme].push(pack)
+    for (const tag of tagsOf(pack)) {
+      counts[tag] = (counts[tag] || 0) + 1
+    }
   }
-  return groups
+  return Object.keys(counts).sort().map(tag => ({ tag, count: counts[tag] }))
 })
 
-const activeThemes = computed(() =>
-  THEME_ORDER.filter(t => grouped.value[t]?.length)
-)
+const sections = computed(() => {
+  const visible = activeTag.value
+    ? props.packs.filter(p => tagsOf(p).includes(activeTag.value))
+    : props.packs
+  return [
+    { label: '2D', packs: visible.filter(p => !p.is_3d) },
+    { label: '3D', packs: visible.filter(p => p.is_3d) },
+  ].filter(s => s.packs.length)
+})
+
+function toggleTag(tag) {
+  activeTag.value = activeTag.value === tag ? null : tag
+}
 
 function previewUrl(packName) {
   return `${API_BASE}/pack-preview/${encodeURIComponent(packName)}`
 }
 
-function scrollTo(theme) {
-  const el = sectionEls[theme]
-  if (!el) return
-  // smooth scroll silently no-ops in nested scroll containers; jump instantly
-  const gallery = el.closest('.pack-gallery')
-  const chips = gallery.querySelector('.theme-chips')
-  gallery.scrollTop += el.getBoundingClientRect().top
-    - gallery.getBoundingClientRect().top
-    - chips.offsetHeight
+function startEditing(packName) {
+  editingPack.value = packName
+  newTag.value = ''
+}
+
+function stopEditing() {
+  editingPack.value = null
+  newTag.value = ''
+}
+
+async function addTag(pack) {
+  const tag = newTag.value.trim()
+  if (!tag) return
+  const res = await fetch(`${API_BASE}/pack/${encodeURIComponent(pack.name)}/tags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tag })
+  })
+  if (res.ok) {
+    tagOverrides[pack.name] = (await res.json()).tags
+  }
+  stopEditing()
+}
+
+async function removeTag(pack, tag) {
+  const res = await fetch(
+    `${API_BASE}/pack/${encodeURIComponent(pack.name)}/tags/${encodeURIComponent(tag)}`,
+    { method: 'DELETE' }
+  )
+  if (res.ok) {
+    tagOverrides[pack.name] = (await res.json()).tags
+  }
 }
 </script>
 
@@ -101,7 +152,7 @@ function scrollTo(theme) {
   padding: 1rem;
 }
 
-.theme-chips {
+.tag-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -126,12 +177,17 @@ function scrollTo(theme) {
   border-color: var(--color-accent);
 }
 
+.chip.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
 .chip-count {
   color: var(--color-text-secondary);
   margin-left: 0.25rem;
 }
 
-.theme-title {
+.dim-title {
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-text-primary);
@@ -182,7 +238,7 @@ function scrollTo(theme) {
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.5rem;
+  padding: 0.5rem 0.5rem 0.25rem;
 }
 
 .card-name {
@@ -193,27 +249,69 @@ function scrollTo(theme) {
   line-height: 1.25;
 }
 
-.badge {
-  font-size: 0.625rem;
-  font-weight: 700;
-  padding: 0.0625rem 0.375rem;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.badge-3d {
-  background: var(--color-accent-light);
-  color: var(--color-accent);
-}
-
-.badge-2d {
-  background: var(--color-bg-elevated);
-  color: var(--color-text-secondary);
-}
-
 .card-count {
   font-size: 0.6875rem;
   color: var(--color-text-secondary);
   flex-shrink: 0;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem 0.5rem;
+  cursor: default;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  font-size: 0.625rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 4px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+}
+
+.tag-remove {
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.6875rem;
+  padding: 0;
+  line-height: 1;
+}
+
+.tag-remove:hover {
+  color: var(--color-text-primary);
+}
+
+.tag-add {
+  border: 1px dashed var(--color-border);
+  background: none;
+  color: var(--color-text-secondary);
+  border-radius: 4px;
+  font-size: 0.625rem;
+  padding: 0.0625rem 0.375rem;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.tag-add:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.tag-input {
+  width: 5.5rem;
+  font-size: 0.625rem;
+  padding: 0.0625rem 0.25rem;
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
 }
 </style>
