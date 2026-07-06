@@ -440,10 +440,9 @@ def filters():
     theme_col = "p.theme" if has_theme else "NULL"
     packs = conn.execute(f"""
         SELECT p.name, p.asset_count AS count, {theme_col} AS theme,
-               (SELECT COUNT(*) FROM assets a
-                WHERE a.pack_id = p.id
-                  AND a.asset_kind IN ('model', 'animation_bundle')) * 2
-                 > p.asset_count AS is_3d
+               EXISTS (SELECT 1 FROM assets a
+                       WHERE a.pack_id = p.id
+                         AND a.asset_kind IN ('model', 'animation_bundle')) AS is_3d
         FROM packs p
         ORDER BY p.name
     """).fetchall()
