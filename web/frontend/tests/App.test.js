@@ -36,7 +36,7 @@ describe('Theme toggle', () => {
     mockFetch.mockImplementation((url) => {
       if (url === '/assets/api/filters') {
         return Promise.resolve({
-          json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
+          json: () => Promise.resolve({ packs: [], tags: [] })
         })
       }
       if (url.startsWith('/assets/api/search')) {
@@ -100,7 +100,7 @@ describe('App URL routing', () => {
     mockFetch.mockImplementation((url) => {
       if (url === '/assets/api/filters') {
         return Promise.resolve({
-          json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
+          json: () => Promise.resolve({ packs: [], tags: [] })
         })
       }
       if (url.startsWith('/assets/api/search')) {
@@ -320,7 +320,7 @@ describe('App URL routing', () => {
     mockFetch.mockImplementation((url) => {
       if (url === '/assets/api/filters') {
         return Promise.resolve({
-          json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
+          json: () => Promise.resolve({ packs: [], tags: [] })
         })
       }
       if (url.startsWith('/assets/api/search')) {
@@ -490,7 +490,7 @@ describe('App 3-column layout', () => {
     mockFetch.mockImplementation((url) => {
       if (url === '/assets/api/filters') {
         return Promise.resolve({
-          json: () => Promise.resolve({ packs: [{ name: 'pack1', count: 10 }], tags: [], colors: [] })
+          json: () => Promise.resolve({ packs: [{ name: 'pack1', count: 10 }], tags: [] })
         })
       }
       if (url.startsWith('/assets/api/search')) {
@@ -567,7 +567,7 @@ describe('Preview Override', () => {
     mockFetch.mockImplementation((url) => {
       if (url === '/assets/api/filters') {
         return Promise.resolve({
-          json: () => Promise.resolve({ packs: [], tags: [], colors: [] })
+          json: () => Promise.resolve({ packs: [], tags: [] })
         })
       }
       if (url.startsWith('/assets/api/search')) {
@@ -608,7 +608,7 @@ describe('Home search visibility', () => {
     mockFetch.mockImplementation((url) => {
       if (url === '/assets/api/filters') {
         return Promise.resolve({
-          json: () => Promise.resolve({ packs: [{ name: 'pack1', count: 10 }], tags: [], colors: [] })
+          json: () => Promise.resolve({ packs: [{ name: 'pack1', count: 10 }], tags: [] })
         })
       }
       if (url.startsWith('/assets/api/search')) {

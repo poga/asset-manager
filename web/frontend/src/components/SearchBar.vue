@@ -72,6 +72,7 @@ const suggestions = computed(() => {
 function handleClickOutside(event) {
   if (!event.target.closest('[data-filter="suggest"]')) {
     suggestionsOpen.value = false
+    highlight.value = -1
   }
 }
 
@@ -94,15 +95,17 @@ function onInput() {
 function onKeydown(event) {
   if (event.key === 'ArrowDown') {
     event.preventDefault()
+    suggestionsOpen.value = true
     if (suggestions.value.length) {
       highlight.value = Math.min(highlight.value + 1, suggestions.value.length - 1)
     }
   } else if (event.key === 'ArrowUp') {
     event.preventDefault()
+    suggestionsOpen.value = true
     highlight.value = Math.max(highlight.value - 1, -1)
   } else if (event.key === 'Enter') {
-    // only a deliberate highlight adds a tag; plain Enter stays a text search
-    if (highlight.value >= 0 && suggestions.value[highlight.value]) {
+    // only a deliberate highlight in an open panel adds a tag
+    if (suggestionsOpen.value && highlight.value >= 0 && suggestions.value[highlight.value]) {
       addTag(suggestions.value[highlight.value].name)
     }
   } else if (event.key === 'Escape') {

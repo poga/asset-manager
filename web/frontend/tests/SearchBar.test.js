@@ -111,4 +111,28 @@ describe('SearchBar smart box', () => {
     expect(wrapper.find('.suggestion').exists()).toBe(false)
     expect(lastSearch(wrapper).q).toBe('goblin')
   })
+
+  it('outside click then Enter does not add a stale highlight', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    const input = wrapper.find('input')
+    await input.setValue('go')
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    document.body.click()
+    await wrapper.vm.$nextTick()
+    await input.trigger('keydown', { key: 'Enter' })
+    expect(lastSearch(wrapper).tag).toEqual([])
+  })
+
+  it('addTagExternal adds a chip and ignores a duplicate call', async () => {
+    const wrapper = mount(SearchBar, { props: { filters } })
+    wrapper.vm.addTagExternal('goblin')
+    await wrapper.vm.$nextTick()
+    expect(lastSearch(wrapper).tag).toContain('goblin')
+    expect(wrapper.emitted('search').length).toBe(1)
+
+    wrapper.vm.addTagExternal('goblin')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('search').length).toBe(1)
+    expect(lastSearch(wrapper).tag).toEqual(['goblin'])
+  })
 })

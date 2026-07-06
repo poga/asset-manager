@@ -94,7 +94,7 @@ import { parseRoute, buildUrl } from './router.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
-const filters = ref({ packs: [], tags: [], colors: [] })
+const filters = ref({ packs: [], tags: [] })
 const assets = ref([])
 const selectedAsset = ref(null)
 const searchBarRef = ref(null)
@@ -390,7 +390,7 @@ function handlePopState(event) {
     // Only re-fetch if we were on a non-home view (similar/pack) or had pack filters
     if (!isDefaultHomeView.value || hadPackFilter) {
       selectedPacks.value = []  // Clear pack filter (triggers watcher, but we also call search)
-      search({ q: null, tag: [], color: null, type: null })
+      search({ q: null, tag: [] })
       isDefaultHomeView.value = true
     }
     // Otherwise, keep existing assets - just close asset detail view
@@ -429,7 +429,7 @@ onMounted(async () => {
     mediaQuery.addEventListener('change', handleSystemThemeChange)
   }
   await fetchFilters()
-  search({ q: null, tag: [], color: null, type: null })
+  search({ q: null, tag: [] })
   handleInitialRoute()
   window.addEventListener('popstate', handlePopState)
   isInitializing = false
