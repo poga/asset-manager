@@ -121,6 +121,21 @@ describe('PackGallery', () => {
     expect(wrapper.emitted('view-pack')).toBeTruthy()
   })
 
+  it('gives visually distinct tags a clearly separated hue', () => {
+    const distinctPacks = [
+      { name: 'A', count: 1, is_3d: false, tags: ['minifantasy'] },
+      { name: 'B', count: 1, is_3d: false, tags: ['penusbmic'] },
+    ]
+    const wrapper = mount(PackGallery, { props: { packs: distinctPacks } })
+    const hues = wrapper.findAll('.tag-chip').map(chip => {
+      const hue = Number(chip.element.style.getPropertyValue('--tag-hue'))
+      return hue
+    })
+    const [a, b] = hues
+    const circularDistance = Math.min(Math.abs(a - b), 360 - Math.abs(a - b))
+    expect(circularDistance).toBeGreaterThanOrEqual(20)
+  })
+
   it('upscales small covers crisply, leaves large covers smooth', async () => {
     const wrapper = mount(PackGallery, { props: { packs } })
     const imgs = wrapper.findAll('.card-cover img')
