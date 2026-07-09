@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import App from '../src/App.vue'
-import PackList from '../src/components/PackList.vue'
 import Cart from '../src/components/Cart.vue'
 import AssetDetail from '../src/components/AssetDetail.vue'
 import AssetGrid from '../src/components/AssetGrid.vue'
@@ -53,13 +52,13 @@ describe('Theme toggle', () => {
   })
 
   it('renders theme toggle button', async () => {
-    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
     await flushPromises()
     expect(wrapper.find('[data-testid="theme-toggle"]').exists()).toBe(true)
   })
 
   it('toggles theme on click', async () => {
-    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
     await flushPromises()
 
     const toggle = wrapper.find('[data-testid="theme-toggle"]')
@@ -69,7 +68,7 @@ describe('Theme toggle', () => {
   })
 
   it('persists theme to localStorage', async () => {
-    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
     await flushPromises()
 
     const toggle = wrapper.find('[data-testid="theme-toggle"]')
@@ -81,7 +80,7 @@ describe('Theme toggle', () => {
   it('loads theme from localStorage on mount', async () => {
     localStorageMock['theme'] = 'dark'
 
-    mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
     await flushPromises()
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
@@ -434,16 +433,12 @@ describe('App URL routing', () => {
     expect(wrapper.vm.selectedPacks).toEqual([])
   })
 
-  it('calls pushState with /pack/:name when selecting a pack in single mode', async () => {
+  it('calls pushState with /pack/:name when a pack is selected', async () => {
     const wrapper = mount(App)
     await flushPromises()
     pushStateSpy.mockClear()
 
-    // Ensure single selection mode
-    wrapper.vm.selectionMode = 'single'
-    await flushPromises()
-
-    // Simulate pack selection via v-model update (as PackList would do)
+    // Simulate pack selection
     wrapper.vm.selectedPacks = ['fantasy-pack']
     await flushPromises()
 
@@ -454,7 +449,7 @@ describe('App URL routing', () => {
     )
   })
 
-  it('calls pushState with / when deselecting the last pack in single mode', async () => {
+  it('calls pushState with / when the last pack is deselected', async () => {
     // Start at /pack/test-pack
     window.history.replaceState({}, '', '/assets/pack/test-pack')
 
@@ -462,8 +457,6 @@ describe('App URL routing', () => {
     await flushPromises()
     pushStateSpy.mockClear()
 
-    // Ensure single selection mode
-    wrapper.vm.selectionMode = 'single'
     expect(wrapper.vm.selectedPacks).toContain('test-pack')
 
     // Deselect the pack
@@ -523,19 +516,14 @@ describe('App 3-column layout', () => {
   })
 
   it('renders 3-column layout', () => {
-    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
-    expect(wrapper.find('.left-panel').exists()).toBe(true)
+    const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
+    expect(wrapper.find('.left-panel').exists()).toBe(false)
     expect(wrapper.find('.middle-panel').exists()).toBe(true)
     expect(wrapper.find('.right-panel').exists()).toBe(true)
   })
 
-  it('renders PackList in left panel', () => {
-    const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
-    expect(wrapper.findComponent(PackList).exists()).toBe(true)
-  })
-
   it('renders Cart in right panel', async () => {
-    const wrapper = mount(App, { global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'AssetDetail'] } })
+    const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'AssetDetail'] } })
     // Cart is only shown when panel is expanded
     wrapper.vm.cartPanelExpanded = true
     await wrapper.vm.$nextTick()
@@ -544,7 +532,7 @@ describe('App 3-column layout', () => {
 
   it('shows AssetDetail when asset selected', async () => {
     const wrapper = mount(App, {
-      global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart'] }
+      global: { stubs: ['SearchBar', 'AssetGrid', 'Cart'] }
     })
     wrapper.vm.selectedAsset = { id: 1, filename: 'test.png' }
     await wrapper.vm.$nextTick()
@@ -553,7 +541,7 @@ describe('App 3-column layout', () => {
 
   it('hides AssetGrid when asset selected', async () => {
     const wrapper = mount(App, {
-      global: { stubs: ['PackList', 'SearchBar', 'Cart', 'AssetDetail'] }
+      global: { stubs: ['SearchBar', 'Cart', 'AssetDetail'] }
     })
     wrapper.vm.selectedAsset = { id: 1, filename: 'test.png' }
     await wrapper.vm.$nextTick()
@@ -585,7 +573,7 @@ describe('Preview Override', () => {
 
   it('calls API when toggle-preview-override is emitted', async () => {
     const wrapper = mount(App, {
-      global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] }
+      global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] }
     })
     await flushPromises()
     mockFetch.mockClear()
@@ -626,7 +614,7 @@ describe('Home search visibility', () => {
 
   it('switches from gallery to results when a search is active, and back when cleared', async () => {
     const wrapper = mount(App, {
-      global: { stubs: ['PackList', 'Cart', 'AssetDetail', 'PackGallery'] }
+      global: { stubs: ['Cart', 'AssetDetail', 'PackGallery'] }
     })
     await flushPromises()
 
@@ -650,7 +638,7 @@ describe('Home search visibility', () => {
 
   it('goHome clears stale search state from the SearchBar and params', async () => {
     const wrapper = mount(App, {
-      global: { stubs: ['PackList', 'Cart', 'AssetDetail', 'PackGallery'] }
+      global: { stubs: ['Cart', 'AssetDetail', 'PackGallery'] }
     })
     await flushPromises()
 
@@ -668,17 +656,17 @@ describe('Home search visibility', () => {
 
   it('returns to the gallery when the pack selection is cleared', async () => {
     const wrapper = mount(App, {
-      global: { stubs: ['PackList', 'SearchBar', 'AssetGrid', 'Cart', 'AssetDetail', 'PackGallery'] }
+      global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail', 'PackGallery'] }
     })
     await flushPromises()
     expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(true)
 
     // select a pack (leaves home), then clear it
-    wrapper.findComponent(PackList).vm.$emit('update:selectedPacks', ['SomePack'])
+    wrapper.vm.selectedPacks = ['SomePack']
     await flushPromises()
     expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(false)
 
-    wrapper.findComponent(PackList).vm.$emit('update:selectedPacks', [])
+    wrapper.vm.selectedPacks = []
     await flushPromises()
     expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(true)
   })
