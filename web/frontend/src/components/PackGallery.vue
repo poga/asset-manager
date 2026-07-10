@@ -55,7 +55,7 @@
           </div>
           <div class="card-meta">
             <span class="card-name" :title="formatPackName(pack.name)">{{ formatPackName(pack.name) }}</span>
-            <span class="card-count">{{ pack.count }} {{ pack.count === 1 ? 'asset' : 'assets' }}</span>
+            <span class="card-count">{{ pack.count }}</span>
           </div>
           <div class="card-tags" @click.stop>
             <span
