@@ -498,19 +498,20 @@ describe('App 3-column layout', () => {
     window.history.replaceState({}, '', originalLocation)
   })
 
-  it('renders 3-column layout', () => {
+  it('renders single-column layout with no cart aside', () => {
     const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] } })
     expect(wrapper.find('.left-panel').exists()).toBe(false)
     expect(wrapper.find('.middle-panel').exists()).toBe(true)
-    expect(wrapper.find('.right-panel').exists()).toBe(true)
+    expect(wrapper.find('.right-panel').exists()).toBe(false)
   })
 
-  it('renders Cart in right panel', async () => {
+  it('opens and closes the cart drawer from the header button', async () => {
     const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'AssetDetail'] } })
-    // Cart is only shown when panel is expanded
-    wrapper.vm.cartPanelExpanded = true
-    await wrapper.vm.$nextTick()
+    expect(wrapper.findComponent(Cart).exists()).toBe(false)
+    await wrapper.find('[data-testid="cart-button"]').trigger('click')
     expect(wrapper.findComponent(Cart).exists()).toBe(true)
+    await wrapper.find('.cart-scrim').trigger('click')
+    expect(wrapper.findComponent(Cart).exists()).toBe(false)
   })
 
   it('shows AssetDetail when asset selected', async () => {
