@@ -801,6 +801,61 @@ def upload_board_images(board_id: int, files: list[UploadFile] = File(...)):
     return {"assets": created, "cover_asset_id": cover_id, "cover_asset_path": cover_path}
 
 
+@app.delete("/api/asset/{asset_id}")
+def delete_asset(asset_id: int):
+    """Delete a board image: asset row, tag links, and file on disk."""
+    conn = get_db()
+    _ensure_board_columns(conn)
+    row = conn.execute(
+        """SELECT a.path, a.pack_id, p.source FROM assets a
+           JOIN packs p ON a.pack_id = p.id WHERE a.id = ?""",
+        [asset_id],
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+    if row["source"] != "user":
+        conn.close()
+        raise HTTPException(status_code=400, detail="Not a board asset")
+    pack_id = row["pack_id"]
+    conn.execute("DELETE FROM asset_tags WHERE asset_id = ?", [asset_id])
+    conn.execute("DELETE FROM assets WHERE id = ?", [asset_id])
+    conn.execute(
+        "UPDATE packs SET asset_count = (SELECT COUNT(*) FROM assets WHERE pack_id = ?) WHERE id = ?",
+        [pack_id, pack_id],
+    )
+    conn.commit()
+    conn.close()
+    f = get_assets_path() / row["path"]
+    if f.exists():
+        f.unlink()
+    return {"deleted": asset_id}
+
+
+@app.delete("/api/boards/{board_id}")
+def delete_board(board_id: int):
+    """Delete a board: its assets, tag links, pack_tags, pack row, and directory."""
+    import shutil
+    conn = get_db()
+    _ensure_board_columns(conn)
+    _ensure_pack_tags(conn)
+    board = _board_or_404(conn, board_id)
+    ids = [r["id"] for r in conn.execute(
+        "SELECT id FROM assets WHERE pack_id = ?", [board_id])]
+    for aid in ids:
+        conn.execute("DELETE FROM asset_tags WHERE asset_id = ?", [aid])
+    conn.execute("DELETE FROM assets WHERE pack_id = ?", [board_id])
+    conn.execute("DELETE FROM pack_tags WHERE pack_id = ?", [board_id])
+    conn.execute("DELETE FROM packs WHERE id = ?", [board_id])
+    conn.commit()
+    conn.close()
+    slug = board["path"].split("/", 1)[1]
+    d = boards_mod.board_dir(get_assets_path(), slug)
+    if d.exists():
+        shutil.rmtree(d)
+    return {"deleted": board_id}
+
+
 @app.patch("/api/boards/{board_id}")
 def patch_board(board_id: int, request: BoardPatchRequest):
     """Rename a board and/or set its cover asset."""

@@ -253,6 +253,48 @@ def test_pack_preview_serves_board_cover(env):
     assert r.headers["content-type"].startswith("image/")
 
 
+def test_delete_board_image(env):
+    board = _create("Del")
+    up = client.post(
+        f"/api/boards/{board['id']}/images",
+        files=[("files", ("a.png", png_bytes(), "image/png"))],
+    ).json()
+    a = up["assets"][0]
+    r = client.delete(f"/api/asset/{a['id']}")
+    assert r.status_code == 200
+    assert not (env["assets"] / a["path"]).exists()
+    conn = sqlite3.connect(env["db"])
+    n = conn.execute("SELECT COUNT(*) FROM assets WHERE id = ?", [a["id"]]).fetchone()[0]
+    conn.close()
+    assert n == 0
+
+
+def test_delete_asset_refuses_indexed(env):
+    conn = sqlite3.connect(env["db"])
+    conn.execute("INSERT INTO packs (name, path, source) VALUES ('P', 'p', 'indexed')")
+    pid = conn.execute("SELECT id FROM packs WHERE path='p'").fetchone()[0]
+    conn.execute(
+        "INSERT INTO assets (pack_id, path, filename, filetype, file_hash) "
+        "VALUES (?, 'p/x.png', 'x.png', 'png', 'h')", [pid])
+    aid = conn.execute("SELECT id FROM assets WHERE path='p/x.png'").fetchone()[0]
+    conn.commit(); conn.close()
+    r = client.delete(f"/api/asset/{aid}")
+    assert r.status_code == 400
+
+
+def test_delete_board(env):
+    board = _create("Whole")
+    client.post(f"/api/boards/{board['id']}/images",
+                files=[("files", ("a.png", png_bytes(), "image/png"))])
+    r = client.delete(f"/api/boards/{board['id']}")
+    assert r.status_code == 200
+    assert not (env["assets"] / ".boards" / "whole").exists()
+    conn = sqlite3.connect(env["db"])
+    assert conn.execute("SELECT COUNT(*) FROM packs WHERE id = ?", [board["id"]]).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM assets WHERE pack_id = ?", [board["id"]]).fetchone()[0] == 0
+    conn.close()
+
+
 def test_api_imports_under_server_layout():
     """Guard: `uvicorn web.api:app` must import without web/ pre-added to sys.path."""
     import subprocess
