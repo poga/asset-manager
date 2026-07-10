@@ -1355,6 +1355,68 @@ class TestKindRegistry:
 
 
 # =============================================================================
+# Font Indexing Tests
+# =============================================================================
+
+FIXTURES_FONTS = Path(__file__).parent / "tests" / "fixtures" / "fonts"
+FIXTURE_TTF = FIXTURES_FONTS / "PressStart2P-Regular.ttf"
+
+
+class TestFontIndexing:
+    def test_render_font_specimen_creates_png(self, tmp_path):
+        out = tmp_path / "specimen.png"
+        assert asset_kinds.render_font_specimen(FIXTURE_TTF, out) is True
+        with Image.open(out) as img:
+            assert img.size == (512, 256)
+            # opaque glyph pixels prove text actually rendered
+            assert img.getextrema()[3][1] == 255
+
+    def test_render_specimen_rejects_corrupt_font(self, tmp_path):
+        bad = tmp_path / "bad.ttf"
+        bad.write_bytes(b"this is not a font")
+        out = tmp_path / "specimen.png"
+        assert asset_kinds.render_font_specimen(bad, out) is False
+        assert not out.exists()
+
+    def test_index_font_pack_end_to_end(self, tmp_path):
+        pack = tmp_path / "assets" / "FontPack"
+        pack.mkdir(parents=True)
+        shutil.copy(FIXTURE_TTF, pack / "PressStart2P-Regular.ttf")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute(
+            "SELECT * FROM assets WHERE filename = 'PressStart2P-Regular.ttf'"
+        ).fetchone()
+        assert row["asset_kind"] == "font"
+        assert row["filetype"] == "ttf"
+        assert row["thumbnail_path"] is not None
+        assert (tmp_path / row["thumbnail_path"]).exists()
+        tags = {r["name"] for r in conn.execute("""
+            SELECT t.name FROM asset_tags at
+            JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = ?
+        """, [row["id"]])}
+        assert "font" in tags
+
+    def test_corrupt_font_indexes_without_thumbnail(self, tmp_path):
+        pack = tmp_path / "assets" / "FontPack"
+        pack.mkdir(parents=True)
+        (pack / "broken.ttf").write_bytes(b"garbage bytes")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT * FROM assets WHERE filename = 'broken.ttf'").fetchone()
+        assert row["asset_kind"] == "font"
+        assert row["thumbnail_path"] is None
+
+
+# =============================================================================
 # Entry point
 # =============================================================================
 

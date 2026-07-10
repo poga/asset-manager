@@ -35,7 +35,7 @@ import aseprite_parser
 import asset_kinds
 import frame_detect
 import model_indexer
-from asset_kinds import ASEPRITE_EXTENSIONS, IMAGE_EXTENSIONS, MODEL_EXTENSIONS
+from asset_kinds import ASEPRITE_EXTENSIONS, IMAGE_EXTENSIONS, MODEL_EXTENSIONS, FONT_EXTENSIONS
 
 app = typer.Typer(help="Build and update the game asset index")
 console = Console()
