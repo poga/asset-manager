@@ -11,11 +11,27 @@
       />
       <h2 v-else class="board-name">{{ board.name }}</h2>
       <div class="board-actions">
-        <button data-testid="add-images" class="board-btn" @click="pick">+ Add images</button>
+        <button data-testid="add-images" class="board-btn" :disabled="uploading" @click="pick">+ Add images</button>
         <button class="board-btn" @click="startRename">Rename</button>
         <button class="board-btn danger" @click="removeBoard">Delete</button>
       </div>
       <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="onPick" />
+    </div>
+
+    <div v-if="uploading" data-testid="upload-progress" class="upload-progress">
+      <div class="upload-progress-label">
+        <span v-if="processing">Processing {{ fileCount }} {{ fileCount === 1 ? 'file' : 'files' }}…</span>
+        <span v-else>Uploading {{ fileCount }} {{ fileCount === 1 ? 'file' : 'files' }}…</span>
+        <span v-if="!processing" class="upload-progress-pct">{{ progress }}%</span>
+      </div>
+      <div class="upload-bar">
+        <div class="upload-bar-fill" :class="{ processing }" :style="processing ? {} : { width: progress + '%' }"></div>
+      </div>
+    </div>
+
+    <div v-if="errorMsg" data-testid="upload-error" class="upload-error">
+      <span>⚠ {{ errorMsg }}</span>
+      <button class="upload-error-dismiss" @click="errorMsg = ''">Dismiss</button>
     </div>
 
     <div
@@ -59,12 +75,33 @@ const dragOver = ref(false)
 const renaming = ref(false)
 const draftName = ref('')
 
+const uploading = ref(false)
+const processing = ref(false)
+const progress = ref(0)
+const fileCount = ref(0)
+const errorMsg = ref('')
+
 function pick() { fileInput.value?.click() }
 
 async function upload(files) {
-  if (!files || !files.length) return
-  await uploadImages(props.board.id, files)
-  emit('changed')
+  if (!files || !files.length || uploading.value) return
+  errorMsg.value = ''
+  uploading.value = true
+  processing.value = false
+  progress.value = 0
+  fileCount.value = files.length
+  try {
+    await uploadImages(props.board.id, files, p => {
+      progress.value = p
+      processing.value = p >= 100
+    })
+    emit('changed')
+  } catch (e) {
+    errorMsg.value = e.message || 'Upload failed'
+  } finally {
+    uploading.value = false
+    processing.value = false
+  }
 }
 
 function onPick(e) {
@@ -117,6 +154,38 @@ async function removeBoard() {
 }
 .board-btn:hover { border-color: var(--color-accent); color: var(--color-text-primary); }
 .board-btn.danger:hover { border-color: var(--color-danger); color: var(--color-danger); }
+.upload-progress { padding: 0 1.25rem 0.75rem; }
+.upload-progress-label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 0.8125rem; color: var(--color-text-secondary); margin-bottom: 0.375rem;
+}
+.upload-progress-pct { font-variant-numeric: tabular-nums; color: var(--color-text-primary); }
+.upload-bar {
+  height: 6px; border-radius: 3px; overflow: hidden;
+  background: var(--color-border);
+}
+.upload-bar-fill {
+  height: 100%; background: var(--color-accent);
+  border-radius: 3px; transition: width 0.15s ease;
+}
+.upload-bar-fill.processing {
+  width: 40%; animation: upload-indeterminate 1s ease-in-out infinite;
+}
+@keyframes upload-indeterminate {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+.upload-error {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin: 0 1.25rem 0.75rem; padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-danger); border-radius: 6px;
+  color: var(--color-danger); font-size: 0.8125rem;
+}
+.upload-error-dismiss {
+  margin-left: auto; border: none; background: transparent;
+  color: var(--color-danger); cursor: pointer; text-decoration: underline; font-size: 0.8125rem;
+}
+.board-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .dropzone { flex: 1; overflow-y: auto; position: relative; }
 .dropzone.over { outline: 2px dashed var(--color-accent); outline-offset: -6px; }
 .empty-hint { text-align: center; color: var(--color-text-muted); padding: 2rem; }
