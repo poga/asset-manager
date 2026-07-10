@@ -117,5 +117,27 @@ def test_save_image_writes_file_and_dims(env):
     assert (w, h) == (12, 7)
 
 
+def test_create_board(env):
+    r = client.post("/api/boards", json={"name": "My Board", "tags": ["inspo"]})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["name"] == "My Board"
+    assert body["path"] == ".boards/my-board"
+    conn = sqlite3.connect(env["db"])
+    row = conn.execute("SELECT source FROM packs WHERE id = ?", [body["id"]]).fetchone()
+    assert row[0] == "user"
+    tag = conn.execute(
+        "SELECT tag FROM pack_tags WHERE pack_id = ?", [body["id"]]
+    ).fetchone()
+    conn.close()
+    assert tag[0] == "inspo"
+
+
+def test_create_board_duplicate_name(env):
+    client.post("/api/boards", json={"name": "Dup"})
+    r = client.post("/api/boards", json={"name": "Dup"})
+    assert r.status_code == 409
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -26,6 +26,7 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import aseprite_parser
 import model_indexer
+import boards as boards_mod
 
 app = FastAPI(title="Asset Search API")
 
@@ -59,6 +60,20 @@ class PreviewOverrideRequest(BaseModel):
 
 
 class PackTagRequest(BaseModel):
+    tag: str
+
+
+class BoardCreateRequest(BaseModel):
+    name: str
+    tags: list[str] = []
+
+
+class BoardPatchRequest(BaseModel):
+    name: Optional[str] = None
+    cover_asset_id: Optional[int] = None
+
+
+class AssetTagRequest(BaseModel):
     tag: str
 
 
@@ -161,6 +176,16 @@ def _pack_id_or_404(conn: sqlite3.Connection, pack_name: str) -> int:
         conn.close()
         raise HTTPException(status_code=404, detail="Pack not found")
     return row["id"]
+
+
+def _board_or_404(conn: sqlite3.Connection, board_id: int) -> sqlite3.Row:
+    row = conn.execute(
+        "SELECT * FROM packs WHERE id = ? AND source = 'user'", [board_id]
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Board not found")
+    return row
 
 
 @app.get("/api/health")
@@ -681,6 +706,37 @@ def remove_pack_tag(pack_name: str, tag: str):
     tags = _pack_tag_list(conn, pack_id)
     conn.close()
     return {"tags": tags}
+
+
+@app.post("/api/boards", status_code=201)
+def create_board(request: BoardCreateRequest):
+    """Create a user board pack, optionally with pack-level tags."""
+    name = request.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Empty name")
+    conn = get_db()
+    _ensure_board_columns(conn)
+    _ensure_pack_tags(conn)
+    if conn.execute("SELECT 1 FROM packs WHERE name = ?", [name]).fetchone():
+        conn.close()
+        raise HTTPException(status_code=409, detail="Name already exists")
+    slug = boards_mod.unique_slug(conn, name)
+    path = f"{boards_mod.BOARD_ROOT}/{slug}"
+    cur = conn.execute(
+        "INSERT INTO packs (name, path, source, asset_count) VALUES (?, ?, 'user', 0)",
+        [name, path],
+    )
+    board_id = cur.lastrowid
+    for tag in request.tags:
+        t = tag.strip().lower()
+        if t:
+            conn.execute(
+                "INSERT OR IGNORE INTO pack_tags (pack_id, tag) VALUES (?, ?)",
+                [board_id, t],
+            )
+    conn.commit()
+    conn.close()
+    return {"id": board_id, "name": name, "path": path}
 
 
 class DownloadCartRequest(BaseModel):
