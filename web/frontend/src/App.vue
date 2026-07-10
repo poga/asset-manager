@@ -19,22 +19,6 @@
     </header>
 
     <div class="app-layout">
-      <aside class="left-panel" :class="'pack-' + packPanelState">
-        <div v-if="packPanelState === 'collapsed'" class="collapsed-strip" @click="togglePackPanel">
-          <span class="strip-icon">📦</span>
-          <span v-if="selectedPacks.length > 0" class="strip-badge">{{ selectedPacks.length }}</span>
-        </div>
-        <PackList
-          v-else
-          :packs="packList"
-          v-model:selectedPacks="selectedPacks"
-          v-model:selectionMode="selectionMode"
-          :panelState="packPanelState"
-          @toggle-panel="togglePackPanel"
-          @view-pack="viewPack"
-        />
-      </aside>
-
       <main class="middle-panel">
         <SearchBar ref="searchBarRef" :filters="filters" @search="handleSearch" />
 
@@ -86,7 +70,6 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import PackList from './components/PackList.vue'
 import SearchBar from './components/SearchBar.vue'
 import AssetGrid from './components/AssetGrid.vue'
 import PackGallery from './components/PackGallery.vue'
@@ -103,14 +86,12 @@ const loadingMore = ref(false)
 const selectedAsset = ref(null)
 const searchBarRef = ref(null)
 const selectedPacks = ref([])
-const selectionMode = ref('single')
 const cartItems = ref([])
 const currentSearchParams = ref({})
 const isDark = ref(false)
 const isDefaultHomeView = ref(true)
 
-// Panel state management
-const packPanelState = ref('normal') // 'collapsed' | 'normal' | 'expanded'
+// Cart panel state
 const cartPanelExpanded = ref(false)
 
 function loadPanelState() {
@@ -118,12 +99,7 @@ function loadPanelState() {
     const saved = localStorage.getItem('panelState')
     if (saved) {
       const state = JSON.parse(saved)
-      const validPackStates = ['collapsed', 'normal', 'expanded']
-      if (validPackStates.includes(state.pack)) packPanelState.value = state.pack
       if (typeof state.cart === 'boolean') cartPanelExpanded.value = state.cart
-      if (state.selectionMode === 'single' || state.selectionMode === 'multi') {
-        selectionMode.value = state.selectionMode
-      }
     }
   } catch (e) {
     // Ignore invalid localStorage data
@@ -132,21 +108,8 @@ function loadPanelState() {
 
 function savePanelState() {
   localStorage.setItem('panelState', JSON.stringify({
-    pack: packPanelState.value,
-    cart: cartPanelExpanded.value,
-    selectionMode: selectionMode.value
+    cart: cartPanelExpanded.value
   }))
-}
-
-function togglePackPanel() {
-  const states = ['collapsed', 'normal', 'expanded']
-  const currentIndex = states.indexOf(packPanelState.value)
-  packPanelState.value = states[(currentIndex + 1) % 3]
-  // Auto-collapse cart when pack expands to 60%
-  if (packPanelState.value === 'expanded' && cartPanelExpanded.value) {
-    cartPanelExpanded.value = false
-  }
-  savePanelState()
 }
 
 function toggleCartPanel() {
@@ -399,26 +362,8 @@ watch(selectedPacks, (newPacks, oldPacks) => {
         && !hasActiveSearch(currentSearchParams.value)) {
       isDefaultHomeView.value = true
     }
-    // In single mode, update URL to reflect pack selection
-    if (selectionMode.value === 'single' && !skipNextPush) {
-      if (newPacks.length === 1) {
-        selectedAsset.value = null
-        isDefaultHomeView.value = false
-        window.history.pushState({ route: 'pack', name: newPacks[0] }, '', buildUrl({ name: 'pack', params: { name: newPacks[0] } }))
-      } else if (newPacks.length === 0 && oldPacks && oldPacks.length > 0) {
-        window.history.pushState({ route: 'home' }, '', buildUrl({ name: 'home' }))
-      }
-    }
   }
   skipNextPush = false
-})
-
-watch(selectionMode, (newMode, oldMode) => {
-  // When switching from multi to single, keep only first selected pack
-  if (oldMode === 'multi' && newMode === 'single' && selectedPacks.value.length > 1) {
-    selectedPacks.value = [selectedPacks.value[0]]
-  }
-  savePanelState()
 })
 
 function handlePopState(event) {
@@ -599,28 +544,6 @@ body {
   gap: 1rem;
   padding: 1rem;
   background: var(--color-bg-base);
-}
-
-.left-panel {
-  flex-shrink: 0;
-  overflow-y: auto;
-  background: var(--glass-bg);
-  backdrop-filter: blur(8px);
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-}
-
-.left-panel.pack-collapsed {
-  width: 40px;
-  overflow: hidden;
-}
-
-.left-panel.pack-normal {
-  width: 320px;
-}
-
-.left-panel.pack-expanded {
-  width: 60%;
 }
 
 .middle-panel {
