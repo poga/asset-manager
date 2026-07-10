@@ -496,6 +496,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
+  z-index: 20;
 }
 
 .app-header h1 {
@@ -557,6 +559,8 @@ body {
   background: var(--glass-bg);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--color-border);
+  position: relative;
+  z-index: 20;
 }
 
 .header-actions {

@@ -454,7 +454,7 @@ describe('App URL routing', () => {
   })
 })
 
-describe('App 3-column layout', () => {
+describe('App layout', () => {
   let pushStateSpy
   let originalLocation
 
@@ -505,12 +505,23 @@ describe('App 3-column layout', () => {
     expect(wrapper.find('.right-panel').exists()).toBe(false)
   })
 
-  it('opens and closes the cart drawer from the header button', async () => {
+  it('opens and closes the cart drawer (scrim, close button, Escape)', async () => {
     const wrapper = mount(App, { global: { stubs: ['SearchBar', 'AssetGrid', 'AssetDetail'] } })
+    const openDrawer = () => wrapper.find('[data-testid="cart-button"]').trigger('click')
+
     expect(wrapper.findComponent(Cart).exists()).toBe(false)
-    await wrapper.find('[data-testid="cart-button"]').trigger('click')
+    await openDrawer()
     expect(wrapper.findComponent(Cart).exists()).toBe(true)
     await wrapper.find('.cart-scrim').trigger('click')
+    expect(wrapper.findComponent(Cart).exists()).toBe(false)
+
+    await openDrawer()
+    await wrapper.findComponent(Cart).find('.icon-btn').trigger('click')
+    expect(wrapper.findComponent(Cart).exists()).toBe(false)
+
+    await openDrawer()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
     expect(wrapper.findComponent(Cart).exists()).toBe(false)
   })
 

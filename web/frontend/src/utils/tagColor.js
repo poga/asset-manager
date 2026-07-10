@@ -1,5 +1,4 @@
-// deterministic hue per tag, snapped to evenly-spaced steps so
-// unrelated tags are never a near-identical, hard-to-tell-apart color
+// deterministic hue per tag, snapped to 12 steps so tags stay distinguishable
 const TAG_HUE_STEPS = 12
 
 export function tagHue(tag) {
