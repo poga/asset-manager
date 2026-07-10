@@ -91,7 +91,7 @@ const currentSearchParams = ref({})
 const isDark = ref(false)
 const isDefaultHomeView = ref(true)
 
-// Panel state management
+// Cart panel state
 const cartPanelExpanded = ref(false)
 
 function loadPanelState() {
