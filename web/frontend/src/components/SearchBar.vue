@@ -158,7 +158,7 @@ defineExpose({ addTagExternal, clear })
   gap: 12px;
   flex-wrap: wrap;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .search-input-wrapper {

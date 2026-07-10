@@ -107,7 +107,7 @@ defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack', 'tag-click', 't
 
 <style scoped>
 .asset-detail {
-  padding: 1rem;
+  padding: 1rem 1.25rem 2rem;
 }
 
 .back-btn {

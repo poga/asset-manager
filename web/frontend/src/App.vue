@@ -29,10 +29,12 @@
       </div>
     </header>
 
+    <div class="search-toolbar">
+      <SearchBar ref="searchBarRef" :filters="filters" @search="handleSearch" />
+    </div>
+
     <div class="app-layout">
       <main class="middle-panel">
-        <SearchBar ref="searchBarRef" :filters="filters" @search="handleSearch" />
-
         <AssetDetail
           v-if="selectedAsset"
           :asset="selectedAsset"
@@ -533,25 +535,28 @@ body {
   display: flex;
   flex: 1;
   overflow: hidden;
-  gap: 1rem;
-  padding: 1rem;
   background: var(--color-bg-base);
 }
 
 .middle-panel {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-bg-surface);
-  border-radius: 8px;
-  box-shadow: var(--shadow-card);
-  padding: 1rem;
 }
 
 .middle-panel > :last-child {
   flex: 1;
   overflow-y: auto;
+}
+
+.search-toolbar {
+  flex-shrink: 0;
+  padding: 0.75rem 1.25rem;
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .header-actions {

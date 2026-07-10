@@ -93,6 +93,10 @@ function onScroll(e) {
 </script>
 
 <style scoped>
+.asset-grid-container {
+  padding: 1rem 1.25rem 2rem;
+}
+
 .result-count {
   margin-bottom: 0.5rem;
   color: var(--color-text-muted);
