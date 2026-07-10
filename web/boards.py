@@ -37,11 +37,18 @@ def board_dir(assets_root: Path, slug: str) -> Path:
 
 def validate_upload(filename: str, data: bytes) -> str:
     """Return the lowercased extension or raise ValueError."""
+    if not filename:
+        raise ValueError("Missing filename")
     ext = Path(filename).suffix.lower().lstrip(".")
     if ext not in ALLOWED_EXTS:
         raise ValueError(f"Unsupported type: {ext}")
     if len(data) > MAX_UPLOAD_BYTES:
         raise ValueError("File too large")
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            img.verify()
+    except Exception:
+        raise ValueError("Not a valid image")
     return ext
 
 

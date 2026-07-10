@@ -109,6 +109,20 @@ def test_validate_upload(env):
         boards.validate_upload("a.png", b"x" * (boards.MAX_UPLOAD_BYTES + 1))
 
 
+def test_validate_upload_rejects_corrupt_bytes(env):
+    import boards
+    with pytest.raises(ValueError):
+        boards.validate_upload("bad.png", b"not an image")
+
+
+def test_validate_upload_rejects_missing_filename(env):
+    import boards
+    with pytest.raises(ValueError):
+        boards.validate_upload(None, png_bytes())
+    with pytest.raises(ValueError):
+        boards.validate_upload("", png_bytes())
+
+
 def test_save_image_writes_file_and_dims(env):
     import boards
     rel, w, h = boards.save_image(env["assets"], "my-board", png_bytes(size=(12, 7)), "png")
@@ -175,6 +189,22 @@ def test_upload_rejects_bad_type(env):
     n = conn.execute("SELECT COUNT(*) FROM assets").fetchone()[0]
     conn.close()
     assert n == 0
+
+
+def test_upload_batch_with_corrupt_file_writes_nothing(env):
+    board = _create("Atomic")
+    files = [
+        ("files", ("good.png", png_bytes(), "image/png")),
+        ("files", ("bad.png", b"not an image", "image/png")),
+    ]
+    r = client.post(f"/api/boards/{board['id']}/images", files=files)
+    assert r.status_code == 400
+    conn = sqlite3.connect(env["db"])
+    n = conn.execute("SELECT COUNT(*) FROM assets").fetchone()[0]
+    conn.close()
+    assert n == 0
+    board_dir = env["assets"] / ".boards" / "atomic"
+    assert not board_dir.exists() or list(board_dir.iterdir()) == []
 
 
 def test_upload_missing_board_404(env):
