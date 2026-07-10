@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS packs (
     preview_path TEXT,
     preview_generated BOOLEAN DEFAULT FALSE,
     asset_count INTEGER DEFAULT 0,
+    source TEXT DEFAULT 'indexed',
     indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -170,6 +171,8 @@ def migrate_schema(conn: sqlite3.Connection) -> None:
         existing = {r["name"] for r in conn.execute("PRAGMA table_info(packs)")}
         if "theme" not in existing:
             conn.execute("ALTER TABLE packs ADD COLUMN theme TEXT")
+        if "source" not in existing:
+            conn.execute("ALTER TABLE packs ADD COLUMN source TEXT DEFAULT 'indexed'")
     if "assets" in tables:
         existing = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
         if "asset_kind" not in existing:

@@ -136,6 +136,13 @@ def _ensure_pack_tags(conn: sqlite3.Connection) -> None:
     )
 
 
+def _ensure_board_columns(conn: sqlite3.Connection) -> None:
+    """Lazily add the board flag so pre-existing DBs work without a reindex."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(packs)")}
+    if "source" not in cols:
+        conn.execute("ALTER TABLE packs ADD COLUMN source TEXT DEFAULT 'indexed'")
+
+
 def _pack_tag_list(conn: sqlite3.Connection, pack_id: int) -> list[str]:
     return [
         r["tag"]
@@ -437,8 +444,9 @@ def filters():
     """Get available filter options."""
     conn = get_db()
 
+    _ensure_board_columns(conn)
     packs = conn.execute("""
-        SELECT p.id, p.name, p.asset_count AS count,
+        SELECT p.id, p.name, p.source, p.asset_count AS count,
                EXISTS (SELECT 1 FROM assets a
                        WHERE a.pack_id = p.id
                          AND a.asset_kind IN ('model', 'animation_bundle')) AS is_3d
@@ -477,9 +485,11 @@ def filters():
     return {
         "packs": [
             {
+                "id": p["id"],
                 "name": p["name"],
                 "count": p["count"],
                 "is_3d": bool(p["is_3d"]),
+                "is_board": p["source"] == "user",
                 "tags": pack_tag_map.get(p["id"], []),
             }
             for p in packs
