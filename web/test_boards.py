@@ -48,6 +48,10 @@ def _make_db(dir_path: Path) -> Path:
         CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, source TEXT, PRIMARY KEY (asset_id, tag_id));
         CREATE TABLE asset_colors (asset_id INTEGER, color_hex TEXT, percentage REAL, PRIMARY KEY (asset_id, color_hex));
         CREATE TABLE asset_phash (asset_id INTEGER PRIMARY KEY, phash BLOB);
+        CREATE TABLE asset_preview_overrides (
+            path TEXT PRIMARY KEY, use_full_image BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
         """
     )
     conn.commit()
@@ -293,6 +297,28 @@ def test_delete_board(env):
     assert conn.execute("SELECT COUNT(*) FROM packs WHERE id = ?", [board["id"]]).fetchone()[0] == 0
     assert conn.execute("SELECT COUNT(*) FROM assets WHERE pack_id = ?", [board["id"]]).fetchone()[0] == 0
     conn.close()
+
+
+def test_image_tags_roundtrip(env):
+    board = _create("Tagged")
+    up = client.post(f"/api/boards/{board['id']}/images",
+                     files=[("files", ("a.png", png_bytes(), "image/png"))]).json()
+    aid = up["assets"][0]["id"]
+    r = client.post(f"/api/asset/{aid}/tags", json={"tag": "Inspo"})
+    assert r.status_code == 200
+    assert "inspo" in r.json()["tags"]
+    r = client.delete(f"/api/asset/{aid}/tags/inspo")
+    assert r.status_code == 200
+    assert "inspo" not in r.json()["tags"]
+
+
+def test_asset_detail_reports_board(env):
+    board = _create("Detail")
+    up = client.post(f"/api/boards/{board['id']}/images",
+                     files=[("files", ("a.png", png_bytes(), "image/png"))]).json()
+    d = client.get(f"/api/asset/{up['assets'][0]['id']}").json()
+    assert d["is_board"] is True
+    assert d["board_id"] == board["id"]
 
 
 def test_api_imports_under_server_layout():

@@ -367,8 +367,9 @@ def asset_detail(asset_id: int):
     """Get detailed info for an asset."""
     conn = get_db()
 
+    _ensure_board_columns(conn)
     row = conn.execute("""
-        SELECT a.*, p.name as pack_name
+        SELECT a.*, p.name as pack_name, p.source as pack_source
         FROM assets a
         LEFT JOIN packs p ON a.pack_id = p.id
         WHERE a.id = ?
@@ -418,7 +419,49 @@ def asset_detail(asset_id: int):
         "kind": row["asset_kind"],
         "rig": row["rig"],
         "thumbnail_path": row["thumbnail_path"],
+        "is_board": row["pack_source"] == "user",
+        "board_id": row["pack_id"] if row["pack_source"] == "user" else None,
     }
+
+
+@app.post("/api/asset/{asset_id}/tags")
+def add_asset_tag(asset_id: int, request: AssetTagRequest):
+    """Add a user tag to an asset, creating the tag if needed."""
+    tag = request.tag.strip().lower()
+    if not tag:
+        raise HTTPException(status_code=400, detail="Empty tag")
+    conn = get_db()
+    if not conn.execute("SELECT 1 FROM assets WHERE id = ?", [asset_id]).fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+    conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", [tag])
+    tag_id = conn.execute("SELECT id FROM tags WHERE name = ?", [tag]).fetchone()[0]
+    conn.execute(
+        "INSERT OR IGNORE INTO asset_tags (asset_id, tag_id, source) VALUES (?, ?, 'user')",
+        [asset_id, tag_id],
+    )
+    conn.commit()
+    tags = [r["name"] for r in conn.execute(
+        "SELECT t.name FROM asset_tags at JOIN tags t ON at.tag_id = t.id WHERE at.asset_id = ?",
+        [asset_id])]
+    conn.close()
+    return {"tags": tags}
+
+
+@app.delete("/api/asset/{asset_id}/tags/{tag}")
+def remove_asset_tag(asset_id: int, tag: str):
+    """Remove a tag from an asset; absent tag is a no-op."""
+    conn = get_db()
+    row = conn.execute("SELECT id FROM tags WHERE name = ?", [tag.strip().lower()]).fetchone()
+    if row:
+        conn.execute("DELETE FROM asset_tags WHERE asset_id = ? AND tag_id = ?",
+                     [asset_id, row["id"]])
+        conn.commit()
+    tags = [r["name"] for r in conn.execute(
+        "SELECT t.name FROM asset_tags at JOIN tags t ON at.tag_id = t.id WHERE at.asset_id = ?",
+        [asset_id])]
+    conn.close()
+    return {"tags": tags}
 
 
 @app.post("/api/asset/{asset_id}/preview-override")
