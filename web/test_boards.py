@@ -242,6 +242,17 @@ def test_set_cover_foreign_asset_400(env):
     assert r.status_code == 400
 
 
+def test_pack_preview_serves_board_cover(env):
+    board = _create("Preview Board")
+    client.post(
+        f"/api/boards/{board['id']}/images",
+        files=[("files", ("a.png", png_bytes((9, 9, 9)), "image/png"))],
+    )
+    r = client.get("/api/pack-preview/Preview%20Board")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/")
+
+
 def test_api_imports_under_server_layout():
     """Guard: `uvicorn web.api:app` must import without web/ pre-added to sys.path."""
     import subprocess

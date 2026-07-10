@@ -664,6 +664,22 @@ def pack_preview(pack_name: str):
     from urllib.parse import unquote
     pack_name = unquote(pack_name)
 
+    conn = get_db()
+    _ensure_board_columns(conn)
+    row = conn.execute(
+        "SELECT preview_path FROM packs WHERE name = ? AND source = 'user'", [pack_name]
+    ).fetchone()
+    conn.close()
+    if row and row["preview_path"]:
+        cover = get_assets_path() / row["preview_path"]
+        if cover.exists():
+            media = "image/gif" if cover.suffix.lower() == ".gif" else "image/png"
+            if cover.suffix.lower() in (".jpg", ".jpeg"):
+                media = "image/jpeg"
+            elif cover.suffix.lower() == ".webp":
+                media = "image/webp"
+            return FileResponse(cover, media_type=media)
+
     # Check for both .gif and .png
     gif_path = previews_dir / f"{pack_name}.gif"
     png_path = previews_dir / f"{pack_name}.png"
