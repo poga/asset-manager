@@ -362,16 +362,6 @@ watch(selectedPacks, (newPacks, oldPacks) => {
         && !hasActiveSearch(currentSearchParams.value)) {
       isDefaultHomeView.value = true
     }
-    // update URL to reflect pack selection
-    if (!skipNextPush) {
-      if (newPacks.length === 1) {
-        selectedAsset.value = null
-        isDefaultHomeView.value = false
-        window.history.pushState({ route: 'pack', name: newPacks[0] }, '', buildUrl({ name: 'pack', params: { name: newPacks[0] } }))
-      } else if (newPacks.length === 0 && oldPacks && oldPacks.length > 0) {
-        window.history.pushState({ route: 'home' }, '', buildUrl({ name: 'home' }))
-      }
-    }
   }
   skipNextPush = false
 })

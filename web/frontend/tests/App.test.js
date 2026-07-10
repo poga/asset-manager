@@ -433,23 +433,7 @@ describe('App URL routing', () => {
     expect(wrapper.vm.selectedPacks).toEqual([])
   })
 
-  it('calls pushState with /pack/:name when a pack is selected', async () => {
-    const wrapper = mount(App)
-    await flushPromises()
-    pushStateSpy.mockClear()
-
-    // Simulate pack selection
-    wrapper.vm.selectedPacks = ['fantasy-pack']
-    await flushPromises()
-
-    expect(pushStateSpy).toHaveBeenCalledWith(
-      { route: 'pack', name: 'fantasy-pack' },
-      '',
-      '/assets/pack/fantasy-pack'
-    )
-  })
-
-  it('calls pushState with / when the last pack is deselected', async () => {
+  it('calls pushState with / when returning home from a pack', async () => {
     // Start at /pack/test-pack
     window.history.replaceState({}, '', '/assets/pack/test-pack')
 
@@ -459,8 +443,7 @@ describe('App URL routing', () => {
 
     expect(wrapper.vm.selectedPacks).toContain('test-pack')
 
-    // Deselect the pack
-    wrapper.vm.selectedPacks = []
+    wrapper.vm.goHome()
     await flushPromises()
 
     expect(pushStateSpy).toHaveBeenCalledWith(
@@ -662,7 +645,7 @@ describe('Home search visibility', () => {
     expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(true)
 
     // select a pack (leaves home), then clear it
-    wrapper.vm.selectedPacks = ['SomePack']
+    wrapper.vm.viewPack('SomePack')
     await flushPromises()
     expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(false)
 
