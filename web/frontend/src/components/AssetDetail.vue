@@ -52,6 +52,7 @@
             v-for="tag in asset.tags"
             :key="tag"
             class="tag"
+            :style="{ '--tag-hue': tagHue(tag) }"
             @click="$emit('tag-click', tag)"
           >{{ tag }}</span>
         </div>
@@ -93,6 +94,7 @@
 
 <script setup>
 import ModelViewer from './ModelViewer.vue'
+import { tagHue } from '../utils/tagColor.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
@@ -105,7 +107,7 @@ defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack', 'tag-click', 't
 
 <style scoped>
 .asset-detail {
-  padding: 1rem;
+  padding: 1rem 1.25rem 2rem;
 }
 
 .back-btn {
@@ -189,19 +191,23 @@ h2 {
 
 .tag {
   display: inline-block;
-  background: var(--color-accent-light);
-  color: var(--color-accent-hover);
+  background: hsl(var(--tag-hue, 0), 50%, 92%);
+  color: hsl(var(--tag-hue, 0), 40%, 30%);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   margin-left: 0.25rem;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background-color 150ms;
+  transition: filter 150ms;
+}
+
+[data-theme='dark'] .tag {
+  background: hsl(var(--tag-hue, 0), 30%, 24%);
+  color: hsl(var(--tag-hue, 0), 55%, 78%);
 }
 
 .tag:hover {
-  background: var(--color-accent);
-  color: white;
+  filter: brightness(0.95);
 }
 
 .colors {

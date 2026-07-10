@@ -3,8 +3,8 @@
   <div class="cart">
     <div class="cart-header">
       <span class="cart-title">Cart</span>
-      <button class="icon-btn" @click="$emit('toggle-panel')" title="Collapse panel">
-        <span>➡️</span>
+      <button class="icon-btn" @click="$emit('toggle-panel')" title="Close cart">
+        <span>✕</span>
       </button>
     </div>
 

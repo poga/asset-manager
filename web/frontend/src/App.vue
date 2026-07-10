@@ -2,26 +2,39 @@
   <div class="app">
     <header class="app-header">
       <h1 class="home-link" @click="goHome">Asset Manager</h1>
-      <button
-        class="theme-toggle"
-        data-testid="theme-toggle"
-        @click="toggleTheme"
-        :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-      >
-        <svg v-if="isDark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="5"/>
-          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-        </svg>
-        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
-      </button>
+      <div class="header-actions">
+        <button
+          class="cart-button"
+          data-testid="cart-button"
+          @click="cartOpen = true"
+          title="Open cart"
+        >
+          <span class="cart-button-icon">🛒</span>
+          <span v-if="cartItems.length > 0" class="cart-button-badge">{{ cartItems.length }}</span>
+        </button>
+        <button
+          class="theme-toggle"
+          data-testid="theme-toggle"
+          @click="toggleTheme"
+          :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+        >
+          <svg v-if="isDark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+      </div>
     </header>
+
+    <div class="search-toolbar">
+      <SearchBar ref="searchBarRef" :filters="filters" @search="handleSearch" />
+    </div>
 
     <div class="app-layout">
       <main class="middle-panel">
-        <SearchBar ref="searchBarRef" :filters="filters" @search="handleSearch" />
-
         <AssetDetail
           v-if="selectedAsset"
           :asset="selectedAsset"
@@ -50,21 +63,21 @@
           @load-more="loadMore"
         />
       </main>
-
-      <aside class="right-panel" :class="{ 'cart-collapsed': !cartPanelExpanded }">
-        <div v-if="!cartPanelExpanded" class="collapsed-strip" @click="toggleCartPanel">
-          <span class="strip-icon">🛒</span>
-          <span v-if="cartItems.length > 0" class="strip-badge">{{ cartItems.length }}</span>
-        </div>
-        <Cart
-          v-else
-          :items="cartItems"
-          @remove="removeFromCart"
-          @download="downloadCart"
-          @toggle-panel="toggleCartPanel"
-        />
-      </aside>
     </div>
+
+    <transition name="drawer">
+      <div v-if="cartOpen" class="cart-drawer-wrap">
+        <div class="cart-scrim" @click="cartOpen = false"></div>
+        <aside class="cart-drawer">
+          <Cart
+            :items="cartItems"
+            @remove="removeFromCart"
+            @download="downloadCart"
+            @toggle-panel="cartOpen = false"
+          />
+        </aside>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -91,30 +104,10 @@ const currentSearchParams = ref({})
 const isDark = ref(false)
 const isDefaultHomeView = ref(true)
 
-// Cart panel state
-const cartPanelExpanded = ref(false)
+const cartOpen = ref(false)
 
-function loadPanelState() {
-  try {
-    const saved = localStorage.getItem('panelState')
-    if (saved) {
-      const state = JSON.parse(saved)
-      if (typeof state.cart === 'boolean') cartPanelExpanded.value = state.cart
-    }
-  } catch (e) {
-    // Ignore invalid localStorage data
-  }
-}
-
-function savePanelState() {
-  localStorage.setItem('panelState', JSON.stringify({
-    cart: cartPanelExpanded.value
-  }))
-}
-
-function toggleCartPanel() {
-  cartPanelExpanded.value = !cartPanelExpanded.value
-  savePanelState()
+function handleKeydown(e) {
+  if (e.key === 'Escape' && cartOpen.value) cartOpen.value = false
 }
 
 let debounceTimer = null
@@ -408,7 +401,6 @@ function handleInitialRoute() {
 
 onMounted(async () => {
   initTheme()
-  loadPanelState()
   if (window.matchMedia) {
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     mediaQuery.addEventListener('change', handleSystemThemeChange)
@@ -417,11 +409,13 @@ onMounted(async () => {
   search({ q: null, tag: [] })
   handleInitialRoute()
   window.addEventListener('popstate', handlePopState)
+  window.addEventListener('keydown', handleKeydown)
   isInitializing = false
 })
 
 onUnmounted(() => {
   window.removeEventListener('popstate', handlePopState)
+  window.removeEventListener('keydown', handleKeydown)
   if (mediaQuery) {
     mediaQuery.removeEventListener('change', handleSystemThemeChange)
   }
@@ -502,6 +496,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
+  z-index: 20;
 }
 
 .app-header h1 {
@@ -541,20 +537,15 @@ body {
   display: flex;
   flex: 1;
   overflow: hidden;
-  gap: 1rem;
-  padding: 1rem;
   background: var(--color-bg-base);
 }
 
 .middle-panel {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-bg-surface);
-  border-radius: 8px;
-  box-shadow: var(--shadow-card);
-  padding: 1rem;
 }
 
 .middle-panel > :last-child {
@@ -562,22 +553,97 @@ body {
   overflow-y: auto;
 }
 
-.right-panel {
+.search-toolbar {
   flex-shrink: 0;
-  overflow-y: auto;
+  padding: 0.75rem 1.25rem;
   background: var(--glass-bg);
   backdrop-filter: blur(8px);
-  border-radius: 8px;
+  border-bottom: 1px solid var(--color-border);
+  position: relative;
+  z-index: 20;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cart-button {
+  position: relative;
+  background: none;
   border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
 }
 
-.right-panel.cart-collapsed {
-  width: 40px;
-  overflow: hidden;
+.cart-button:hover {
+  border-color: var(--color-border-emphasis);
+  background: var(--color-bg-surface);
 }
 
-.right-panel:not(.cart-collapsed) {
-  width: 280px;
+.cart-button-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 0.625rem;
+  background: var(--color-accent);
+  color: #fff;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  min-width: 1rem;
+  text-align: center;
+}
+
+.cart-drawer-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+
+.cart-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.cart-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 300px;
+  max-width: 85vw;
+  background: var(--color-bg-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-elevated);
+  overflow-y: auto;
+}
+
+.drawer-enter-active,
+.drawer-leave-active {
+  transition: opacity 180ms;
+}
+
+.drawer-enter-active .cart-drawer,
+.drawer-leave-active .cart-drawer {
+  transition: transform 180ms;
+}
+
+.drawer-enter-from,
+.drawer-leave-to {
+  opacity: 0;
+}
+
+.drawer-enter-from .cart-drawer,
+.drawer-leave-to .cart-drawer {
+  transform: translateX(100%);
 }
 
 /* Scrollbar styling - Firefox */
@@ -607,33 +673,5 @@ body {
 
 *:hover::-webkit-scrollbar-thumb {
   background: var(--color-text-muted);
-}
-
-.collapsed-strip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 1rem;
-  gap: 0.5rem;
-  cursor: pointer;
-  height: 100%;
-}
-
-.collapsed-strip:hover {
-  background: var(--color-bg-elevated);
-}
-
-.strip-icon {
-  font-size: 1.25rem;
-}
-
-.strip-badge {
-  font-size: 0.625rem;
-  background: var(--color-accent);
-  color: white;
-  padding: 0.125rem 0.375rem;
-  border-radius: 8px;
-  min-width: 1rem;
-  text-align: center;
 }
 </style>

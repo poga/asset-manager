@@ -21,13 +21,17 @@
           :class="{ highlighted: i === highlight }"
           @mousedown.prevent="addTag(s.name)"
         >
-          <span class="suggestion-name">{{ s.name }}</span>
+          <span class="suggestion-main">
+            <span class="suggestion-dot" :style="{ background: `hsl(${tagHue(s.name)}, 55%, 50%)` }"></span>
+            <span class="suggestion-name">{{ s.name }}</span>
+          </span>
           <span class="suggestion-count">{{ s.count }}</span>
         </button>
       </div>
     </div>
     <div v-if="tags.length" class="tags-row">
-      <span v-for="t in tags" :key="t" class="tag" :title="t" @click="removeTag(t)">
+      <span v-for="t in tags" :key="t" class="tag" :title="t"
+            :style="{ '--tag-hue': tagHue(t) }" @click="removeTag(t)">
         <span class="tag-text">{{ t }}</span>
         <svg class="tag-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18 6L6 18M6 6l12 12"/>
@@ -39,6 +43,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { tagHue } from '../utils/tagColor.js'
 
 const props = defineProps({
   filters: {
@@ -153,7 +158,7 @@ defineExpose({ addTagExternal, clear })
   gap: 12px;
   flex-wrap: wrap;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .search-input-wrapper {
@@ -244,12 +249,35 @@ defineExpose({ addTagExternal, clear })
   gap: 4px;
   height: 24px;
   padding: 0 10px;
-  background: var(--color-bg-elevated);
-  color: var(--color-text-secondary);
+  background: hsl(var(--tag-hue, 0), 50%, 92%);
+  color: hsl(var(--tag-hue, 0), 40%, 30%);
   border-radius: 12px;
   font-size: 0.8125rem;
   cursor: pointer;
   max-width: 120px;
+}
+
+[data-theme='dark'] .tag {
+  background: hsl(var(--tag-hue, 0), 30%, 24%);
+  color: hsl(var(--tag-hue, 0), 55%, 78%);
+}
+
+.tag:hover {
+  filter: brightness(0.97);
+}
+
+.suggestion-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.suggestion-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
 }
 
 .tag-text {
@@ -262,10 +290,7 @@ defineExpose({ addTagExternal, clear })
   width: 12px;
   height: 12px;
   flex-shrink: 0;
-  color: var(--color-text-muted);
-}
-
-.tag:hover {
-  background: var(--color-border);
+  color: inherit;
+  opacity: 0.7;
 }
 </style>
