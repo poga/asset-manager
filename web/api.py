@@ -785,6 +785,41 @@ def upload_board_images(board_id: int, files: list[UploadFile] = File(...)):
     return {"assets": created, "cover_asset_id": cover_id, "cover_asset_path": cover_path}
 
 
+@app.patch("/api/boards/{board_id}")
+def patch_board(board_id: int, request: BoardPatchRequest):
+    """Rename a board and/or set its cover asset."""
+    conn = get_db()
+    _ensure_board_columns(conn)
+    board = _board_or_404(conn, board_id)
+    name = board["name"]
+    if request.name is not None:
+        name = request.name.strip()
+        if not name:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Empty name")
+        clash = conn.execute(
+            "SELECT 1 FROM packs WHERE name = ? AND id != ?", [name, board_id]
+        ).fetchone()
+        if clash:
+            conn.close()
+            raise HTTPException(status_code=409, detail="Name already exists")
+        conn.execute("UPDATE packs SET name = ? WHERE id = ?", [name, board_id])
+    preview_path = board["preview_path"]
+    if request.cover_asset_id is not None:
+        row = conn.execute(
+            "SELECT path FROM assets WHERE id = ? AND pack_id = ?",
+            [request.cover_asset_id, board_id],
+        ).fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Asset not in board")
+        preview_path = row["path"]
+        conn.execute("UPDATE packs SET preview_path = ? WHERE id = ?", [preview_path, board_id])
+    conn.commit()
+    conn.close()
+    return {"id": board_id, "name": name, "path": board["path"], "preview_path": preview_path}
+
+
 class DownloadCartRequest(BaseModel):
     asset_ids: list[int]
 

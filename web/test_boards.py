@@ -213,6 +213,35 @@ def test_upload_missing_board_404(env):
     assert r.status_code == 404
 
 
+def test_rename_board(env):
+    board = _create("Old Name")
+    r = client.patch(f"/api/boards/{board['id']}", json={"name": "New Name"})
+    assert r.status_code == 200
+    assert r.json()["name"] == "New Name"
+    assert r.json()["path"] == ".boards/old-name"  # slug fixed
+
+
+def test_set_cover(env):
+    board = _create("Cover")
+    up = client.post(
+        f"/api/boards/{board['id']}/images",
+        files=[
+            ("files", ("a.png", png_bytes((1, 1, 1)), "image/png")),
+            ("files", ("b.png", png_bytes((2, 2, 2)), "image/png")),
+        ],
+    ).json()
+    second = up["assets"][1]["id"]
+    r = client.patch(f"/api/boards/{board['id']}", json={"cover_asset_id": second})
+    assert r.status_code == 200
+    assert r.json()["preview_path"] == up["assets"][1]["path"]
+
+
+def test_set_cover_foreign_asset_400(env):
+    board = _create("Guard")
+    r = client.patch(f"/api/boards/{board['id']}", json={"cover_asset_id": 12345})
+    assert r.status_code == 400
+
+
 def test_api_imports_under_server_layout():
     """Guard: `uvicorn web.api:app` must import without web/ pre-added to sys.path."""
     import subprocess
