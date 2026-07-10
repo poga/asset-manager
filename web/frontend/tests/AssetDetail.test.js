@@ -1,6 +1,6 @@
 // web/frontend/tests/AssetDetail.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import AssetDetail from '../src/components/AssetDetail.vue'
 
 describe('AssetDetail', () => {
@@ -149,6 +149,62 @@ describe('AssetDetail', () => {
       const w = mount(AssetDetail, { props: { asset: { ...base } } })
       expect(w.find('img.asset-image').exists()).toBe(true)
       expect(w.find('model-viewer').exists()).toBe(false)
+    })
+  })
+
+  describe('Board image actions', () => {
+    const boardAsset = {
+      id: 5, filename: 'a.png', filetype: 'png', pack: 'My Board',
+      is_board: true, board_id: 7, tags: [], colors: [], width: 10, height: 10
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal('fetch', vi.fn(() =>
+        Promise.resolve({ ok: true, json: () => Promise.resolve({ tags: [] }) })
+      ))
+    })
+
+    afterEach(() => { vi.unstubAllGlobals() })
+
+    it('hides board actions for non-board assets', () => {
+      const wrapper = mount(AssetDetail, { props: { asset: mockAsset } })
+      expect(wrapper.find('[data-testid="set-cover"]').exists()).toBe(false)
+    })
+
+    it('shows board image actions and emits on set-cover', async () => {
+      const wrapper = mount(AssetDetail, { props: { asset: boardAsset } })
+      const btn = wrapper.find('[data-testid="set-cover"]')
+      expect(btn.exists()).toBe(true)
+      await btn.trigger('click')
+      await flushPromises()
+      expect(wrapper.emitted('board-image-changed')).toBeTruthy()
+    })
+
+    it('emits board-image-removed on remove', async () => {
+      const wrapper = mount(AssetDetail, { props: { asset: boardAsset } })
+      await wrapper.find('.board-btn.danger').trigger('click')
+      await flushPromises()
+      expect(wrapper.emitted('board-image-removed')).toBeTruthy()
+    })
+
+    it('adds a tag and emits board-image-changed', async () => {
+      global.fetch.mockImplementationOnce(() =>
+        Promise.resolve({ ok: true, json: () => Promise.resolve({ tags: ['new'] }) })
+      )
+      const wrapper = mount(AssetDetail, { props: { asset: boardAsset } })
+      await wrapper.find('.tag-input').setValue('new')
+      await wrapper.find('.tag-input').trigger('keyup.enter')
+      await flushPromises()
+      expect(wrapper.emitted('board-image-changed')).toBeTruthy()
+      expect(wrapper.text()).toContain('new')
+    })
+
+    it('removes a tag and emits board-image-changed', async () => {
+      const asset = { ...boardAsset, tags: ['old'] }
+      const wrapper = mount(AssetDetail, { props: { asset } })
+      await wrapper.find('.tag-remove').trigger('click')
+      await flushPromises()
+      expect(wrapper.emitted('board-image-changed')).toBeTruthy()
     })
   })
 

@@ -44,6 +44,8 @@
           @view-pack="viewPack"
           @tag-click="handleTagClick"
           @toggle-preview-override="handleTogglePreviewOverride"
+          @board-image-changed="refreshAfterBoardChange"
+          @board-image-removed="onBoardImageRemoved"
         />
 
         <PackGallery
@@ -327,6 +329,11 @@ async function refreshAfterBoardChange() {
 async function goHomeAfterDelete() {
   await fetchFilters()
   goHome()
+}
+
+async function onBoardImageRemoved() {
+  selectedAsset.value = null
+  await refreshAfterBoardChange()
 }
 
 function addToCart(asset) {

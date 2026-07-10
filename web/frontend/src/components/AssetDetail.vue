@@ -87,22 +87,73 @@
             Full Size
           </a>
         </div>
+
+        <div v-if="asset.is_board" class="board-image-actions">
+          <button data-testid="set-cover" class="board-btn" @click="makeCover">Set as cover</button>
+          <button class="board-btn danger" @click="removeImage">Remove</button>
+          <div class="image-tags">
+            <span v-for="t in localTags" :key="t" class="tag-chip">
+              {{ t }}<button class="tag-remove" @click="dropTag(t)">×</button>
+            </span>
+            <input
+              v-model="newTag"
+              class="tag-input"
+              placeholder="+ tag"
+              @keyup.enter="addTag"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref, watch } from 'vue'
 import ModelViewer from './ModelViewer.vue'
 import { tagHue } from '../utils/tagColor.js'
+import { setCover, deleteImage, addImageTag, removeImageTag } from '../api/boards.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
-defineProps({
+const props = defineProps({
   asset: { type: Object, required: true }
 })
 
-defineEmits(['back', 'add-to-cart', 'find-similar', 'view-pack', 'tag-click', 'toggle-preview-override'])
+const emit = defineEmits([
+  'back', 'add-to-cart', 'find-similar', 'view-pack', 'tag-click', 'toggle-preview-override',
+  'board-image-changed', 'board-image-removed'
+])
+
+const localTags = ref([...(props.asset.tags || [])])
+const newTag = ref('')
+
+watch(() => props.asset, a => { localTags.value = [...(a.tags || [])] })
+
+async function makeCover() {
+  await setCover(props.asset.board_id, props.asset.id)
+  emit('board-image-changed')
+}
+
+async function removeImage() {
+  await deleteImage(props.asset.id)
+  emit('board-image-removed')
+}
+
+async function addTag() {
+  const t = newTag.value.trim()
+  newTag.value = ''
+  if (!t) return
+  const res = await addImageTag(props.asset.id, t)
+  localTags.value = res.tags
+  emit('board-image-changed')
+}
+
+async function dropTag(t) {
+  const res = await removeImageTag(props.asset.id, t)
+  localTags.value = res.tags
+  emit('board-image-changed')
+}
 </script>
 
 <style scoped>
@@ -298,4 +349,13 @@ h2 {
 .preview-override-checkbox input {
   cursor: pointer;
 }
+
+.board-image-actions { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+.board-image-actions .board-btn {
+  border: 1px solid var(--color-border); background: var(--color-bg-surface);
+  color: var(--color-text-secondary); border-radius: 6px; padding: 0.375rem 0.75rem;
+  cursor: pointer; font-size: 0.8125rem; align-self: flex-start;
+}
+.board-image-actions .board-btn.danger:hover { border-color: var(--color-danger); color: var(--color-danger); }
+.image-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; align-items: center; }
 </style>
