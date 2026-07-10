@@ -23,6 +23,7 @@ from PIL import Image
 # Import modules under test
 import index
 import search
+import asset_kinds
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -1344,6 +1345,13 @@ class TestPackIdStability:
             "SELECT tag FROM pack_tags WHERE pack_id = ?", [row["id"]])]
         assert tags == ["keep"]
         conn.close()
+
+
+class TestKindRegistry:
+    def test_handlers_match_by_extension(self):
+        assert isinstance(asset_kinds.find_handler(Path("a/b.png")), asset_kinds.ImageHandler)
+        assert isinstance(asset_kinds.find_handler(Path("a/b.ASE")), asset_kinds.AsepriteHandler)
+        assert isinstance(asset_kinds.find_handler(Path("a/b.glb")), asset_kinds.ModelHandler)
 
 
 # =============================================================================
