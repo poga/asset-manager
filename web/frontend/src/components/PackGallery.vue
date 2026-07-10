@@ -364,12 +364,14 @@ async function removeTag(pack, tag) {
 
 .card-meta {
   display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
+  align-items: baseline;
+  gap: 0.5rem;
   padding: 0.625rem 0.75rem 0;
 }
 
 .card-name {
+  flex: 1;
+  min-width: 0;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-text-primary);
@@ -380,6 +382,7 @@ async function removeTag(pack, tag) {
 }
 
 .card-count {
+  flex-shrink: 0;
   font-size: 0.75rem;
   color: var(--color-text-muted);
 }
