@@ -294,6 +294,29 @@ class TestFrameAwareIndexing:
         index.index(temp_dir, db_path, force=True)
         assert montage.exists()
 
+    def test_reindex_skips_board_with_no_directory_on_disk(self, sample_asset_pack, temp_dir):
+        db_path = temp_dir / "t.db"
+        index.index(sample_asset_pack, db_path, force=False)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        # empty board: DB row exists, but its dir was never created on disk
+        conn.execute(
+            "INSERT INTO packs (name, path, source, preview_path) "
+            "VALUES ('Empty Board', '.boards/empty-board', 'user', NULL)"
+        )
+        conn.commit()
+        conn.close()
+        # must not raise FileNotFoundError on the missing board directory
+        index.index(sample_asset_pack, db_path, force=False)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT preview_path FROM packs WHERE path = '.boards/empty-board'"
+        ).fetchone()
+        conn.close()
+        assert row is not None
+        assert row["preview_path"] is None
+
 
 class TestComputePhash:
     """Tests for compute_phash function."""

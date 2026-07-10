@@ -793,7 +793,9 @@ def index(
         conn.execute("UPDATE packs SET preview_path = NULL WHERE preview_generated = TRUE")
         conn.commit()
     console.print("Generating pack previews...")
-    for row in conn.execute("SELECT id, name, path, preview_path FROM packs"):
+    for row in conn.execute("SELECT id, name, path, preview_path, source FROM packs"):
+        if row["source"] == "user":
+            continue  # boards own their cover; never auto-generate one
         if row["preview_path"]:
             continue
         pack_dir = asset_root / row["path"]

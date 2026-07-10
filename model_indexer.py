@@ -164,6 +164,8 @@ def find_pack_preview(pack_root: Path) -> Optional[Path]:
     Tier 2: <prefix>_Contents.{png,jpg} (KayKit naming for packs without a
     bare contents.* file), excluding *AlternateTexture* variants.
     """
+    if not pack_root.is_dir():
+        return None  # e.g. an empty board with no uploads yet
     for name in PACK_PREVIEW_NAMES:
         candidate = pack_root / name
         if candidate.is_file():
