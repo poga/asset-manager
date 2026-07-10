@@ -71,6 +71,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { formatPackName } from '../utils/packName.js'
+import { tagHue } from '../utils/tagColor.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
@@ -97,20 +98,6 @@ function onCoverLoad(packName, event) {
 
 function tagsOf(pack) {
   return tagOverrides[pack.name] ?? pack.tags ?? []
-}
-
-// deterministic hue per tag, snapped to evenly-spaced steps so
-// unrelated tags are never a near-identical, hard-to-tell-apart color
-const TAG_HUE_STEPS = 12
-
-function tagHue(tag) {
-  let h = 0
-  for (let i = 0; i < tag.length; i++) {
-    h = (h << 5) - h + tag.charCodeAt(i)
-    h |= 0
-  }
-  const step = ((h % TAG_HUE_STEPS) + TAG_HUE_STEPS) % TAG_HUE_STEPS
-  return step * (360 / TAG_HUE_STEPS)
 }
 
 const allTags = computed(() => {
