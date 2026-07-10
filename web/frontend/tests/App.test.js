@@ -708,7 +708,7 @@ describe('Board view refresh', () => {
     expect(wrapper.vm.selectedPacks).toEqual(['My Board'])
   })
 
-  // regression: a rename changes the name server-side; restore must follow by id
+  // regression: rename changes the name server-side; restore follows by id
   it('follows the board to its new name after a rename refresh', async () => {
     let boardName = 'Old Name'
     mockFetch.mockImplementation((url) => {
