@@ -24,6 +24,8 @@ from pydantic import BaseModel
 
 # Add parent directory to path for local module imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+# make web/ importable so `import boards` works under uvicorn web.api:app
+sys.path.insert(0, str(Path(__file__).parent))
 import aseprite_parser
 import model_indexer
 import boards as boards_mod

@@ -139,5 +139,16 @@ def test_create_board_duplicate_name(env):
     assert r.status_code == 409
 
 
+def test_api_imports_under_server_layout():
+    """Guard: `uvicorn web.api:app` must import without web/ pre-added to sys.path."""
+    import subprocess
+    root = Path(__file__).resolve().parent.parent
+    r = subprocess.run(
+        [sys.executable, "-c", "import web.api"],
+        cwd=root, capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
