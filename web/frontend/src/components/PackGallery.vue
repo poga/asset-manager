@@ -6,6 +6,7 @@
         :key="t.tag"
         class="chip"
         :class="{ active: activeTag === t.tag }"
+        :style="{ '--tag-hue': tagHue(t.tag) }"
         @click="toggleTag(t.tag)"
       >
         {{ t.tag }} <span class="chip-count">{{ t.count }}</span>
@@ -192,27 +193,38 @@ async function removeTag(pack, tag) {
 
 .chip {
   padding: 0.25rem 0.75rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--color-bg-surface);
-  color: var(--color-text-primary);
+  background: hsl(var(--tag-hue, 0), 50%, 92%);
+  color: hsl(var(--tag-hue, 0), 40%, 30%);
   font-size: 0.75rem;
   cursor: pointer;
-  transition: border-color 120ms, background-color 120ms;
+  transition: filter 120ms, background-color 120ms, color 120ms;
 }
 
 .chip:hover {
-  border-color: var(--color-accent);
+  filter: brightness(0.97);
 }
 
+/* filled so the selected filter stays obvious among tinted-inactive chips */
 .chip.active {
-  border-color: var(--color-accent);
-  background: var(--color-accent-light);
+  background: hsl(var(--tag-hue, 0), 55%, 45%);
+  color: #fff;
 }
 
 .chip-count {
-  color: var(--color-text-muted);
+  opacity: 0.7;
   margin-left: 0.25rem;
+}
+
+[data-theme='dark'] .chip {
+  background: hsl(var(--tag-hue, 0), 30%, 24%);
+  color: hsl(var(--tag-hue, 0), 55%, 78%);
+}
+
+[data-theme='dark'] .chip.active {
+  background: hsl(var(--tag-hue, 0), 50%, 55%);
+  color: #0f172a;
 }
 
 .dim-header {
