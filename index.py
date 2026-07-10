@@ -510,12 +510,15 @@ def add_tags(conn: sqlite3.Connection, asset_id: int, tags: list[str], source: s
 
 def scan_assets(asset_root: Path) -> list[Path]:
     """Scan directory for image, Aseprite, and 3D model files."""
+    def visible(p: Path) -> bool:
+        return not any(part.startswith(".") for part in p.relative_to(asset_root).parts)
+
     image_assets: list[Path] = []
     model_assets: list[Path] = []
     for ext in IMAGE_EXTENSIONS | ASEPRITE_EXTENSIONS:
-        image_assets.extend(asset_root.rglob(f"*{ext}"))
+        image_assets.extend(p for p in asset_root.rglob(f"*{ext}") if visible(p))
     for ext in MODEL_EXTENSIONS:
-        model_assets.extend(asset_root.rglob(f"*{ext}"))
+        model_assets.extend(p for p in asset_root.rglob(f"*{ext}") if visible(p))
     model_assets = model_indexer.filter_canonical_models(sorted(model_assets))
     return sorted(image_assets + model_assets)
 

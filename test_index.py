@@ -366,6 +366,19 @@ class TestScanAssets:
         assert "readme.txt" not in filenames
 
 
+def test_scan_assets_skips_hidden_dirs():
+    import index
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        (root / "pack").mkdir()
+        (root / "pack" / "y.png").write_bytes(b"\x89PNG\r\n")
+        (root / ".boards" / "b").mkdir(parents=True)
+        (root / ".boards" / "b" / "x.png").write_bytes(b"\x89PNG\r\n")
+        found = {p.name for p in index.scan_assets(root)}
+        assert "y.png" in found
+        assert "x.png" not in found
+
+
 # =============================================================================
 # Unit Tests: search.py
 # =============================================================================
