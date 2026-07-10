@@ -6,6 +6,7 @@
 #     "httpx>=0.27",
 #     "pytest>=8.0",
 #     "pillow>=10.0",
+#     "python-multipart>=0.0.9",
 # ]
 # ///
 """Tests for UI-created boards."""
@@ -137,6 +138,49 @@ def test_create_board_duplicate_name(env):
     client.post("/api/boards", json={"name": "Dup"})
     r = client.post("/api/boards", json={"name": "Dup"})
     assert r.status_code == 409
+
+
+def _create(name="Board"):
+    return client.post("/api/boards", json={"name": name}).json()
+
+
+def test_upload_images_creates_rows_and_files(env):
+    board = _create("Uploads")
+    files = [
+        ("files", ("a.png", png_bytes((255, 0, 0)), "image/png")),
+        ("files", ("b.png", png_bytes((0, 255, 0)), "image/png")),
+    ]
+    r = client.post(f"/api/boards/{board['id']}/images", files=files)
+    assert r.status_code == 201
+    body = r.json()
+    assert len(body["assets"]) == 2
+    for a in body["assets"]:
+        assert (env["assets"] / a["path"]).exists()
+    conn = sqlite3.connect(env["db"])
+    prev = conn.execute(
+        "SELECT preview_path FROM packs WHERE id = ?", [board["id"]]
+    ).fetchone()[0]
+    conn.close()
+    assert prev == body["cover_asset_path"] == body["assets"][0]["path"]
+
+
+def test_upload_rejects_bad_type(env):
+    board = _create("Bad")
+    r = client.post(
+        f"/api/boards/{board['id']}/images",
+        files=[("files", ("a.svg", b"<svg/>", "image/svg+xml"))],
+    )
+    assert r.status_code == 400
+    conn = sqlite3.connect(env["db"])
+    n = conn.execute("SELECT COUNT(*) FROM assets").fetchone()[0]
+    conn.close()
+    assert n == 0
+
+
+def test_upload_missing_board_404(env):
+    r = client.post("/api/boards/999/images",
+                    files=[("files", ("a.png", png_bytes(), "image/png"))])
+    assert r.status_code == 404
 
 
 def test_api_imports_under_server_layout():

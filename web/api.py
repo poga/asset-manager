@@ -5,6 +5,7 @@
 #     "fastapi>=0.109",
 #     "uvicorn>=0.27",
 #     "pillow>=10.0",
+#     "python-multipart>=0.0.9",
 # ]
 # ///
 """Web API for asset search."""
@@ -17,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -739,6 +740,49 @@ def create_board(request: BoardCreateRequest):
     conn.commit()
     conn.close()
     return {"id": board_id, "name": name, "path": path}
+
+
+@app.post("/api/boards/{board_id}/images", status_code=201)
+def upload_board_images(board_id: int, files: list[UploadFile] = File(...)):
+    """Upload images to a board; first upload sets the cover."""
+    conn = get_db()
+    _ensure_board_columns(conn)
+    board = _board_or_404(conn, board_id)
+    slug = board["path"].split("/", 1)[1]
+    assets_root = get_assets_path()
+
+    # validate all before writing so a bad file writes nothing
+    payloads = []
+    for f in files:
+        data = f.file.read()
+        try:
+            ext = boards_mod.validate_upload(f.filename, data)
+        except ValueError as e:
+            conn.close()
+            raise HTTPException(status_code=400, detail=str(e))
+        payloads.append((f.filename, data, ext))
+
+    created = []
+    for filename, data, ext in payloads:
+        rel, w, h = boards_mod.save_image(assets_root, slug, data, ext)
+        asset_id = boards_mod.insert_board_asset(
+            conn, board_id, rel, filename, ext, len(data), w, h
+        )
+        created.append({"id": asset_id, "path": rel, "filename": filename,
+                        "width": w, "height": h})
+
+    conn.execute(
+        "UPDATE packs SET asset_count = (SELECT COUNT(*) FROM assets WHERE pack_id = ?) WHERE id = ?",
+        [board_id, board_id],
+    )
+    cover_id, cover_path = None, None
+    if not board["preview_path"] and created:
+        cover_path = created[0]["path"]
+        cover_id = created[0]["id"]
+        conn.execute("UPDATE packs SET preview_path = ? WHERE id = ?", [cover_path, board_id])
+    conn.commit()
+    conn.close()
+    return {"assets": created, "cover_asset_id": cover_id, "cover_asset_path": cover_path}
 
 
 class DownloadCartRequest(BaseModel):
