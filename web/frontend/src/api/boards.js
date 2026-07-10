@@ -13,10 +13,26 @@ export function createBoard(name, tags = []) {
   }).then(json)
 }
 
-export function uploadImages(boardId, fileList) {
+// XHR (not fetch) exposes upload progress; onProgress gets 0-100, 100 = sent.
+export function uploadImages(boardId, fileList, onProgress) {
   const form = new FormData()
   for (const f of fileList) form.append('files', f)
-  return fetch(`${API_BASE}/boards/${boardId}/images`, { method: 'POST', body: form }).then(json)
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_BASE}/boards/${boardId}/images`)
+    xhr.upload.addEventListener('progress', e => {
+      if (onProgress && e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+    })
+    xhr.upload.addEventListener('load', () => onProgress && onProgress(100))
+    xhr.addEventListener('load', () => {
+      let body = {}
+      try { body = JSON.parse(xhr.responseText) } catch {}
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body)
+      else reject(new Error(body.detail || xhr.statusText || 'Upload failed'))
+    })
+    xhr.addEventListener('error', () => reject(new Error('Upload failed')))
+    xhr.send(form)
+  })
 }
 
 export function renameBoard(id, name) {
