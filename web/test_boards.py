@@ -88,5 +88,34 @@ def test_filters_marks_board_packs(env):
     assert isinstance(by_name["My Board"]["id"], int)
 
 
+def test_slugify_and_unique(env):
+    import boards
+    assert boards.slugify("My Cool Board!") == "my-cool-board"
+    assert boards.slugify("  A/B  c ") == "a-b-c"
+    conn = sqlite3.connect(env["db"])
+    conn.execute("INSERT INTO packs (name, path, source) VALUES ('x', '.boards/my-board', 'user')")
+    conn.commit()
+    assert boards.unique_slug(conn, "My Board") == "my-board-2"
+    conn.close()
+
+
+def test_validate_upload(env):
+    import boards
+    assert boards.validate_upload("a.PNG", png_bytes()) == "png"
+    with pytest.raises(ValueError):
+        boards.validate_upload("a.svg", b"<svg/>")
+    with pytest.raises(ValueError):
+        boards.validate_upload("a.png", b"x" * (boards.MAX_UPLOAD_BYTES + 1))
+
+
+def test_save_image_writes_file_and_dims(env):
+    import boards
+    rel, w, h = boards.save_image(env["assets"], "my-board", png_bytes(size=(12, 7)), "png")
+    assert rel.startswith(".boards/my-board/")
+    assert rel.endswith(".png")
+    assert (env["assets"] / rel).exists()
+    assert (w, h) == (12, 7)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
