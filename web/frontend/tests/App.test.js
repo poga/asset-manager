@@ -666,3 +666,82 @@ describe('Home search visibility', () => {
     expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(true)
   })
 })
+
+describe('Board view refresh', () => {
+  beforeEach(() => {
+    mockFetch.mockImplementation((url) => {
+      if (url === '/assets/api/filters') {
+        return Promise.resolve({
+          json: () => Promise.resolve({
+            packs: [{ id: 7, name: 'My Board', count: 1, is_3d: false, is_board: true, tags: [] }],
+            tags: []
+          })
+        })
+      }
+      if (url.startsWith('/assets/api/search')) {
+        return Promise.resolve({ json: () => Promise.resolve({ assets: [] }) })
+      }
+      return Promise.resolve({ json: () => Promise.resolve({}) })
+    })
+  })
+
+  afterEach(() => {
+    mockFetch.mockReset()
+  })
+
+  // regression: an upload refresh must not bounce the user to the gallery
+  it('stays on the board after an upload (name unchanged) refresh', async () => {
+    const wrapper = mount(App, {
+      global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] }
+    })
+    await flushPromises()
+
+    wrapper.vm.viewPack('My Board')
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'BoardView' }).exists()).toBe(true)
+
+    await wrapper.findComponent({ name: 'BoardView' }).vm.$emit('changed')
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'BoardView' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(false)
+    expect(wrapper.vm.selectedPacks).toEqual(['My Board'])
+  })
+
+  // regression: rename changes the name server-side; restore follows by id
+  it('follows the board to its new name after a rename refresh', async () => {
+    let boardName = 'Old Name'
+    mockFetch.mockImplementation((url) => {
+      if (url === '/assets/api/filters') {
+        return Promise.resolve({
+          json: () => Promise.resolve({
+            packs: [{ id: 7, name: boardName, count: 1, is_3d: false, is_board: true, tags: [] }],
+            tags: []
+          })
+        })
+      }
+      if (url.startsWith('/assets/api/search')) {
+        return Promise.resolve({ json: () => Promise.resolve({ assets: [] }) })
+      }
+      return Promise.resolve({ json: () => Promise.resolve({}) })
+    })
+
+    const wrapper = mount(App, {
+      global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] }
+    })
+    await flushPromises()
+
+    wrapper.vm.viewPack('Old Name')
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'BoardView' }).exists()).toBe(true)
+
+    // the rename was persisted before 'changed' fired: filters now returns the new name
+    boardName = 'New Name'
+    await wrapper.findComponent({ name: 'BoardView' }).vm.$emit('changed')
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'BoardView' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(false)
+    expect(wrapper.vm.selectedPacks).toEqual(['New Name'])
+  })
+})

@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS packs (
     preview_path TEXT,
     preview_generated BOOLEAN DEFAULT FALSE,
     asset_count INTEGER DEFAULT 0,
+    source TEXT DEFAULT 'indexed',
     indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -170,6 +171,8 @@ def migrate_schema(conn: sqlite3.Connection) -> None:
         existing = {r["name"] for r in conn.execute("PRAGMA table_info(packs)")}
         if "theme" not in existing:
             conn.execute("ALTER TABLE packs ADD COLUMN theme TEXT")
+        if "source" not in existing:
+            conn.execute("ALTER TABLE packs ADD COLUMN source TEXT DEFAULT 'indexed'")
     if "assets" in tables:
         existing = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}
         if "asset_kind" not in existing:
@@ -507,12 +510,15 @@ def add_tags(conn: sqlite3.Connection, asset_id: int, tags: list[str], source: s
 
 def scan_assets(asset_root: Path) -> list[Path]:
     """Scan directory for image, Aseprite, and 3D model files."""
+    def visible(p: Path) -> bool:
+        return not any(part.startswith(".") for part in p.relative_to(asset_root).parts)
+
     image_assets: list[Path] = []
     model_assets: list[Path] = []
     for ext in IMAGE_EXTENSIONS | ASEPRITE_EXTENSIONS:
-        image_assets.extend(asset_root.rglob(f"*{ext}"))
+        image_assets.extend(p for p in asset_root.rglob(f"*{ext}") if visible(p))
     for ext in MODEL_EXTENSIONS:
-        model_assets.extend(asset_root.rglob(f"*{ext}"))
+        model_assets.extend(p for p in asset_root.rglob(f"*{ext}") if visible(p))
     model_assets = model_indexer.filter_canonical_models(sorted(model_assets))
     return sorted(image_assets + model_assets)
 
@@ -787,7 +793,9 @@ def index(
         conn.execute("UPDATE packs SET preview_path = NULL WHERE preview_generated = TRUE")
         conn.commit()
     console.print("Generating pack previews...")
-    for row in conn.execute("SELECT id, name, path, preview_path FROM packs"):
+    for row in conn.execute("SELECT id, name, path, preview_path, source FROM packs"):
+        if row["source"] == "user":
+            continue  # boards own their cover; never auto-generate one
         if row["preview_path"]:
             continue
         pack_dir = asset_root / row["path"]

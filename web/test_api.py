@@ -6,6 +6,7 @@
 #     "httpx>=0.27",
 #     "pytest>=8.0",
 #     "pillow>=10.0",
+#     "python-multipart>=0.0.9",
 # ]
 # ///
 """Tests for web API."""

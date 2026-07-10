@@ -13,6 +13,20 @@
       </button>
     </div>
 
+    <div class="new-board-block">
+      <div v-if="!creating" class="new-board-card" @click="creating = true">+ New board</div>
+      <input
+        v-else
+        class="new-board-input"
+        v-model="boardName"
+        placeholder="Board name"
+        @keyup.enter="submitBoard"
+        @keyup.escape="cancelBoard"
+        @blur="cancelBoard"
+        v-focus
+      />
+    </div>
+
     <section v-for="s in sections" :key="s.label" class="dim-section">
       <div class="dim-header">
         <h2 class="dim-title">{{ s.label }}</h2>
@@ -37,6 +51,7 @@
               @error="failedCovers[pack.name] = true"
             />
             <span v-else class="cover-placeholder">📦</span>
+            <span v-if="pack.is_board" class="board-badge">BOARD</span>
           </div>
           <div class="card-meta">
             <span class="card-name" :title="formatPackName(pack.name)">{{ formatPackName(pack.name) }}</span>
@@ -80,7 +95,9 @@ const props = defineProps({
   packs: { type: Array, required: true }
 })
 
-defineEmits(['view-pack'])
+const emit = defineEmits(['view-pack', 'create-board'])
+const creating = ref(false)
+const boardName = ref('')
 
 const failedCovers = reactive({})
 // sprites below this width are upscaled; pixelated keeps them crisp
@@ -123,6 +140,17 @@ const sections = computed(() => {
 
 function toggleTag(tag) {
   activeTag.value = activeTag.value === tag ? null : tag
+}
+
+function submitBoard() {
+  const name = boardName.value.trim()
+  if (name) emit('create-board', name)
+  cancelBoard()
+}
+
+function cancelBoard() {
+  creating.value = false
+  boardName.value = ''
 }
 
 function previewUrl(packName) {
@@ -289,6 +317,19 @@ async function removeTag(pack, tag) {
   }
 }
 
+.new-board-block { padding: 1rem 0 0; }
+.new-board-card {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.5rem 0.875rem; border: 1px dashed var(--color-border-emphasis);
+  border-radius: 8px; cursor: pointer; color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+.new-board-card:hover { border-color: var(--color-accent); color: var(--color-text-primary); }
+.new-board-input {
+  padding: 0.5rem 0.75rem; border: 1px solid var(--color-accent);
+  border-radius: 8px; background: var(--color-bg-surface); color: var(--color-text-primary);
+}
+
 .card-cover {
   aspect-ratio: 5 / 3;
   background: #1a1a2e;
@@ -297,6 +338,13 @@ async function removeTag(pack, tag) {
   justify-content: center;
   overflow: hidden;
   padding: 0.5rem;
+  position: relative;
+}
+
+.board-badge {
+  position: absolute; top: 0.5rem; left: 0.5rem;
+  background: var(--color-accent); color: #fff; font-size: 0.625rem;
+  font-weight: 700; letter-spacing: 0.04em; padding: 0.125rem 0.375rem; border-radius: 4px;
 }
 
 .card-cover img {

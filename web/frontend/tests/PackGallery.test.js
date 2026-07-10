@@ -136,6 +136,21 @@ describe('PackGallery', () => {
     expect(circularDistance).toBeGreaterThanOrEqual(20)
   })
 
+  it('renders a BOARD badge on board packs', () => {
+    const withBoard = [...packs, { name: 'My Board', count: 3, is_3d: false, is_board: true, tags: [], id: 9 }]
+    const wrapper = mount(PackGallery, { props: { packs: withBoard } })
+    expect(wrapper.text()).toContain('BOARD')
+  })
+
+  it('emits create-board when a name is entered on the new-board card', async () => {
+    const wrapper = mount(PackGallery, { props: { packs } })
+    await wrapper.find('.new-board-card').trigger('click')
+    const input = wrapper.find('.new-board-input')
+    await input.setValue('Fresh Board')
+    await input.trigger('keyup.enter')
+    expect(wrapper.emitted('create-board')[0]).toEqual(['Fresh Board'])
+  })
+
   it('upscales small covers crisply, leaves large covers smooth', async () => {
     const wrapper = mount(PackGallery, { props: { packs } })
     const imgs = wrapper.findAll('.card-cover img')

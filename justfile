@@ -27,7 +27,7 @@ reindex-assets:
 
 # Start API server (port 8000) with auto-reload
 start-api:
-    uv run --with fastapi --with uvicorn --with pillow uvicorn web.api:app --host 0.0.0.0 --port 8000 --reload
+    uv run --with fastapi --with uvicorn --with pillow --with python-multipart uvicorn web.api:app --host 0.0.0.0 --port 8000 --reload
 
 # Start frontend dev server (port 5173)
 start-frontend:
@@ -51,7 +51,7 @@ start-all:
 
 # Start API server for background service (port 38471)
 start-api-bg:
-    /Users/poga/.local/bin/uv run --with fastapi --with uvicorn --with pillow uvicorn web.api:app --host 127.0.0.1 --port 38471
+    /Users/poga/.local/bin/uv run --with fastapi --with uvicorn --with pillow --with python-multipart uvicorn web.api:app --host 127.0.0.1 --port 38471
 
 # Start frontend for background service (port 38472)
 start-frontend-bg:

@@ -5,6 +5,7 @@
 #     "fastapi>=0.109",
 #     "uvicorn>=0.27",
 #     "pillow>=10.0",
+#     "python-multipart>=0.0.9",
 # ]
 # ///
 """Web API for asset search."""
@@ -17,15 +18,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 # Add parent directory to path for local module imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+# make web/ importable so `import boards` works under uvicorn web.api:app
+sys.path.insert(0, str(Path(__file__).parent))
 import aseprite_parser
 import model_indexer
+import boards as boards_mod
 
 app = FastAPI(title="Asset Search API")
 
@@ -59,6 +63,20 @@ class PreviewOverrideRequest(BaseModel):
 
 
 class PackTagRequest(BaseModel):
+    tag: str
+
+
+class BoardCreateRequest(BaseModel):
+    name: str
+    tags: list[str] = []
+
+
+class BoardPatchRequest(BaseModel):
+    name: Optional[str] = None
+    cover_asset_id: Optional[int] = None
+
+
+class AssetTagRequest(BaseModel):
     tag: str
 
 
@@ -136,6 +154,13 @@ def _ensure_pack_tags(conn: sqlite3.Connection) -> None:
     )
 
 
+def _ensure_board_columns(conn: sqlite3.Connection) -> None:
+    """Lazily add the board flag so pre-existing DBs work without a reindex."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(packs)")}
+    if "source" not in cols:
+        conn.execute("ALTER TABLE packs ADD COLUMN source TEXT DEFAULT 'indexed'")
+
+
 def _pack_tag_list(conn: sqlite3.Connection, pack_id: int) -> list[str]:
     return [
         r["tag"]
@@ -154,6 +179,16 @@ def _pack_id_or_404(conn: sqlite3.Connection, pack_name: str) -> int:
         conn.close()
         raise HTTPException(status_code=404, detail="Pack not found")
     return row["id"]
+
+
+def _board_or_404(conn: sqlite3.Connection, board_id: int) -> sqlite3.Row:
+    row = conn.execute(
+        "SELECT * FROM packs WHERE id = ? AND source = 'user'", [board_id]
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Board not found")
+    return row
 
 
 @app.get("/api/health")
@@ -332,8 +367,9 @@ def asset_detail(asset_id: int):
     """Get detailed info for an asset."""
     conn = get_db()
 
+    _ensure_board_columns(conn)
     row = conn.execute("""
-        SELECT a.*, p.name as pack_name
+        SELECT a.*, p.name as pack_name, p.source as pack_source
         FROM assets a
         LEFT JOIN packs p ON a.pack_id = p.id
         WHERE a.id = ?
@@ -383,7 +419,49 @@ def asset_detail(asset_id: int):
         "kind": row["asset_kind"],
         "rig": row["rig"],
         "thumbnail_path": row["thumbnail_path"],
+        "is_board": row["pack_source"] == "user",
+        "board_id": row["pack_id"] if row["pack_source"] == "user" else None,
     }
+
+
+@app.post("/api/asset/{asset_id}/tags")
+def add_asset_tag(asset_id: int, request: AssetTagRequest):
+    """Add a user tag to an asset, creating the tag if needed."""
+    tag = request.tag.strip().lower()
+    if not tag:
+        raise HTTPException(status_code=400, detail="Empty tag")
+    conn = get_db()
+    if not conn.execute("SELECT 1 FROM assets WHERE id = ?", [asset_id]).fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+    conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", [tag])
+    tag_id = conn.execute("SELECT id FROM tags WHERE name = ?", [tag]).fetchone()[0]
+    conn.execute(
+        "INSERT OR IGNORE INTO asset_tags (asset_id, tag_id, source) VALUES (?, ?, 'user')",
+        [asset_id, tag_id],
+    )
+    conn.commit()
+    tags = [r["name"] for r in conn.execute(
+        "SELECT t.name FROM asset_tags at JOIN tags t ON at.tag_id = t.id WHERE at.asset_id = ?",
+        [asset_id])]
+    conn.close()
+    return {"tags": tags}
+
+
+@app.delete("/api/asset/{asset_id}/tags/{tag}")
+def remove_asset_tag(asset_id: int, tag: str):
+    """Remove a tag from an asset; absent tag is a no-op."""
+    conn = get_db()
+    row = conn.execute("SELECT id FROM tags WHERE name = ?", [tag.strip().lower()]).fetchone()
+    if row:
+        conn.execute("DELETE FROM asset_tags WHERE asset_id = ? AND tag_id = ?",
+                     [asset_id, row["id"]])
+        conn.commit()
+    tags = [r["name"] for r in conn.execute(
+        "SELECT t.name FROM asset_tags at JOIN tags t ON at.tag_id = t.id WHERE at.asset_id = ?",
+        [asset_id])]
+    conn.close()
+    return {"tags": tags}
 
 
 @app.post("/api/asset/{asset_id}/preview-override")
@@ -437,8 +515,9 @@ def filters():
     """Get available filter options."""
     conn = get_db()
 
+    _ensure_board_columns(conn)
     packs = conn.execute("""
-        SELECT p.id, p.name, p.asset_count AS count,
+        SELECT p.id, p.name, p.source, p.asset_count AS count,
                EXISTS (SELECT 1 FROM assets a
                        WHERE a.pack_id = p.id
                          AND a.asset_kind IN ('model', 'animation_bundle')) AS is_3d
@@ -477,9 +556,11 @@ def filters():
     return {
         "packs": [
             {
+                "id": p["id"],
                 "name": p["name"],
                 "count": p["count"],
                 "is_3d": bool(p["is_3d"]),
+                "is_board": p["source"] == "user",
                 "tags": pack_tag_map.get(p["id"], []),
             }
             for p in packs
@@ -626,6 +707,22 @@ def pack_preview(pack_name: str):
     from urllib.parse import unquote
     pack_name = unquote(pack_name)
 
+    conn = get_db()
+    _ensure_board_columns(conn)
+    row = conn.execute(
+        "SELECT preview_path FROM packs WHERE name = ? AND source = 'user'", [pack_name]
+    ).fetchone()
+    conn.close()
+    if row and row["preview_path"]:
+        cover = get_assets_path() / row["preview_path"]
+        if cover.exists():
+            media = "image/gif" if cover.suffix.lower() == ".gif" else "image/png"
+            if cover.suffix.lower() in (".jpg", ".jpeg"):
+                media = "image/jpeg"
+            elif cover.suffix.lower() == ".webp":
+                media = "image/webp"
+            return FileResponse(cover, media_type=media)
+
     # Check for both .gif and .png
     gif_path = previews_dir / f"{pack_name}.gif"
     png_path = previews_dir / f"{pack_name}.png"
@@ -671,6 +768,170 @@ def remove_pack_tag(pack_name: str, tag: str):
     tags = _pack_tag_list(conn, pack_id)
     conn.close()
     return {"tags": tags}
+
+
+@app.post("/api/boards", status_code=201)
+def create_board(request: BoardCreateRequest):
+    """Create a user board pack, optionally with pack-level tags."""
+    name = request.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Empty name")
+    conn = get_db()
+    _ensure_board_columns(conn)
+    _ensure_pack_tags(conn)
+    if conn.execute("SELECT 1 FROM packs WHERE name = ?", [name]).fetchone():
+        conn.close()
+        raise HTTPException(status_code=409, detail="Name already exists")
+    slug = boards_mod.unique_slug(conn, name)
+    path = f"{boards_mod.BOARD_ROOT}/{slug}"
+    cur = conn.execute(
+        "INSERT INTO packs (name, path, source, asset_count) VALUES (?, ?, 'user', 0)",
+        [name, path],
+    )
+    board_id = cur.lastrowid
+    for tag in request.tags:
+        t = tag.strip().lower()
+        if t:
+            conn.execute(
+                "INSERT OR IGNORE INTO pack_tags (pack_id, tag) VALUES (?, ?)",
+                [board_id, t],
+            )
+    conn.commit()
+    conn.close()
+    return {"id": board_id, "name": name, "path": path}
+
+
+@app.post("/api/boards/{board_id}/images", status_code=201)
+def upload_board_images(board_id: int, files: list[UploadFile] = File(...)):
+    """Upload images to a board; first upload sets the cover."""
+    conn = get_db()
+    _ensure_board_columns(conn)
+    board = _board_or_404(conn, board_id)
+    slug = board["path"].split("/", 1)[1]
+    assets_root = get_assets_path()
+
+    # validate all before writing so a bad file writes nothing
+    payloads = []
+    for f in files:
+        data = f.file.read()
+        try:
+            ext = boards_mod.validate_upload(f.filename, data)
+        except ValueError as e:
+            conn.close()
+            raise HTTPException(status_code=400, detail=str(e))
+        payloads.append((f.filename, data, ext))
+
+    created = []
+    for filename, data, ext in payloads:
+        rel, w, h = boards_mod.save_image(assets_root, slug, data, ext)
+        asset_id = boards_mod.insert_board_asset(
+            conn, board_id, rel, filename, ext, len(data), w, h
+        )
+        created.append({"id": asset_id, "path": rel, "filename": filename,
+                        "width": w, "height": h})
+
+    conn.execute(
+        "UPDATE packs SET asset_count = (SELECT COUNT(*) FROM assets WHERE pack_id = ?) WHERE id = ?",
+        [board_id, board_id],
+    )
+    cover_id, cover_path = None, None
+    if not board["preview_path"] and created:
+        cover_path = created[0]["path"]
+        cover_id = created[0]["id"]
+        conn.execute("UPDATE packs SET preview_path = ? WHERE id = ?", [cover_path, board_id])
+    conn.commit()
+    conn.close()
+    return {"assets": created, "cover_asset_id": cover_id, "cover_asset_path": cover_path}
+
+
+@app.delete("/api/asset/{asset_id}")
+def delete_asset(asset_id: int):
+    """Delete a board image: asset row, tag links, and file on disk."""
+    conn = get_db()
+    _ensure_board_columns(conn)
+    row = conn.execute(
+        """SELECT a.path, a.pack_id, p.source FROM assets a
+           JOIN packs p ON a.pack_id = p.id WHERE a.id = ?""",
+        [asset_id],
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Asset not found")
+    if row["source"] != "user":
+        conn.close()
+        raise HTTPException(status_code=400, detail="Not a board asset")
+    pack_id = row["pack_id"]
+    conn.execute("DELETE FROM asset_tags WHERE asset_id = ?", [asset_id])
+    conn.execute("DELETE FROM assets WHERE id = ?", [asset_id])
+    conn.execute(
+        "UPDATE packs SET asset_count = (SELECT COUNT(*) FROM assets WHERE pack_id = ?) WHERE id = ?",
+        [pack_id, pack_id],
+    )
+    conn.commit()
+    conn.close()
+    f = get_assets_path() / row["path"]
+    if f.exists():
+        f.unlink()
+    return {"deleted": asset_id}
+
+
+@app.delete("/api/boards/{board_id}")
+def delete_board(board_id: int):
+    """Delete a board: its assets, tag links, pack_tags, pack row, and directory."""
+    import shutil
+    conn = get_db()
+    _ensure_board_columns(conn)
+    _ensure_pack_tags(conn)
+    board = _board_or_404(conn, board_id)
+    ids = [r["id"] for r in conn.execute(
+        "SELECT id FROM assets WHERE pack_id = ?", [board_id])]
+    for aid in ids:
+        conn.execute("DELETE FROM asset_tags WHERE asset_id = ?", [aid])
+    conn.execute("DELETE FROM assets WHERE pack_id = ?", [board_id])
+    conn.execute("DELETE FROM pack_tags WHERE pack_id = ?", [board_id])
+    conn.execute("DELETE FROM packs WHERE id = ?", [board_id])
+    conn.commit()
+    conn.close()
+    slug = board["path"].split("/", 1)[1]
+    d = boards_mod.board_dir(get_assets_path(), slug)
+    if d.exists():
+        shutil.rmtree(d)
+    return {"deleted": board_id}
+
+
+@app.patch("/api/boards/{board_id}")
+def patch_board(board_id: int, request: BoardPatchRequest):
+    """Rename a board and/or set its cover asset."""
+    conn = get_db()
+    _ensure_board_columns(conn)
+    board = _board_or_404(conn, board_id)
+    name = board["name"]
+    if request.name is not None:
+        name = request.name.strip()
+        if not name:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Empty name")
+        clash = conn.execute(
+            "SELECT 1 FROM packs WHERE name = ? AND id != ?", [name, board_id]
+        ).fetchone()
+        if clash:
+            conn.close()
+            raise HTTPException(status_code=409, detail="Name already exists")
+        conn.execute("UPDATE packs SET name = ? WHERE id = ?", [name, board_id])
+    preview_path = board["preview_path"]
+    if request.cover_asset_id is not None:
+        row = conn.execute(
+            "SELECT path FROM assets WHERE id = ? AND pack_id = ?",
+            [request.cover_asset_id, board_id],
+        ).fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Asset not in board")
+        preview_path = row["path"]
+        conn.execute("UPDATE packs SET preview_path = ? WHERE id = ?", [preview_path, board_id])
+    conn.commit()
+    conn.close()
+    return {"id": board_id, "name": name, "path": board["path"], "preview_path": preview_path}
 
 
 class DownloadCartRequest(BaseModel):
