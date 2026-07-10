@@ -666,3 +666,45 @@ describe('Home search visibility', () => {
     expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(true)
   })
 })
+
+describe('Board view refresh', () => {
+  beforeEach(() => {
+    mockFetch.mockImplementation((url) => {
+      if (url === '/assets/api/filters') {
+        return Promise.resolve({
+          json: () => Promise.resolve({
+            packs: [{ id: 7, name: 'My Board', count: 1, is_3d: false, is_board: true, tags: [] }],
+            tags: []
+          })
+        })
+      }
+      if (url.startsWith('/assets/api/search')) {
+        return Promise.resolve({ json: () => Promise.resolve({ assets: [] }) })
+      }
+      return Promise.resolve({ json: () => Promise.resolve({}) })
+    })
+  })
+
+  afterEach(() => {
+    mockFetch.mockReset()
+  })
+
+  // regression: refreshing after upload/rename must not bounce the user to the gallery
+  it('stays on the board after BoardView emits changed', async () => {
+    const wrapper = mount(App, {
+      global: { stubs: ['SearchBar', 'AssetGrid', 'Cart', 'AssetDetail'] }
+    })
+    await flushPromises()
+
+    wrapper.vm.viewPack('My Board')
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'BoardView' }).exists()).toBe(true)
+
+    await wrapper.findComponent({ name: 'BoardView' }).vm.$emit('changed')
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'BoardView' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'PackGallery' }).exists()).toBe(false)
+    expect(wrapper.vm.selectedPacks).toEqual(['My Board'])
+  })
+})

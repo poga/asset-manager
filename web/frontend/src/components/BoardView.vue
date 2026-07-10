@@ -67,7 +67,10 @@ async function upload(files) {
   emit('changed')
 }
 
-function onPick(e) { upload(e.target.files) }
+function onPick(e) {
+  upload(e.target.files)
+  e.target.value = ''
+}
 
 function onDrop(e) {
   dragOver.value = false

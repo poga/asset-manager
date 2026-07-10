@@ -313,7 +313,13 @@ async function handleCreateBoard(name) {
 }
 
 async function refreshAfterBoardChange() {
+  // fetchFilters clears selectedPacks; restore board view so we don't bounce home
+  const name = currentBoard.value?.name
   await fetchFilters()
+  if (name) {
+    selectedPacks.value = [name]
+    isDefaultHomeView.value = false
+  }
   await search(currentSearchParams.value)
 }
 
