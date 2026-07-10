@@ -50,6 +50,21 @@
           v-else-if="isDefaultHomeView"
           :packs="packList"
           @view-pack="viewPack"
+          @create-board="handleCreateBoard"
+        />
+
+        <BoardView
+          v-else-if="currentBoard"
+          :board="currentBoard"
+          :assets="assets"
+          :cart-ids="cartIds"
+          :loading="loadingMore"
+          @select="selectAsset"
+          @view-pack="viewPack"
+          @add-to-cart="addToCart"
+          @load-more="loadMore"
+          @changed="refreshAfterBoardChange"
+          @deleted="goHomeAfterDelete"
         />
 
         <AssetGrid
@@ -88,7 +103,9 @@ import AssetGrid from './components/AssetGrid.vue'
 import PackGallery from './components/PackGallery.vue'
 import AssetDetail from './components/AssetDetail.vue'
 import Cart from './components/Cart.vue'
+import BoardView from './components/BoardView.vue'
 import { parseRoute, buildUrl } from './router.js'
+import { createBoard } from './api/boards.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
@@ -152,6 +169,11 @@ function handleSystemThemeChange(e) {
 
 const packList = computed(() => filters.value.packs)
 const cartIds = computed(() => cartItems.value.map(item => item.id))
+
+const currentBoard = computed(() => {
+  if (selectedPacks.value.length !== 1) return null
+  return filters.value.packs.find(p => p.name === selectedPacks.value[0] && p.is_board) || null
+})
 
 async function fetchFilters() {
   const res = await fetch(`${API_BASE}/filters`)
@@ -278,6 +300,26 @@ function viewPack(packName) {
   isDefaultHomeView.value = false
   selectedPacks.value = [packName]
   window.history.pushState({ route: 'pack', name: packName }, '', buildUrl({ name: 'pack', params: { name: packName } }))
+}
+
+async function handleCreateBoard(name) {
+  try {
+    await createBoard(name)
+  } catch (e) {
+    return
+  }
+  await fetchFilters()
+  viewPack(name)
+}
+
+async function refreshAfterBoardChange() {
+  await fetchFilters()
+  await search(currentSearchParams.value)
+}
+
+async function goHomeAfterDelete() {
+  await fetchFilters()
+  goHome()
 }
 
 function addToCart(asset) {
