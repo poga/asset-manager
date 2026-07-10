@@ -16,3 +16,4 @@ assets/
 .worktrees/
 node_modules
 .env
+.claude
