@@ -1358,5 +1358,43 @@ def test_asset_detail_includes_file_size(kinds_db):
     assert body["kind"] == "file"
 
 
+def test_filters_pack_sections(test_db):
+    conn = sqlite3.connect(test_db)
+    conn.executescript("""
+        INSERT INTO packs (id, name, path, asset_count) VALUES
+            (20, 'FontPack', 'FontPack', 5),
+            (21, 'ShaderPack', 'ShaderPack', 6),
+            (22, 'ModelPack', 'ModelPack', 2);
+        INSERT INTO assets (pack_id, path, filename, filetype, file_hash, asset_kind) VALUES
+            (20, 'FontPack/a.ttf', 'a.ttf', 'ttf', 's1', 'font'),
+            (20, 'FontPack/b.ttf', 'b.ttf', 'ttf', 's2', 'font'),
+            (20, 'FontPack/c.ttf', 'c.ttf', 'ttf', 's3', 'font'),
+            (20, 'FontPack/p1.png', 'p1.png', 'png', 's4', 'image'),
+            (20, 'FontPack/p2.png', 'p2.png', 'png', 's5', 'image'),
+            (21, 'ShaderPack/a.glsl', 'a.glsl', 'glsl', 's6', 'file'),
+            (21, 'ShaderPack/b.glsl', 'b.glsl', 'glsl', 's7', 'file'),
+            (21, 'ShaderPack/c.glsl', 'c.glsl', 'glsl', 's8', 'file'),
+            (21, 'ShaderPack/d.glsl', 'd.glsl', 'glsl', 's9', 'file'),
+            (21, 'ShaderPack/e.glsl', 'e.glsl', 'glsl', 's10', 'file'),
+            (21, 'ShaderPack/prev.png', 'prev.png', 'png', 's11', 'image'),
+            (22, 'ModelPack/m.glb', 'm.glb', 'glb', 's12', 'model'),
+            (22, 'ModelPack/tex.png', 'tex.png', 'png', 's13', 'image');
+    """)
+    conn.commit()
+    conn.close()
+
+    import api
+    api.set_db_path(test_db)
+    resp = client.get("/api/filters")
+    assert resp.status_code == 200
+    packs = {p["name"]: p for p in resp.json()["packs"]}
+    # fonts outnumber preview images -> fonts; shaders dominate -> files
+    assert packs["FontPack"]["section"] == "fonts"
+    assert packs["ShaderPack"]["section"] == "files"
+    assert packs["ModelPack"]["section"] == "3d"
+    # existing image-only pack stays 2d
+    assert packs["creatures"]["section"] == "2d"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

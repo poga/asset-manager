@@ -512,6 +512,15 @@ def delete_preview_override(asset_id: int):
     return {"success": True}
 
 
+def _pack_section(n_3d: int, n_image: int, n_font: int, n_file: int) -> str:
+	"""Sidebar section: any 3D asset wins; else plurality, ties font > file > image."""
+	if n_3d:
+		return "3d"
+	ranked = [("fonts", n_font), ("files", n_file), ("2d", n_image)]
+	label, best = max(ranked, key=lambda kv: kv[1])
+	return label if best else "2d"
+
+
 @app.get("/api/filters")
 def filters():
     """Get available filter options."""
@@ -520,10 +529,15 @@ def filters():
     _ensure_board_columns(conn)
     packs = conn.execute("""
         SELECT p.id, p.name, p.source, p.asset_count AS count,
-               EXISTS (SELECT 1 FROM assets a
-                       WHERE a.pack_id = p.id
-                         AND a.asset_kind IN ('model', 'animation_bundle')) AS is_3d
+               SUM(CASE WHEN a.asset_kind IN ('model', 'animation_bundle') THEN 1 ELSE 0 END) AS n_3d,
+               SUM(CASE WHEN a.asset_kind = 'font' THEN 1 ELSE 0 END) AS n_font,
+               SUM(CASE WHEN a.asset_kind = 'file' THEN 1 ELSE 0 END) AS n_file,
+               SUM(CASE WHEN a.id IS NOT NULL
+                         AND (a.asset_kind = 'image' OR a.asset_kind IS NULL)
+                    THEN 1 ELSE 0 END) AS n_image
         FROM packs p
+        LEFT JOIN assets a ON a.pack_id = p.id
+        GROUP BY p.id
         ORDER BY p.name
     """).fetchall()
     _ensure_pack_tags(conn)
@@ -561,7 +575,8 @@ def filters():
                 "id": p["id"],
                 "name": p["name"],
                 "count": p["count"],
-                "is_3d": bool(p["is_3d"]),
+                "is_3d": bool(p["n_3d"]),
+                "section": _pack_section(p["n_3d"], p["n_image"], p["n_font"], p["n_file"]),
                 "is_board": p["source"] == "user",
                 "tags": pack_tag_map.get(p["id"], []),
             }
