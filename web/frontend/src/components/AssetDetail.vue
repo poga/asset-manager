@@ -12,6 +12,11 @@
         :filename="asset.filename"
         :api-base="API_BASE"
       />
+      <FontTester
+        v-else-if="asset.kind === 'font'"
+        :asset-id="asset.id"
+        :api-base="API_BASE"
+      />
       <div v-else-if="asset.kind === 'file'" class="file-panel">
         <span class="file-ext-big">.{{ fileExt }}</span>
         <span class="file-panel-name">{{ asset.filename }}</span>
@@ -127,6 +132,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import ModelViewer from './ModelViewer.vue'
+import FontTester from './FontTester.vue'
 import { tagHue } from '../utils/tagColor.js'
 import { setCover, deleteImage, addImageTag, removeImageTag } from '../api/boards.js'
 import { formatSize } from '../utils/fileSize.js'

@@ -288,4 +288,23 @@ describe('AssetDetail', () => {
       expect(wrapper.find('.full-size-btn').exists()).toBe(false)
     })
   })
+
+  describe('AssetDetail font kind', () => {
+    beforeEach(() => {
+      vi.stubGlobal('FontFace', class {
+        load() { return Promise.resolve(this) }
+      })
+    })
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('renders the type tester for fonts', () => {
+      const fontAsset = {
+        id: 6, filename: 'pixel.ttf', path: 'Fonts/pixel.ttf', pack: 'Fonts',
+        kind: 'font', file_size: 900, width: null, height: null, tags: ['font'], colors: [],
+      }
+      const wrapper = mount(AssetDetail, { props: { asset: fontAsset } })
+      expect(wrapper.findComponent({ name: 'FontTester' }).exists()).toBe(true)
+      expect(wrapper.find('.download-btn').exists()).toBe(true)
+    })
+  })
 })
