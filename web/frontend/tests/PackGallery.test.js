@@ -42,6 +42,29 @@ describe('PackGallery', () => {
     expect(names).toEqual(['Cave', 'Swamp', 'Beach', 'Attic', 'Zebra'])
   })
 
+  it('sorts by name when a tag filter is active, ignoring other tags', async () => {
+    const multiTag = [
+      { name: 'Anchor', count: 1, is_3d: false, tags: ['icon'] },
+      { name: 'Zebra', count: 1, is_3d: false, tags: ['aaa', 'icon'] },
+    ]
+    const wrapper = mount(PackGallery, { props: { packs: multiTag } })
+    // unfiltered: Zebra leads via its smallest tag 'aaa'
+    expect(wrapper.findAll('.card-name').map(n => n.text())).toEqual(['Zebra', 'Anchor'])
+
+    const chip = wrapper.findAll('.chip').find(c => c.text().includes('icon'))
+    await chip.trigger('click')
+    expect(wrapper.findAll('.card-name').map(n => n.text())).toEqual(['Anchor', 'Zebra'])
+  })
+
+  it('sorts numbered pack names naturally', () => {
+    const numbered = [
+      { name: 'Series 10', count: 1, is_3d: false, tags: [] },
+      { name: 'Series 5', count: 1, is_3d: false, tags: [] },
+    ]
+    const wrapper = mount(PackGallery, { props: { packs: numbered } })
+    expect(wrapper.findAll('.card-name').map(n => n.text())).toEqual(['Series 5', 'Series 10'])
+  })
+
   it('re-sorts when a tag edit changes a pack ordering', async () => {
     mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ tags: ['axe'] }) })
     const sortable = [
