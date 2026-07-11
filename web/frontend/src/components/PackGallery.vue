@@ -128,14 +128,20 @@ const allTags = computed(() => {
   return Object.keys(counts).sort().map(tag => ({ tag, count: counts[tag] }))
 })
 
+const SECTIONS = [
+  { key: '2d', label: '2D' },
+  { key: '3d', label: '3D' },
+  { key: 'fonts', label: 'Fonts' },
+  { key: 'files', label: 'Files' },
+]
+
 const sections = computed(() => {
   const visible = activeTag.value
     ? props.packs.filter(p => tagsOf(p).includes(activeTag.value))
     : props.packs
-  return [
-    { label: '2D', packs: visible.filter(p => !p.is_3d) },
-    { label: '3D', packs: visible.filter(p => p.is_3d) },
-  ].filter(s => s.packs.length)
+  return SECTIONS
+    .map(s => ({ label: s.label, packs: visible.filter(p => (p.section || '2d') === s.key) }))
+    .filter(s => s.packs.length)
 })
 
 function toggleTag(tag) {

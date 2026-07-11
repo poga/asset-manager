@@ -6,9 +6,9 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 
 const packs = [
-  { name: 'Minifantasy_Ancient_Forests', count: 120, is_3d: false, tags: ['forest'] },
-  { name: 'KayKit Forest Nature Pack 1.0', count: 80, is_3d: true, tags: ['forest'] },
-  { name: 'Minifantasy_Dungeon_v2.3', count: 300, is_3d: false, tags: [] },
+  { name: 'Minifantasy_Ancient_Forests', count: 120, section: '2d', tags: ['forest'] },
+  { name: 'KayKit Forest Nature Pack 1.0', count: 80, section: '3d', tags: ['forest'] },
+  { name: 'Minifantasy_Dungeon_v2.3', count: 300, section: '2d', tags: [] },
 ]
 
 beforeEach(() => {
@@ -29,7 +29,7 @@ describe('PackGallery', () => {
   })
 
   it('omits an empty dimension section', () => {
-    const wrapper = mount(PackGallery, { props: { packs: packs.filter(p => !p.is_3d) } })
+    const wrapper = mount(PackGallery, { props: { packs: packs.filter(p => p.section !== '3d') } })
     expect(wrapper.findAll('.dim-title').map(t => t.text())).toEqual(['2D'])
   })
 
@@ -123,8 +123,8 @@ describe('PackGallery', () => {
 
   it('gives visually distinct tags a clearly separated hue', () => {
     const distinctPacks = [
-      { name: 'A', count: 1, is_3d: false, tags: ['minifantasy'] },
-      { name: 'B', count: 1, is_3d: false, tags: ['penusbmic'] },
+      { name: 'A', count: 1, section: '2d', tags: ['minifantasy'] },
+      { name: 'B', count: 1, section: '2d', tags: ['penusbmic'] },
     ]
     const wrapper = mount(PackGallery, { props: { packs: distinctPacks } })
     const hues = wrapper.findAll('.tag-chip').map(chip => {
@@ -137,7 +137,7 @@ describe('PackGallery', () => {
   })
 
   it('renders a BOARD badge on board packs', () => {
-    const withBoard = [...packs, { name: 'My Board', count: 3, is_3d: false, is_board: true, tags: [], id: 9 }]
+    const withBoard = [...packs, { name: 'My Board', count: 3, section: '2d', is_board: true, tags: [], id: 9 }]
     const wrapper = mount(PackGallery, { props: { packs: withBoard } })
     expect(wrapper.text()).toContain('BOARD')
   })
@@ -162,5 +162,17 @@ describe('PackGallery', () => {
     Object.defineProperty(imgs[1].element, 'naturalWidth', { value: 512 })
     await imgs[1].trigger('load')
     expect(imgs[1].classes()).not.toContain('pixelated')
+  })
+})
+
+describe('PackGallery kind sections', () => {
+  it('groups packs into Fonts and Files sections', () => {
+    const wrapper = mount(PackGallery, { props: { packs: [
+      { name: 'PixelFonts', count: 10, section: 'fonts', tags: [] },
+      { name: 'ShaderLib', count: 5, section: 'files', tags: [] },
+      { name: 'Sprites', count: 5, section: '2d', tags: [] },
+    ] } })
+    const titles = wrapper.findAll('.dim-title').map(t => t.text())
+    expect(titles).toEqual(['2D', 'Fonts', 'Files'])
   })
 })

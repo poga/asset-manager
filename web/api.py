@@ -575,7 +575,6 @@ def filters():
                 "id": p["id"],
                 "name": p["name"],
                 "count": p["count"],
-                "is_3d": bool(p["n_3d"]),
                 "section": _pack_section(p["n_3d"], p["n_image"], p["n_font"], p["n_file"]),
                 "is_board": p["source"] == "user",
                 "tags": pack_tag_map.get(p["id"], []),

@@ -673,7 +673,7 @@ describe('Board view refresh', () => {
       if (url === '/assets/api/filters') {
         return Promise.resolve({
           json: () => Promise.resolve({
-            packs: [{ id: 7, name: 'My Board', count: 1, is_3d: false, is_board: true, tags: [] }],
+            packs: [{ id: 7, name: 'My Board', count: 1, section: '2d', is_board: true, tags: [] }],
             tags: []
           })
         })
@@ -715,7 +715,7 @@ describe('Board view refresh', () => {
       if (url === '/assets/api/filters') {
         return Promise.resolve({
           json: () => Promise.resolve({
-            packs: [{ id: 7, name: boardName, count: 1, is_3d: false, is_board: true, tags: [] }],
+            packs: [{ id: 7, name: boardName, count: 1, section: '2d', is_board: true, tags: [] }],
             tags: []
           })
         })

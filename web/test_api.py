@@ -363,7 +363,7 @@ def test_filters_tags_full_vocabulary_merges_pack_tags(test_db):
             assert a["name"] <= b["name"]
 
 
-def test_filters_include_is_3d(test_db):
+def test_filters_model_pack_3d_section(test_db):
     conn = sqlite3.connect(test_db)
     # texture-heavy 3D pack: one model among many pngs must still be 3D
     conn.execute(
@@ -399,8 +399,8 @@ def test_filters_include_is_3d(test_db):
     assert resp.status_code == 200
     packs = {p["name"]: p for p in resp.json()["packs"]}
     assert "theme" not in packs["Forest3D"]
-    assert packs["Forest3D"]["is_3d"] is True
-    assert packs["Sprites2D"]["is_3d"] is False
+    assert packs["Forest3D"]["section"] == "3d"
+    assert packs["Sprites2D"]["section"] == "2d"
 
 
 def test_filters_tolerate_db_without_theme_column(tmp_path):
