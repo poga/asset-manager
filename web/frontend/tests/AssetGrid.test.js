@@ -165,3 +165,33 @@ describe('AssetGrid', () => {
     })
   })
 })
+
+describe('AssetGrid file/font kinds', () => {
+  const fileAsset = {
+    id: 10, filename: 'blur.glsl', pack: 'Shaders', kind: 'file',
+    file_size: 2048, tags: [], preview_x: null, width: null, height: null,
+  }
+  const fontAsset = {
+    id: 11, filename: 'pixel.ttf', pack: 'Fonts', kind: 'font',
+    tags: [], preview_x: null, width: null, height: null,
+  }
+
+  it('renders extension badge instead of image for file assets', () => {
+    const wrapper = mount(AssetGrid, { props: { assets: [fileAsset] } })
+    expect(wrapper.find('.file-ext').text()).toBe('.GLSL')
+    expect(wrapper.find('.file-size').text()).toBe('2.0 KB')
+    expect(wrapper.find('img').exists()).toBe(false)
+  })
+
+  it('renders thumbnail image for font assets', () => {
+    const wrapper = mount(AssetGrid, { props: { assets: [fontAsset] } })
+    expect(wrapper.find('img').attributes('src')).toContain('/image/11')
+  })
+
+  it('falls back to Aa placeholder when a font thumbnail fails', async () => {
+    const wrapper = mount(AssetGrid, { props: { assets: [fontAsset] } })
+    await wrapper.find('img').trigger('error')
+    expect(wrapper.find('.font-fallback').exists()).toBe(true)
+    expect(wrapper.find('img').exists()).toBe(false)
+  })
+})
