@@ -250,13 +250,13 @@ def search(
     where = " AND ".join(conditions) if conditions else "1=1"
 
     # Random order for empty search (discoverability), deterministic for filtered
-    is_empty_search = not q and not tag and not pack and not type
+    is_empty_search = not q and not tag and not pack and not type and not kind
     order_by = "RANDOM()" if is_empty_search else "a.path"
 
     sql = f"""
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
                a.preview_x, a.preview_y, a.preview_width, a.preview_height,
-               a.asset_kind, a.rig, a.thumbnail_path,
+               a.asset_kind, a.rig, a.thumbnail_path, a.file_size,
                p.name as pack_name,
                GROUP_CONCAT(DISTINCT tg.name) as tags,
                po.use_full_image
@@ -297,6 +297,7 @@ def search(
             "kind": row["asset_kind"],
             "rig": row["rig"],
             "thumbnail_path": row["thumbnail_path"],
+            "file_size": row["file_size"],
         })
 
     return {"assets": assets, "total": len(assets)}
@@ -406,6 +407,7 @@ def asset_detail(asset_id: int):
         "path": row["path"],
         "filename": row["filename"],
         "filetype": row["filetype"],
+        "file_size": row["file_size"],
         "pack": row["pack_name"],
         "width": row["width"],
         "height": row["height"],
@@ -572,7 +574,8 @@ def filters():
 ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
 
 
-_3D_KINDS = {"model", "animation_bundle"}
+# kinds whose /api/image response is a generated thumbnail, not the raw file
+_THUMBNAIL_KINDS = {"model", "animation_bundle", "font"}
 
 
 @app.get("/api/image/{asset_id}")
@@ -588,8 +591,12 @@ def image(asset_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    # Serve thumbnail PNG for 3D assets; raw file has no visual representation
-    if row["asset_kind"] in _3D_KINDS:
+    # 'file' assets have no visual form at all
+    if row["asset_kind"] == "file":
+        raise HTTPException(status_code=404, detail="No preview")
+
+    # Serve thumbnail PNG for kinds whose raw file isn't an image
+    if row["asset_kind"] in _THUMBNAIL_KINDS:
         if not row["thumbnail_path"]:
             raise HTTPException(status_code=404, detail="No thumbnail")
         thumb = Path(row["thumbnail_path"])
@@ -695,6 +702,27 @@ def asset_model_sibling(asset_id: int, filename: str):
         raise HTTPException(404)
     ct = MODEL_CONTENT_TYPES.get(target.suffix.lower())
     return FileResponse(target, media_type=ct) if ct else FileResponse(target)
+
+
+@app.get("/api/asset/{asset_id}/file")
+def asset_file(asset_id: int, download: bool = False):
+    """Serve the raw asset file; ?download=true forces attachment."""
+    import mimetypes
+    conn = get_db()
+    row = conn.execute(
+        "SELECT path, filename FROM assets WHERE id = ?", [asset_id]
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    p = get_assets_path() / row["path"]
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="File missing")
+    media = mimetypes.guess_type(row["filename"])[0] or "application/octet-stream"
+    headers = {}
+    if download:
+        headers["Content-Disposition"] = f'attachment; filename="{row["filename"]}"'
+    return FileResponse(p, media_type=media, headers=headers)
 
 
 @app.get("/api/pack-preview/{pack_name:path}")
