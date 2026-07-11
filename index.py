@@ -257,8 +257,10 @@ def generate_pack_preview(
     preview_dir: Path,
     grid_size: int = 4,
     thumb_size: int = 64,
+    db_root: Optional[Path] = None,
 ) -> Optional[str]:
     """Generate a preview montage for a pack."""
+    db_root = db_root or preview_dir.parent.parent
     # Get representative assets (prefer idle animations)
     rows = conn.execute("""
         SELECT path, filename, preview_x, preview_y, preview_width, preview_height
@@ -272,7 +274,20 @@ def generate_pack_preview(
         LIMIT ?
     """, [pack_id, grid_size * grid_size]).fetchall()
 
-    if len(rows) < 4:
+    entries: list[tuple[Path, Optional[sqlite3.Row]]] = [
+        (asset_root / r["path"], r) for r in rows
+    ]
+    if len(entries) < grid_size * grid_size:
+        # Pad with font specimens so fonts-only packs get real previews
+        font_rows = conn.execute("""
+            SELECT thumbnail_path FROM assets
+            WHERE pack_id = ? AND asset_kind = 'font' AND thumbnail_path IS NOT NULL
+            ORDER BY filename
+            LIMIT ?
+        """, [pack_id, grid_size * grid_size - len(entries)]).fetchall()
+        entries.extend((db_root / r["thumbnail_path"], None) for r in font_rows)
+
+    if len(entries) < 4:
         return None
 
     # Create montage
@@ -284,14 +299,13 @@ def generate_pack_preview(
     try:
         montage = Image.new("RGBA", (grid_size * thumb_size, grid_size * thumb_size), (0, 0, 0, 0))
 
-        for i, row in enumerate(rows):
+        for i, (img_path, row) in enumerate(entries):
             x = (i % grid_size) * thumb_size
             y = (i // grid_size) * thumb_size
 
-            img_path = asset_root / row["path"]
             with Image.open(img_path) as img:
                 # Use preview bounds if available
-                if row["preview_x"] is not None:
+                if row is not None and row["preview_x"] is not None:
                     img = img.crop((
                         row["preview_x"],
                         row["preview_y"],
@@ -781,7 +795,7 @@ def index(
         if convention:
             preview_path = stage_pack_convention_preview(convention, preview_dir, row["name"])
         else:
-            preview_path = generate_pack_preview(conn, row["id"], asset_root, preview_dir)
+            preview_path = generate_pack_preview(conn, row["id"], asset_root, preview_dir, db_root=db.parent)
         if preview_path:
             conn.execute(
                 "UPDATE packs SET preview_path = ?, preview_generated = TRUE WHERE id = ?",

@@ -1474,6 +1474,36 @@ class TestAnyfileIndexing:
         assert asset_kinds.find_handler(Path("a/b.meta")) is None
 
 
+class TestFontPackPreview:
+    def test_fonts_only_pack_gets_montage(self, tmp_path):
+        pack = tmp_path / "assets" / "FontPack"
+        pack.mkdir(parents=True)
+        for i in range(4):
+            shutil.copy(FIXTURE_TTF, pack / f"font_{i}.ttf")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT preview_path FROM packs WHERE name = 'FontPack'").fetchone()
+        assert row["preview_path"] is not None
+        assert (db_path.parent / ".index" / row["preview_path"]).exists()
+
+    def test_small_image_pack_still_gets_no_montage(self, tmp_path):
+        pack = tmp_path / "assets" / "TinyPack"
+        pack.mkdir(parents=True)
+        for i in range(3):
+            Image.new("RGBA", (32, 32), (10 * i, 100, 50, 255)).save(pack / f"s{i}.png")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT preview_path FROM packs WHERE name = 'TinyPack'").fetchone()
+        assert row["preview_path"] is None
+
+
 # =============================================================================
 # Entry point
 # =============================================================================
