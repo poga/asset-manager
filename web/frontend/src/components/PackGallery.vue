@@ -128,13 +128,30 @@ const allTags = computed(() => {
   return Object.keys(counts).sort().map(tag => ({ tag, count: counts[tag] }))
 })
 
+// groups tagged packs together; untagged sink below, alphabetical throughout
+function firstTag(pack) {
+  const tags = tagsOf(pack)
+  return tags.length ? [...tags].sort()[0] : null
+}
+
+function byTag(a, b) {
+  const ta = firstTag(a)
+  const tb = firstTag(b)
+  if (ta !== tb) {
+    if (ta === null) return 1
+    if (tb === null) return -1
+    return ta.localeCompare(tb)
+  }
+  return a.name.localeCompare(b.name)
+}
+
 const sections = computed(() => {
   const visible = activeTag.value
     ? props.packs.filter(p => tagsOf(p).includes(activeTag.value))
     : props.packs
   return [
-    { label: '2D', packs: visible.filter(p => !p.is_3d) },
-    { label: '3D', packs: visible.filter(p => p.is_3d) },
+    { label: '2D', packs: visible.filter(p => !p.is_3d).sort(byTag) },
+    { label: '3D', packs: visible.filter(p => p.is_3d).sort(byTag) },
   ].filter(s => s.packs.length)
 })
 

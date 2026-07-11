@@ -28,6 +28,39 @@ describe('PackGallery', () => {
     expect(twoD.length).toBe(2)
   })
 
+  it('sorts packs within a section by tag, untagged last', () => {
+    const unsorted = [
+      { name: 'Zebra', count: 1, is_3d: false, tags: [] },
+      { name: 'Beach', count: 1, is_3d: false, tags: ['water'] },
+      { name: 'Cave', count: 1, is_3d: false, tags: ['dungeon'] },
+      { name: 'Attic', count: 1, is_3d: false, tags: [] },
+      { name: 'Swamp', count: 1, is_3d: false, tags: ['water', 'dungeon'] },
+    ]
+    const wrapper = mount(PackGallery, { props: { packs: unsorted } })
+    const names = wrapper.findAll('.card-name').map(n => n.text())
+    // dungeon < water; Swamp sorts by its smallest tag; untagged by name last
+    expect(names).toEqual(['Cave', 'Swamp', 'Beach', 'Attic', 'Zebra'])
+  })
+
+  it('re-sorts when a tag edit changes a pack ordering', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ tags: ['axe'] }) })
+    const sortable = [
+      { name: 'Beach', count: 1, is_3d: false, tags: ['water'] },
+      { name: 'Zebra', count: 1, is_3d: false, tags: [] },
+    ]
+    const wrapper = mount(PackGallery, { props: { packs: sortable } })
+    const zebra = wrapper.findAll('.gallery-card').find(c => c.text().includes('Zebra'))
+
+    await zebra.find('.tag-add').trigger('click')
+    const input = zebra.find('.tag-input')
+    await input.setValue('axe')
+    await input.trigger('keyup.enter')
+    await flushPromises()
+
+    const names = wrapper.findAll('.card-name').map(n => n.text())
+    expect(names).toEqual(['Zebra', 'Beach'])
+  })
+
   it('omits an empty dimension section', () => {
     const wrapper = mount(PackGallery, { props: { packs: packs.filter(p => !p.is_3d) } })
     expect(wrapper.findAll('.dim-title').map(t => t.text())).toEqual(['2D'])
