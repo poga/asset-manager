@@ -14,11 +14,19 @@
       >
         <div
           class="asset-image-container"
-          :style="{ aspectRatio: (asset.preview_x != null && !asset.use_full_image) ? `${asset.preview_width} / ${asset.preview_height}` : `${asset.width} / ${asset.height}` }"
+          :style="containerStyle(asset)"
           @click="$emit('select', asset.id)"
         >
+          <div v-if="asset.kind === 'file'" class="file-badge">
+            <span class="file-ext">.{{ fileExt(asset) }}</span>
+            <span class="file-size" v-if="asset.file_size != null">{{ formatSize(asset.file_size) }}</span>
+          </div>
+          <span
+            v-else-if="asset.kind === 'font' && thumbFailed[asset.id]"
+            class="font-fallback"
+          >Aa</span>
           <SpritePreview
-            v-if="asset.preview_x !== null && !asset.use_full_image"
+            v-else-if="asset.preview_x !== null && !asset.use_full_image"
             :asset-id="asset.id"
             :preview-x="asset.preview_x"
             :preview-y="asset.preview_y"
@@ -31,6 +39,7 @@
             v-else
             :src="`${API_BASE}/image/${asset.id}`"
             :alt="asset.filename"
+            @error="asset.kind === 'font' ? (thumbFailed[asset.id] = true) : null"
           />
           <button
             v-if="hoveredId === asset.id && !cartIds.includes(asset.id)"
@@ -59,8 +68,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import SpritePreview from './SpritePreview.vue'
+import { formatSize } from '../utils/fileSize.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
@@ -82,6 +92,22 @@ defineProps({
 const emit = defineEmits(['select', 'view-pack', 'add-to-cart', 'load-more'])
 
 const hoveredId = ref(null)
+const thumbFailed = reactive({})
+
+function fileExt(asset) {
+  const parts = asset.filename.split('.')
+  return parts.length > 1 ? parts.pop().toUpperCase() : ''
+}
+
+// specimen/file cards have no intrinsic dimensions; fix a wide ratio
+function containerStyle(asset) {
+  if (asset.kind === 'file' || asset.kind === 'font') return { aspectRatio: '2 / 1' }
+  return {
+    aspectRatio: (asset.preview_x != null && !asset.use_full_image)
+      ? `${asset.preview_width} / ${asset.preview_height}`
+      : `${asset.width} / ${asset.height}`
+  }
+}
 
 // fire before the user hits the bottom so the next page streams in seamlessly
 function onScroll(e) {
@@ -220,5 +246,30 @@ function onScroll(e) {
   color: var(--color-text-muted);
   text-align: center;
   padding: 1rem;
+}
+
+.file-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.file-ext {
+  font-weight: 700;
+  font-size: 1.125rem;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.file-size {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+
+.font-fallback {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
 }
 </style>

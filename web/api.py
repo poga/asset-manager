@@ -250,13 +250,13 @@ def search(
     where = " AND ".join(conditions) if conditions else "1=1"
 
     # Random order for empty search (discoverability), deterministic for filtered
-    is_empty_search = not q and not tag and not pack and not type
+    is_empty_search = not q and not tag and not pack and not type and not kind
     order_by = "RANDOM()" if is_empty_search else "a.path"
 
     sql = f"""
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
                a.preview_x, a.preview_y, a.preview_width, a.preview_height,
-               a.asset_kind, a.rig, a.thumbnail_path,
+               a.asset_kind, a.rig, a.thumbnail_path, a.file_size,
                p.name as pack_name,
                GROUP_CONCAT(DISTINCT tg.name) as tags,
                po.use_full_image
@@ -297,6 +297,7 @@ def search(
             "kind": row["asset_kind"],
             "rig": row["rig"],
             "thumbnail_path": row["thumbnail_path"],
+            "file_size": row["file_size"],
         })
 
     return {"assets": assets, "total": len(assets)}
@@ -406,6 +407,7 @@ def asset_detail(asset_id: int):
         "path": row["path"],
         "filename": row["filename"],
         "filetype": row["filetype"],
+        "file_size": row["file_size"],
         "pack": row["pack_name"],
         "width": row["width"],
         "height": row["height"],
@@ -510,6 +512,15 @@ def delete_preview_override(asset_id: int):
     return {"success": True}
 
 
+def _pack_section(n_3d: int, n_image: int, n_font: int, n_file: int) -> str:
+    """Sidebar section: any 3D asset wins; else plurality, ties font > file > image."""
+    if n_3d:
+        return "3d"
+    ranked = [("fonts", n_font), ("files", n_file), ("2d", n_image)]
+    label, best = max(ranked, key=lambda kv: kv[1])
+    return label if best else "2d"
+
+
 @app.get("/api/filters")
 def filters():
     """Get available filter options."""
@@ -518,10 +529,15 @@ def filters():
     _ensure_board_columns(conn)
     packs = conn.execute("""
         SELECT p.id, p.name, p.source, p.asset_count AS count,
-               EXISTS (SELECT 1 FROM assets a
-                       WHERE a.pack_id = p.id
-                         AND a.asset_kind IN ('model', 'animation_bundle')) AS is_3d
+               SUM(CASE WHEN a.asset_kind IN ('model', 'animation_bundle') THEN 1 ELSE 0 END) AS n_3d,
+               SUM(CASE WHEN a.asset_kind = 'font' THEN 1 ELSE 0 END) AS n_font,
+               SUM(CASE WHEN a.asset_kind = 'file' THEN 1 ELSE 0 END) AS n_file,
+               SUM(CASE WHEN a.id IS NOT NULL
+                         AND (a.asset_kind = 'image' OR a.asset_kind IS NULL)
+                    THEN 1 ELSE 0 END) AS n_image
         FROM packs p
+        LEFT JOIN assets a ON a.pack_id = p.id
+        GROUP BY p.id
         ORDER BY p.name
     """).fetchall()
     _ensure_pack_tags(conn)
@@ -559,7 +575,7 @@ def filters():
                 "id": p["id"],
                 "name": p["name"],
                 "count": p["count"],
-                "is_3d": bool(p["is_3d"]),
+                "section": _pack_section(p["n_3d"], p["n_image"], p["n_font"], p["n_file"]),
                 "is_board": p["source"] == "user",
                 "tags": pack_tag_map.get(p["id"], []),
             }
@@ -572,7 +588,8 @@ def filters():
 ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
 
 
-_3D_KINDS = {"model", "animation_bundle"}
+# kinds whose /api/image response is a generated thumbnail, not the raw file
+_THUMBNAIL_KINDS = {"model", "animation_bundle", "font"}
 
 
 @app.get("/api/image/{asset_id}")
@@ -588,8 +605,12 @@ def image(asset_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    # Serve thumbnail PNG for 3D assets; raw file has no visual representation
-    if row["asset_kind"] in _3D_KINDS:
+    # 'file' assets have no visual form at all
+    if row["asset_kind"] == "file":
+        raise HTTPException(status_code=404, detail="No preview")
+
+    # Serve thumbnail PNG for kinds whose raw file isn't an image
+    if row["asset_kind"] in _THUMBNAIL_KINDS:
         if not row["thumbnail_path"]:
             raise HTTPException(status_code=404, detail="No thumbnail")
         thumb = Path(row["thumbnail_path"])
@@ -695,6 +716,28 @@ def asset_model_sibling(asset_id: int, filename: str):
         raise HTTPException(404)
     ct = MODEL_CONTENT_TYPES.get(target.suffix.lower())
     return FileResponse(target, media_type=ct) if ct else FileResponse(target)
+
+
+@app.get("/api/asset/{asset_id}/file")
+def asset_file(asset_id: int, download: bool = False):
+    """Serve the raw asset file; ?download=true forces attachment."""
+    import mimetypes
+    conn = get_db()
+    row = conn.execute(
+        "SELECT path, filename FROM assets WHERE id = ?", [asset_id]
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    p = get_assets_path() / row["path"]
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="File missing")
+    media = mimetypes.guess_type(row["filename"])[0] or "application/octet-stream"
+    if download:
+        # FileResponse escapes the filename; hand-built headers wouldn't
+        return FileResponse(p, media_type=media, filename=row["filename"],
+                            content_disposition_type="attachment")
+    return FileResponse(p, media_type=media)
 
 
 @app.get("/api/pack-preview/{pack_name:path}")

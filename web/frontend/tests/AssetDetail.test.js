@@ -261,4 +261,50 @@ describe('AssetDetail', () => {
       expect(checkbox.element.checked).toBe(true)
     })
   })
+
+  describe('AssetDetail file kind', () => {
+    const fileAsset = {
+      id: 5, filename: 'blur.glsl', path: 'Shaders/blur.glsl', pack: 'Shaders',
+      kind: 'file', file_size: 2048, width: null, height: null, tags: ['file'], colors: [],
+    }
+
+    it('shows a download link with attachment url', () => {
+      const wrapper = mount(AssetDetail, { props: { asset: fileAsset } })
+      const link = wrapper.find('.download-btn')
+      expect(link.exists()).toBe(true)
+      expect(link.attributes('href')).toContain('/asset/5/file?download=true')
+    })
+
+    it('renders a file panel instead of an image', () => {
+      const wrapper = mount(AssetDetail, { props: { asset: fileAsset } })
+      expect(wrapper.find('.file-panel').exists()).toBe(true)
+      expect(wrapper.find('img').exists()).toBe(false)
+      expect(wrapper.text()).toContain('2.0 KB')
+    })
+
+    it('hides pixel dimensions and Full Size for file assets', () => {
+      const wrapper = mount(AssetDetail, { props: { asset: fileAsset } })
+      expect(wrapper.text()).not.toContain('nullxnull')
+      expect(wrapper.find('.full-size-btn').exists()).toBe(false)
+    })
+  })
+
+  describe('AssetDetail font kind', () => {
+    beforeEach(() => {
+      vi.stubGlobal('FontFace', class {
+        load() { return Promise.resolve(this) }
+      })
+    })
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('renders the type tester for fonts', () => {
+      const fontAsset = {
+        id: 6, filename: 'pixel.ttf', path: 'Fonts/pixel.ttf', pack: 'Fonts',
+        kind: 'font', file_size: 900, width: null, height: null, tags: ['font'], colors: [],
+      }
+      const wrapper = mount(AssetDetail, { props: { asset: fontAsset } })
+      expect(wrapper.findComponent({ name: 'FontTester' }).exists()).toBe(true)
+      expect(wrapper.find('.download-btn').exists()).toBe(true)
+    })
+  })
 })

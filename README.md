@@ -71,7 +71,12 @@ uv run pytest test_index.py
 
 ## Supported Formats
 
-PNG, GIF, JPG, WEBP, Aseprite (.ase, .aseprite)
+- **Images:** PNG, GIF, JPG, WEBP, Aseprite (.ase, .aseprite)
+- **3D models:** glTF (.glb, .gltf)
+- **Fonts:** TTF, OTF, WOFF, WOFF2 (specimen previews + live type tester)
+- **Anything else** is indexed as a downloadable file asset (shaders,
+  .blend files, archives, ...). OS/engine junk (.DS_Store, *.import,
+  *.meta, ...) is skipped.
 
 ## Web Interface
 
@@ -115,5 +120,6 @@ npm run dev
 - `GET /api/search` - Search assets (query params: `q`, `tag`, `color`, `pack`, `type`, `limit`)
 - `GET /api/image/{id}` - Serve asset image
 - `GET /api/asset/{id}` - Asset details
+- `GET /api/asset/{id}/file` - Raw asset file (`?download=true` forces attachment)
 - `GET /api/similar/{id}` - Find visually similar assets
 - `GET /api/filters` - Available filter options

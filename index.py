@@ -32,16 +32,13 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 import aseprite_parser
+import asset_kinds
 import frame_detect
 import model_indexer
+from asset_kinds import ASEPRITE_EXTENSIONS, IMAGE_EXTENSIONS, MODEL_EXTENSIONS
 
 app = typer.Typer(help="Build and update the game asset index")
 console = Console()
-
-# Supported image types for indexing
-IMAGE_EXTENSIONS = {".png", ".gif", ".jpg", ".jpeg", ".webp"}
-ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
-MODEL_EXTENSIONS = {".glb", ".gltf"}
 
 # Noise words to skip in tag extraction
 NOISE_WORDS = {
@@ -260,8 +257,10 @@ def generate_pack_preview(
     preview_dir: Path,
     grid_size: int = 4,
     thumb_size: int = 64,
+    db_root: Optional[Path] = None,
 ) -> Optional[str]:
     """Generate a preview montage for a pack."""
+    db_root = db_root or preview_dir.parent.parent
     # Get representative assets (prefer idle animations)
     rows = conn.execute("""
         SELECT path, filename, preview_x, preview_y, preview_width, preview_height
@@ -275,7 +274,20 @@ def generate_pack_preview(
         LIMIT ?
     """, [pack_id, grid_size * grid_size]).fetchall()
 
-    if len(rows) < 4:
+    entries: list[tuple[Path, Optional[sqlite3.Row]]] = [
+        (asset_root / r["path"], r) for r in rows
+    ]
+    if len(entries) < 4:
+        # Pad with font specimens so fonts-only packs get real previews
+        font_rows = conn.execute("""
+            SELECT thumbnail_path FROM assets
+            WHERE pack_id = ? AND asset_kind = 'font' AND thumbnail_path IS NOT NULL
+            ORDER BY filename
+            LIMIT ?
+        """, [pack_id, grid_size * grid_size - len(entries)]).fetchall()
+        entries.extend((db_root / r["thumbnail_path"], None) for r in font_rows)
+
+    if len(entries) < 4:
         return None
 
     # Create montage
@@ -287,14 +299,13 @@ def generate_pack_preview(
     try:
         montage = Image.new("RGBA", (grid_size * thumb_size, grid_size * thumb_size), (0, 0, 0, 0))
 
-        for i, row in enumerate(rows):
+        for i, (img_path, row) in enumerate(entries):
             x = (i % grid_size) * thumb_size
             y = (i // grid_size) * thumb_size
 
-            img_path = asset_root / row["path"]
             with Image.open(img_path) as img:
                 # Use preview bounds if available
-                if row["preview_x"] is not None:
+                if row is not None and row["preview_x"] is not None:
                     img = img.crop((
                         row["preview_x"],
                         row["preview_y"],
@@ -509,18 +520,24 @@ def add_tags(conn: sqlite3.Connection, asset_id: int, tags: list[str], source: s
 
 
 def scan_assets(asset_root: Path) -> list[Path]:
-    """Scan directory for image, Aseprite, and 3D model files."""
+    """Scan directory for files claimed by a kind handler."""
     def visible(p: Path) -> bool:
         return not any(part.startswith(".") for part in p.relative_to(asset_root).parts)
 
-    image_assets: list[Path] = []
-    model_assets: list[Path] = []
-    for ext in IMAGE_EXTENSIONS | ASEPRITE_EXTENSIONS:
-        image_assets.extend(p for p in asset_root.rglob(f"*{ext}") if visible(p))
-    for ext in MODEL_EXTENSIONS:
-        model_assets.extend(p for p in asset_root.rglob(f"*{ext}") if visible(p))
-    model_assets = model_indexer.filter_canonical_models(sorted(model_assets))
-    return sorted(image_assets + model_assets)
+    regular: list[Path] = []
+    models: list[Path] = []
+    for p in asset_root.rglob("*"):
+        if not p.is_file() or not visible(p):
+            continue
+        handler = asset_kinds.find_handler(p)
+        if handler is None:
+            continue
+        if isinstance(handler, asset_kinds.ModelHandler):
+            models.append(p)
+        else:
+            regular.append(p)
+    models = model_indexer.filter_canonical_models(sorted(models))
+    return sorted(regular + models)
 
 
 def set_pack_preview(
@@ -662,40 +679,15 @@ def index(
                 packs_seen[pack_name] = pack_id
             pack_id = packs_seen.get(pack_name)
 
-            suffix = file_path.suffix.lower()
-            is_model = suffix in MODEL_EXTENSIONS
-            is_image = suffix in IMAGE_EXTENSIONS
-
-            img_info: dict = {}
-            preview_bounds = None
-            asset_kind = "image"
-            rig: Optional[str] = None
-            thumbnail_path: Optional[str] = None
-            clip_names: list[str] = []
-
-            if is_image:
-                img_info = get_image_info(file_path)
-                preview_bounds = frame_detect.detect_preview_bounds(file_path, pack_path)
-            elif is_model:
-                info = model_indexer.extract_model_info(file_path)
-                # KayKit animation bundles ship mannequin meshes, so has_mesh
-                # is unreliable. Use filename prefix + animations instead.
-                is_bundle = file_path.stem.startswith("Rig_") and bool(info.animations)
-                asset_kind = "animation_bundle" if is_bundle else "model"
-                rig = info.rig
-                clip_names = info.animations
-                pack_root = pack_path if pack_name else asset_root
-                cache_dir = db.parent / ".index" / "thumbs"
-                thumb_key = hashlib.sha256(rel_path.encode()).hexdigest()[:16]
-                thumb = model_indexer.resolve_thumbnail(file_path, pack_root, cache_dir, thumb_key)
-                if thumb:
-                    try:
-                        thumbnail_path = str(thumb.relative_to(db.parent))
-                    except ValueError:
-                        thumbnail_path = str(thumb)
-            elif suffix in ASEPRITE_EXTENSIONS:
-                ase_info = aseprite_parser.parse_aseprite(file_path)
-                img_info = {"width": ase_info["width"], "height": ase_info["height"]}
+            handler = asset_kinds.find_handler(file_path)
+            ctx = asset_kinds.IndexContext(
+                asset_root=asset_root,
+                pack_root=pack_path if pack_name else asset_root,
+                db_root=db.parent,
+                rel_path=rel_path,
+            )
+            meta = handler.index_file(file_path, ctx)
+            preview_bounds = meta.preview_bounds
 
             # Category
             category = get_category(file_path, pack_path) if pack_name else ""
@@ -711,16 +703,16 @@ def index(
                     pack_id,
                     rel_path,
                     file_path.name,
-                    suffix.lstrip("."),
+                    file_path.suffix.lower().lstrip("."),
                     current_hash,
                     file_path.stat().st_size,
-                    img_info.get("width"),
-                    img_info.get("height"),
+                    meta.width,
+                    meta.height,
                     preview_bounds[0] if preview_bounds else None,
                     preview_bounds[1] if preview_bounds else None,
                     preview_bounds[2] if preview_bounds else None,
                     preview_bounds[3] if preview_bounds else None,
-                    category, asset_kind, rig, thumbnail_path,
+                    category, meta.asset_kind, meta.rig, meta.thumbnail_path,
                     datetime.now().isoformat(),
                 ]
             )
@@ -730,14 +722,14 @@ def index(
             tags = extract_tags_from_path(file_path, asset_root)
             add_tags(conn, asset_id, tags, "path")
 
-            if is_model:
-                add_tags(conn, asset_id, ["3d"], "kind")
-                for i, name in enumerate(clip_names):
-                    conn.execute(
-                        "INSERT OR REPLACE INTO asset_animations (asset_id, clip_index, name) VALUES (?, ?, ?)",
-                        [asset_id, i, name]
-                    )
-            elif is_image:
+            if meta.extra_tags:
+                add_tags(conn, asset_id, meta.extra_tags, "kind")
+            for i, name in enumerate(meta.clip_names):
+                conn.execute(
+                    "INSERT OR REPLACE INTO asset_animations (asset_id, clip_index, name) VALUES (?, ?, ?)",
+                    [asset_id, i, name]
+                )
+            if meta.wants_colors:
                 colors = extract_colors(file_path)
                 for hex_color, percentage in colors:
                     conn.execute(
@@ -803,7 +795,7 @@ def index(
         if convention:
             preview_path = stage_pack_convention_preview(convention, preview_dir, row["name"])
         else:
-            preview_path = generate_pack_preview(conn, row["id"], asset_root, preview_dir)
+            preview_path = generate_pack_preview(conn, row["id"], asset_root, preview_dir, db_root=db.parent)
         if preview_path:
             conn.execute(
                 "UPDATE packs SET preview_path = ?, preview_generated = TRUE WHERE id = ?",

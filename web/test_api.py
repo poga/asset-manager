@@ -363,7 +363,7 @@ def test_filters_tags_full_vocabulary_merges_pack_tags(test_db):
             assert a["name"] <= b["name"]
 
 
-def test_filters_include_is_3d(test_db):
+def test_filters_model_pack_3d_section(test_db):
     conn = sqlite3.connect(test_db)
     # texture-heavy 3D pack: one model among many pngs must still be 3D
     conn.execute(
@@ -399,8 +399,8 @@ def test_filters_include_is_3d(test_db):
     assert resp.status_code == 200
     packs = {p["name"]: p for p in resp.json()["packs"]}
     assert "theme" not in packs["Forest3D"]
-    assert packs["Forest3D"]["is_3d"] is True
-    assert packs["Sprites2D"]["is_3d"] is False
+    assert packs["Forest3D"]["section"] == "3d"
+    assert packs["Sprites2D"]["section"] == "2d"
 
 
 def test_filters_tolerate_db_without_theme_column(tmp_path):
@@ -1238,6 +1238,162 @@ class TestImageEndpointFor3D:
 
         r = _client.get(f"/api/image/{aid}")
         assert r.status_code == 200
+
+
+@pytest.fixture
+def kinds_db(tmp_path):
+    """DB + real files on disk for font/file kind endpoints."""
+    assets_dir = tmp_path / "assets"
+    pack_dir = assets_dir / "MixedPack"
+    pack_dir.mkdir(parents=True)
+    (pack_dir / "blur.glsl").write_text("void main() {}\n")
+    (pack_dir / "pixel.ttf").write_bytes(b"\x00\x01\x00\x00 fake font bytes")
+    thumbs = tmp_path / ".index" / "thumbs"
+    thumbs.mkdir(parents=True)
+    from PIL import Image
+    Image.new("RGBA", (512, 256), (238, 238, 238, 255)).save(thumbs / "pixel.png")
+
+    db_path = tmp_path / "kinds.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript("""
+        CREATE TABLE packs (
+            id INTEGER PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL UNIQUE,
+            version TEXT, theme TEXT, preview_path TEXT, asset_count INTEGER DEFAULT 0
+        );
+        CREATE TABLE assets (
+            id INTEGER PRIMARY KEY, pack_id INTEGER, path TEXT NOT NULL UNIQUE,
+            filename TEXT NOT NULL, filetype TEXT NOT NULL, file_hash TEXT NOT NULL,
+            file_size INTEGER, width INTEGER, height INTEGER,
+            preview_x INTEGER, preview_y INTEGER, preview_width INTEGER, preview_height INTEGER,
+            category TEXT, asset_kind TEXT, rig TEXT, thumbnail_path TEXT
+        );
+        CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+        CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, source TEXT, PRIMARY KEY (asset_id, tag_id));
+        CREATE TABLE asset_colors (asset_id INTEGER, color_hex TEXT, percentage REAL, PRIMARY KEY (asset_id, color_hex));
+        CREATE TABLE asset_phash (asset_id INTEGER PRIMARY KEY, phash BLOB);
+        CREATE TABLE asset_preview_overrides (
+            path TEXT PRIMARY KEY, use_full_image BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        INSERT INTO packs (id, name, path) VALUES (1, 'MixedPack', 'MixedPack');
+        INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, file_size, asset_kind, thumbnail_path)
+            VALUES (1, 1, 'MixedPack/pixel.ttf', 'pixel.ttf', 'ttf', 'fh1', 20, 'font', '.index/thumbs/pixel.png');
+        INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, file_size, asset_kind)
+            VALUES (2, 1, 'MixedPack/blur.glsl', 'blur.glsl', 'glsl', 'fh2', 15, 'file');
+        INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, file_size, asset_kind) VALUES
+            (3, 1, 'MixedPack/a.wgsl', 'a.wgsl', 'wgsl', 'fh3', 5, 'file'),
+            (4, 1, 'MixedPack/b.wgsl', 'b.wgsl', 'wgsl', 'fh4', 5, 'file'),
+            (5, 1, 'MixedPack/c.wgsl', 'c.wgsl', 'wgsl', 'fh5', 5, 'file'),
+            (6, 1, 'MixedPack/d.wgsl', 'd.wgsl', 'wgsl', 'fh6', 5, 'file'),
+            (7, 1, 'MixedPack/e.wgsl', 'e.wgsl', 'wgsl', 'fh7', 5, 'file'),
+            (8, 1, 'MixedPack/f.wgsl', 'f.wgsl', 'wgsl', 'fh8', 5, 'file');
+        -- row whose file is intentionally absent from disk
+        INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, file_size, asset_kind)
+            VALUES (9, 1, 'MixedPack/ghost.glsl', 'ghost.glsl', 'glsl', 'fh9', 7, 'file');
+    """)
+    conn.commit()
+    conn.close()
+
+    from api import set_assets_path, set_db_path
+    set_db_path(db_path)
+    set_assets_path(assets_dir)
+    yield db_path
+    db_path.unlink()
+
+
+def test_asset_file_serves_raw_bytes(kinds_db):
+    r = client.get("/api/asset/2/file")
+    assert r.status_code == 200
+    assert r.content == b"void main() {}\n"
+    assert r.headers["content-type"].startswith("application/octet-stream")
+    assert "attachment" not in r.headers.get("content-disposition", "")
+
+
+def test_asset_file_download_disposition(kinds_db):
+    r = client.get("/api/asset/2/file?download=true")
+    assert r.status_code == 200
+    assert r.headers["content-disposition"] == 'attachment; filename="blur.glsl"'
+
+
+def test_asset_file_404s(kinds_db):
+    assert client.get("/api/asset/999/file").status_code == 404
+
+
+def test_asset_file_404s_when_file_missing_on_disk(kinds_db):
+    # DB row exists but the file was never written to disk
+    assert client.get("/api/asset/9/file").status_code == 404
+
+
+def test_image_serves_font_thumbnail(kinds_db):
+    r = client.get("/api/image/1")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+
+
+def test_image_404_for_file_kind(kinds_db):
+    assert client.get("/api/image/2").status_code == 404
+
+
+def test_search_returns_file_size(kinds_db):
+    r = client.get("/api/search", params={"kind": "font"})
+    assets = r.json()["assets"]
+    assert [a["filename"] for a in assets] == ["pixel.ttf"]
+    assert assets[0]["file_size"] == 20
+
+
+def test_kind_only_search_is_deterministic(kinds_db):
+    # kind-only search must not fall into RANDOM() empty-search ordering
+    p1 = [a["path"] for a in client.get("/api/search", params={"kind": "file"}).json()["assets"]]
+    p2 = [a["path"] for a in client.get("/api/search", params={"kind": "file"}).json()["assets"]]
+    assert p1 == sorted(p1)
+    assert p2 == sorted(p2)
+
+
+def test_asset_detail_includes_file_size(kinds_db):
+    r = client.get("/api/asset/2")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["file_size"] == 15
+    assert body["kind"] == "file"
+
+
+def test_filters_pack_sections(test_db):
+    conn = sqlite3.connect(test_db)
+    conn.executescript("""
+        INSERT INTO packs (id, name, path, asset_count) VALUES
+            (20, 'FontPack', 'FontPack', 5),
+            (21, 'ShaderPack', 'ShaderPack', 6),
+            (22, 'ModelPack', 'ModelPack', 2);
+        INSERT INTO assets (pack_id, path, filename, filetype, file_hash, asset_kind) VALUES
+            (20, 'FontPack/a.ttf', 'a.ttf', 'ttf', 's1', 'font'),
+            (20, 'FontPack/b.ttf', 'b.ttf', 'ttf', 's2', 'font'),
+            (20, 'FontPack/c.ttf', 'c.ttf', 'ttf', 's3', 'font'),
+            (20, 'FontPack/p1.png', 'p1.png', 'png', 's4', 'image'),
+            (20, 'FontPack/p2.png', 'p2.png', 'png', 's5', 'image'),
+            (21, 'ShaderPack/a.glsl', 'a.glsl', 'glsl', 's6', 'file'),
+            (21, 'ShaderPack/b.glsl', 'b.glsl', 'glsl', 's7', 'file'),
+            (21, 'ShaderPack/c.glsl', 'c.glsl', 'glsl', 's8', 'file'),
+            (21, 'ShaderPack/d.glsl', 'd.glsl', 'glsl', 's9', 'file'),
+            (21, 'ShaderPack/e.glsl', 'e.glsl', 'glsl', 's10', 'file'),
+            (21, 'ShaderPack/prev.png', 'prev.png', 'png', 's11', 'image'),
+            (22, 'ModelPack/m.glb', 'm.glb', 'glb', 's12', 'model'),
+            (22, 'ModelPack/tex.png', 'tex.png', 'png', 's13', 'image');
+    """)
+    conn.commit()
+    conn.close()
+
+    import api
+    api.set_db_path(test_db)
+    resp = client.get("/api/filters")
+    assert resp.status_code == 200
+    packs = {p["name"]: p for p in resp.json()["packs"]}
+    # fonts outnumber preview images -> fonts; shaders dominate -> files
+    assert packs["FontPack"]["section"] == "fonts"
+    assert packs["ShaderPack"]["section"] == "files"
+    assert packs["ModelPack"]["section"] == "3d"
+    # existing image-only pack stays 2d
+    assert packs["creatures"]["section"] == "2d"
 
 
 if __name__ == "__main__":

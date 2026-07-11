@@ -23,6 +23,7 @@ from PIL import Image
 # Import modules under test
 import index
 import search
+import asset_kinds
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -367,8 +368,8 @@ class TestDetectPack:
 class TestScanAssets:
     """Tests for scan_assets function."""
 
-    def test_scans_image_and_aseprite_files(self, temp_dir):
-        """scan_assets should return both image and aseprite files."""
+    def test_scans_all_visible_files(self, temp_dir):
+        """scan_assets returns image/aseprite files plus catch-all files like readme.txt."""
         pack_dir = temp_dir / "TestPack"
         pack_dir.mkdir()
 
@@ -386,7 +387,8 @@ class TestScanAssets:
         assert "animation.gif" in filenames
         assert "source.aseprite" in filenames
         assert "source2.ase" in filenames
-        assert "readme.txt" not in filenames
+        # catch-all claims unlisted extensions as kind='file'
+        assert "readme.txt" in filenames
 
 
 def test_scan_assets_skips_hidden_dirs():
@@ -1344,6 +1346,203 @@ class TestPackIdStability:
             "SELECT tag FROM pack_tags WHERE pack_id = ?", [row["id"]])]
         assert tags == ["keep"]
         conn.close()
+
+
+class TestKindRegistry:
+    def test_handlers_match_by_extension(self):
+        assert isinstance(asset_kinds.find_handler(Path("a/b.png")), asset_kinds.ImageHandler)
+        assert isinstance(asset_kinds.find_handler(Path("a/b.ASE")), asset_kinds.AsepriteHandler)
+        assert isinstance(asset_kinds.find_handler(Path("a/b.glb")), asset_kinds.ModelHandler)
+
+
+# =============================================================================
+# Font Indexing Tests
+# =============================================================================
+
+FIXTURES_FONTS = Path(__file__).parent / "tests" / "fixtures" / "fonts"
+FIXTURE_TTF = FIXTURES_FONTS / "PressStart2P-Regular.ttf"
+
+
+class TestFontIndexing:
+    def test_render_font_specimen_creates_png(self, tmp_path):
+        out = tmp_path / "specimen.png"
+        assert asset_kinds.render_font_specimen(FIXTURE_TTF, out) is True
+        with Image.open(out) as img:
+            assert img.size == (512, 256)
+            # opaque glyph pixels prove text actually rendered
+            assert img.getextrema()[3][1] == 255
+
+    def test_render_specimen_rejects_corrupt_font(self, tmp_path):
+        bad = tmp_path / "bad.ttf"
+        bad.write_bytes(b"this is not a font")
+        out = tmp_path / "specimen.png"
+        assert asset_kinds.render_font_specimen(bad, out) is False
+        assert not out.exists()
+
+    def test_index_font_pack_end_to_end(self, tmp_path):
+        pack = tmp_path / "assets" / "FontPack"
+        pack.mkdir(parents=True)
+        shutil.copy(FIXTURE_TTF, pack / "PressStart2P-Regular.ttf")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute(
+            "SELECT * FROM assets WHERE filename = 'PressStart2P-Regular.ttf'"
+        ).fetchone()
+        assert row["asset_kind"] == "font"
+        assert row["filetype"] == "ttf"
+        assert row["thumbnail_path"] is not None
+        assert (tmp_path / row["thumbnail_path"]).exists()
+        tags = {r["name"] for r in conn.execute("""
+            SELECT t.name FROM asset_tags at
+            JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = ?
+        """, [row["id"]])}
+        assert "font" in tags
+
+    def test_corrupt_font_indexes_without_thumbnail(self, tmp_path):
+        pack = tmp_path / "assets" / "FontPack"
+        pack.mkdir(parents=True)
+        (pack / "broken.ttf").write_bytes(b"garbage bytes")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT * FROM assets WHERE filename = 'broken.ttf'").fetchone()
+        assert row["asset_kind"] == "font"
+        assert row["thumbnail_path"] is None
+
+
+class TestAnyfileIndexing:
+    def _index(self, root, db_path):
+        runner = typer.testing.CliRunner()
+        from index import app
+        return runner.invoke(app, ["index", str(root), "--db", str(db_path)])
+
+    def test_shader_indexed_as_file(self, tmp_path):
+        pack = tmp_path / "assets" / "ShaderPack"
+        pack.mkdir(parents=True)
+        shader = pack / "blur.glsl"
+        shader.write_text("void main() {}\n")
+        db_path = tmp_path / "assets.db"
+        result = self._index(tmp_path / "assets", db_path)
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT * FROM assets WHERE filename = 'blur.glsl'").fetchone()
+        assert row["asset_kind"] == "file"
+        assert row["filetype"] == "glsl"
+        assert row["file_size"] == shader.stat().st_size
+        assert row["width"] is None
+        tags = {r["name"] for r in conn.execute("""
+            SELECT t.name FROM asset_tags at
+            JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = ?
+        """, [row["id"]])}
+        assert "file" in tags
+
+    def test_junk_files_are_skipped(self, tmp_path):
+        pack = tmp_path / "assets" / "ShaderPack"
+        pack.mkdir(parents=True)
+        (pack / "blur.glsl").write_text("void main() {}\n")
+        (pack / ".DS_Store").write_bytes(b"junk")
+        (pack / "Thumbs.db").write_bytes(b"junk")
+        (pack / "scene.import").write_text("junk")
+        (pack / "notes.tmp").write_text("junk")
+        db_path = tmp_path / "assets.db"
+        result = self._index(tmp_path / "assets", db_path)
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        paths = [r["filename"] for r in conn.execute("SELECT filename FROM assets")]
+        assert paths == ["blur.glsl"]
+
+    def test_reindex_skips_unchanged_anyfiles(self, tmp_path):
+        pack = tmp_path / "assets" / "ShaderPack"
+        pack.mkdir(parents=True)
+        (pack / "blur.glsl").write_text("void main() {}\n")
+        db_path = tmp_path / "assets.db"
+        self._index(tmp_path / "assets", db_path)
+        result = self._index(tmp_path / "assets", db_path)
+        assert "Indexed 0 new/changed" in strip_ansi(result.stdout)
+
+    def test_catch_all_matches_unknown_extensions(self):
+        assert isinstance(asset_kinds.find_handler(Path("a/b.wgsl")), asset_kinds.FileHandler)
+        assert isinstance(asset_kinds.find_handler(Path("a/b.blend")), asset_kinds.FileHandler)
+        assert asset_kinds.find_handler(Path("a/.DS_Store")) is None
+        assert asset_kinds.find_handler(Path("a/b.meta")) is None
+
+
+class TestFontPackPreview:
+    def test_fonts_only_pack_gets_montage(self, tmp_path):
+        pack = tmp_path / "assets" / "FontPack"
+        pack.mkdir(parents=True)
+        for i in range(4):
+            shutil.copy(FIXTURE_TTF, pack / f"font_{i}.ttf")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT preview_path FROM packs WHERE name = 'FontPack'").fetchone()
+        assert row["preview_path"] is not None
+        assert (db_path.parent / ".index" / row["preview_path"]).exists()
+
+    def test_small_image_pack_still_gets_no_montage(self, tmp_path):
+        pack = tmp_path / "assets" / "TinyPack"
+        pack.mkdir(parents=True)
+        for i in range(3):
+            Image.new("RGBA", (32, 32), (10 * i, 100, 50, 255)).save(pack / f"s{i}.png")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT preview_path FROM packs WHERE name = 'TinyPack'").fetchone()
+        assert row["preview_path"] is None
+
+    def test_mixed_pack_crosses_combined_threshold(self, tmp_path):
+        pack = tmp_path / "assets" / "MixedPack"
+        pack.mkdir(parents=True)
+        for i in range(2):
+            Image.new("RGBA", (32, 32), (10 * i, 100, 50, 255)).save(pack / f"s{i}.png")
+        for i in range(2):
+            shutil.copy(FIXTURE_TTF, pack / f"font_{i}.ttf")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT preview_path FROM packs WHERE name = 'MixedPack'").fetchone()
+        assert row["preview_path"] is not None
+        assert (db_path.parent / ".index" / row["preview_path"]).exists()
+
+    def test_pack_with_four_pngs_never_pads_with_specimens(self, tmp_path):
+        pack = tmp_path / "assets" / "BigPack"
+        pack.mkdir(parents=True)
+        for i in range(4):
+            Image.new("RGBA", (32, 32), (10 * i, 100, 50, 255)).save(pack / f"s{i}.png")
+        shutil.copy(FIXTURE_TTF, pack / "extra.ttf")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        # Delete the specimen: if padding wrongly triggers, montage fails
+        font = conn.execute(
+            "SELECT thumbnail_path FROM assets WHERE asset_kind = 'font'"
+        ).fetchone()
+        (db_path.parent / font["thumbnail_path"]).unlink()
+        pack_row = conn.execute("SELECT id FROM packs WHERE name = 'BigPack'").fetchone()
+        preview = index.generate_pack_preview(
+            conn, pack_row["id"], tmp_path / "assets",
+            db_path.parent / ".index" / "previews", db_root=db_path.parent,
+        )
+        assert preview is not None
 
 
 # =============================================================================

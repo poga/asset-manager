@@ -8,10 +8,22 @@
     <div class="detail-content">
       <ModelViewer
         v-if="asset.kind === 'model' || asset.kind === 'animation_bundle'"
+        :key="asset.id"
         :asset-id="asset.id"
         :filename="asset.filename"
         :api-base="API_BASE"
       />
+      <FontTester
+        v-else-if="asset.kind === 'font'"
+        :key="asset.id"
+        :asset-id="asset.id"
+        :api-base="API_BASE"
+      />
+      <div v-else-if="asset.kind === 'file'" class="file-panel">
+        <span class="file-ext-big">.{{ fileExt }}</span>
+        <span class="file-panel-name">{{ asset.filename }}</span>
+        <span class="file-panel-size" v-if="asset.file_size != null">{{ formatSize(asset.file_size) }}</span>
+      </div>
       <!-- inline style needed for jsdom test compatibility (scoped CSS not processed) -->
       <img
         v-else
@@ -41,8 +53,11 @@
             <strong>Pack:</strong>
             <span class="pack-link" @click="$emit('view-pack', asset.pack)">{{ asset.pack }}</span>
           </div>
-          <div>
+          <div v-if="asset.width != null">
             <strong>Size:</strong> {{ asset.width }}x{{ asset.height }}
+          </div>
+          <div v-if="asset.file_size != null">
+            <strong>File size:</strong> {{ formatSize(asset.file_size) }}
           </div>
         </div>
 
@@ -79,12 +94,20 @@
             View Pack
           </button>
           <a
+            v-if="asset.kind !== 'file'"
             :href="`${API_BASE}/image/${asset.id}`"
             target="_blank"
             rel="noopener noreferrer"
             class="full-size-btn"
           >
             Full Size
+          </a>
+          <a
+            v-if="asset.kind === 'font' || asset.kind === 'file'"
+            :href="`${API_BASE}/asset/${asset.id}/file?download=true`"
+            class="download-btn"
+          >
+            Download
           </a>
         </div>
 
@@ -109,10 +132,12 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import ModelViewer from './ModelViewer.vue'
+import FontTester from './FontTester.vue'
 import { tagHue } from '../utils/tagColor.js'
 import { setCover, deleteImage, addImageTag, removeImageTag } from '../api/boards.js'
+import { formatSize } from '../utils/fileSize.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
@@ -127,6 +152,11 @@ const emit = defineEmits([
 
 const localTags = ref([...(props.asset.tags || [])])
 const newTag = ref('')
+
+const fileExt = computed(() => {
+  const parts = props.asset.filename.split('.')
+  return parts.length > 1 ? parts.pop().toUpperCase() : ''
+})
 
 watch(() => props.asset, a => { localTags.value = [...(a.tags || [])] })
 
@@ -358,4 +388,51 @@ h2 {
 }
 .board-image-actions .board-btn.danger:hover { border-color: var(--color-danger); color: var(--color-danger); }
 .image-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; align-items: center; }
+
+.file-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 300px;
+  min-height: 200px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 2rem 3rem;
+}
+
+.file-ext-big {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.file-panel-name {
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.file-panel-size {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.download-btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  text-decoration: none;
+  background: var(--color-accent);
+  color: white;
+  cursor: pointer;
+  transition: background-color 150ms;
+}
+
+.download-btn:hover {
+  background: var(--color-accent-hover);
+}
 </style>

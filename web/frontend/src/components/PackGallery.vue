@@ -128,6 +128,13 @@ const allTags = computed(() => {
   return Object.keys(counts).sort().map(tag => ({ tag, count: counts[tag] }))
 })
 
+const SECTIONS = [
+  { key: '2d', label: '2D' },
+  { key: '3d', label: '3D' },
+  { key: 'fonts', label: 'Fonts' },
+  { key: 'files', label: 'Files' },
+]
+
 // natural order: case-insensitive, "Series 5" before "Series 10"
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
@@ -158,10 +165,12 @@ const sections = computed(() => {
     : props.packs
   // an active filter is the grouping, so other tags stop steering the order
   const cmp = activeTag.value ? byName : byTag
-  return [
-    { label: '2D', packs: visible.filter(p => !p.is_3d).sort(cmp) },
-    { label: '3D', packs: visible.filter(p => p.is_3d).sort(cmp) },
-  ].filter(s => s.packs.length)
+  return SECTIONS
+    .map(s => ({
+      label: s.label,
+      packs: visible.filter(p => (p.section || '2d') === s.key).sort(cmp),
+    }))
+    .filter(s => s.packs.length)
 })
 
 function toggleTag(tag) {

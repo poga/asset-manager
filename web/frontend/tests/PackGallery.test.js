@@ -6,9 +6,9 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 
 const packs = [
-  { name: 'Minifantasy_Ancient_Forests', count: 120, is_3d: false, tags: ['forest'] },
-  { name: 'KayKit Forest Nature Pack 1.0', count: 80, is_3d: true, tags: ['forest'] },
-  { name: 'Minifantasy_Dungeon_v2.3', count: 300, is_3d: false, tags: [] },
+  { name: 'Minifantasy_Ancient_Forests', count: 120, section: '2d', tags: ['forest'] },
+  { name: 'KayKit Forest Nature Pack 1.0', count: 80, section: '3d', tags: ['forest'] },
+  { name: 'Minifantasy_Dungeon_v2.3', count: 300, section: '2d', tags: [] },
 ]
 
 beforeEach(() => {
@@ -30,11 +30,11 @@ describe('PackGallery', () => {
 
   it('sorts packs within a section by tag, untagged last', () => {
     const unsorted = [
-      { name: 'Zebra', count: 1, is_3d: false, tags: [] },
-      { name: 'Beach', count: 1, is_3d: false, tags: ['water'] },
-      { name: 'Cave', count: 1, is_3d: false, tags: ['dungeon'] },
-      { name: 'Attic', count: 1, is_3d: false, tags: [] },
-      { name: 'Swamp', count: 1, is_3d: false, tags: ['water', 'dungeon'] },
+      { name: 'Zebra', count: 1, section: '2d', tags: [] },
+      { name: 'Beach', count: 1, section: '2d', tags: ['water'] },
+      { name: 'Cave', count: 1, section: '2d', tags: ['dungeon'] },
+      { name: 'Attic', count: 1, section: '2d', tags: [] },
+      { name: 'Swamp', count: 1, section: '2d', tags: ['water', 'dungeon'] },
     ]
     const wrapper = mount(PackGallery, { props: { packs: unsorted } })
     const names = wrapper.findAll('.card-name').map(n => n.text())
@@ -44,8 +44,8 @@ describe('PackGallery', () => {
 
   it('sorts by name when a tag filter is active, ignoring other tags', async () => {
     const multiTag = [
-      { name: 'Anchor', count: 1, is_3d: false, tags: ['icon'] },
-      { name: 'Zebra', count: 1, is_3d: false, tags: ['aaa', 'icon'] },
+      { name: 'Anchor', count: 1, section: '2d', tags: ['icon'] },
+      { name: 'Zebra', count: 1, section: '2d', tags: ['aaa', 'icon'] },
     ]
     const wrapper = mount(PackGallery, { props: { packs: multiTag } })
     // unfiltered: Zebra leads via its smallest tag 'aaa'
@@ -58,8 +58,8 @@ describe('PackGallery', () => {
 
   it('sorts numbered pack names naturally', () => {
     const numbered = [
-      { name: 'Series 10', count: 1, is_3d: false, tags: [] },
-      { name: 'Series 5', count: 1, is_3d: false, tags: [] },
+      { name: 'Series 10', count: 1, section: '2d', tags: [] },
+      { name: 'Series 5', count: 1, section: '2d', tags: [] },
     ]
     const wrapper = mount(PackGallery, { props: { packs: numbered } })
     expect(wrapper.findAll('.card-name').map(n => n.text())).toEqual(['Series 5', 'Series 10'])
@@ -68,8 +68,8 @@ describe('PackGallery', () => {
   it('re-sorts when a tag edit changes a pack ordering', async () => {
     mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ tags: ['axe'] }) })
     const sortable = [
-      { name: 'Beach', count: 1, is_3d: false, tags: ['water'] },
-      { name: 'Zebra', count: 1, is_3d: false, tags: [] },
+      { name: 'Beach', count: 1, section: '2d', tags: ['water'] },
+      { name: 'Zebra', count: 1, section: '2d', tags: [] },
     ]
     const wrapper = mount(PackGallery, { props: { packs: sortable } })
     const zebra = wrapper.findAll('.gallery-card').find(c => c.text().includes('Zebra'))
@@ -85,7 +85,7 @@ describe('PackGallery', () => {
   })
 
   it('omits an empty dimension section', () => {
-    const wrapper = mount(PackGallery, { props: { packs: packs.filter(p => !p.is_3d) } })
+    const wrapper = mount(PackGallery, { props: { packs: packs.filter(p => p.section !== '3d') } })
     expect(wrapper.findAll('.dim-title').map(t => t.text())).toEqual(['2D'])
   })
 
@@ -179,8 +179,8 @@ describe('PackGallery', () => {
 
   it('gives visually distinct tags a clearly separated hue', () => {
     const distinctPacks = [
-      { name: 'A', count: 1, is_3d: false, tags: ['minifantasy'] },
-      { name: 'B', count: 1, is_3d: false, tags: ['penusbmic'] },
+      { name: 'A', count: 1, section: '2d', tags: ['minifantasy'] },
+      { name: 'B', count: 1, section: '2d', tags: ['penusbmic'] },
     ]
     const wrapper = mount(PackGallery, { props: { packs: distinctPacks } })
     const hues = wrapper.findAll('.tag-chip').map(chip => {
@@ -193,7 +193,7 @@ describe('PackGallery', () => {
   })
 
   it('renders a BOARD badge on board packs', () => {
-    const withBoard = [...packs, { name: 'My Board', count: 3, is_3d: false, is_board: true, tags: [], id: 9 }]
+    const withBoard = [...packs, { name: 'My Board', count: 3, section: '2d', is_board: true, tags: [], id: 9 }]
     const wrapper = mount(PackGallery, { props: { packs: withBoard } })
     expect(wrapper.text()).toContain('BOARD')
   })
@@ -218,5 +218,17 @@ describe('PackGallery', () => {
     Object.defineProperty(imgs[1].element, 'naturalWidth', { value: 512 })
     await imgs[1].trigger('load')
     expect(imgs[1].classes()).not.toContain('pixelated')
+  })
+})
+
+describe('PackGallery kind sections', () => {
+  it('groups packs into Fonts and Files sections', () => {
+    const wrapper = mount(PackGallery, { props: { packs: [
+      { name: 'PixelFonts', count: 10, section: 'fonts', tags: [] },
+      { name: 'ShaderLib', count: 5, section: 'files', tags: [] },
+      { name: 'Sprites', count: 5, section: '2d', tags: [] },
+    ] } })
+    const titles = wrapper.findAll('.dim-title').map(t => t.text())
+    expect(titles).toEqual(['2D', 'Fonts', 'Files'])
   })
 })
