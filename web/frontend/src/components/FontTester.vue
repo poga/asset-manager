@@ -12,7 +12,7 @@
         v-for="size in SIZES"
         :key="size"
         class="specimen"
-        :style="{ fontFamily: family, fontSize: size + 'px' }"
+        :style="{ fontFamily: quotedFamily, fontSize: size + 'px' }"
       >{{ sample }}</p>
     </div>
     <div v-else class="tester-loading">Loading font…</div>
@@ -31,11 +31,13 @@ const SIZES = [16, 32, 64]
 const sample = ref('The quick brown fox 0123456789')
 const loaded = ref(false)
 const error = ref(false)
-const family = ref(`asset-font-${props.assetId}`)
+// FontFace names are raw strings; quotes are CSS-only syntax for the binding
+const family = `asset-font-${props.assetId}`
+const quotedFamily = `'asset-font-${props.assetId}'`
 
 onMounted(async () => {
   try {
-    const face = new FontFace(family.value, `url(${props.apiBase}/asset/${props.assetId}/file)`)
+    const face = new FontFace(family, `url(${props.apiBase}/asset/${props.assetId}/file)`)
     await face.load()
     document.fonts?.add(face)
     loaded.value = true
