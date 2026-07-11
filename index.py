@@ -277,7 +277,7 @@ def generate_pack_preview(
     entries: list[tuple[Path, Optional[sqlite3.Row]]] = [
         (asset_root / r["path"], r) for r in rows
     ]
-    if len(entries) < grid_size * grid_size:
+    if len(entries) < 4:
         # Pad with font specimens so fonts-only packs get real previews
         font_rows = conn.execute("""
             SELECT thumbnail_path FROM assets

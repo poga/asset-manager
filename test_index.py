@@ -1503,6 +1503,47 @@ class TestFontPackPreview:
         row = conn.execute("SELECT preview_path FROM packs WHERE name = 'TinyPack'").fetchone()
         assert row["preview_path"] is None
 
+    def test_mixed_pack_crosses_combined_threshold(self, tmp_path):
+        pack = tmp_path / "assets" / "MixedPack"
+        pack.mkdir(parents=True)
+        for i in range(2):
+            Image.new("RGBA", (32, 32), (10 * i, 100, 50, 255)).save(pack / f"s{i}.png")
+        for i in range(2):
+            shutil.copy(FIXTURE_TTF, pack / f"font_{i}.ttf")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT preview_path FROM packs WHERE name = 'MixedPack'").fetchone()
+        assert row["preview_path"] is not None
+        assert (db_path.parent / ".index" / row["preview_path"]).exists()
+
+    def test_pack_with_four_pngs_never_pads_with_specimens(self, tmp_path):
+        pack = tmp_path / "assets" / "BigPack"
+        pack.mkdir(parents=True)
+        for i in range(4):
+            Image.new("RGBA", (32, 32), (10 * i, 100, 50, 255)).save(pack / f"s{i}.png")
+        shutil.copy(FIXTURE_TTF, pack / "extra.ttf")
+        db_path = tmp_path / "assets.db"
+        runner = typer.testing.CliRunner()
+        from index import app
+        result = runner.invoke(app, ["index", str(tmp_path / "assets"), "--db", str(db_path)])
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        # Delete the specimen: if padding wrongly triggers, montage fails
+        font = conn.execute(
+            "SELECT thumbnail_path FROM assets WHERE asset_kind = 'font'"
+        ).fetchone()
+        (db_path.parent / font["thumbnail_path"]).unlink()
+        pack_row = conn.execute("SELECT id FROM packs WHERE name = 'BigPack'").fetchone()
+        preview = index.generate_pack_preview(
+            conn, pack_row["id"], tmp_path / "assets",
+            db_path.parent / ".index" / "previews", db_root=db_path.parent,
+        )
+        assert preview is not None
+
 
 # =============================================================================
 # Entry point
