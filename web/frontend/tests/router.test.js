@@ -38,9 +38,14 @@ describe('router', () => {
       expect(route).toEqual({ name: 'pack', params: { name: 'fantasy-characters' } })
     })
 
-    it('parses /pack/:name with spaces encoded', () => {
+    it('decodes an encoded /pack/:name to the raw pack name', () => {
       const route = parseRoute('/pack/RPG%20Heroes')
-      expect(route).toEqual({ name: 'pack', params: { name: 'RPG%20Heroes' } })
+      expect(route).toEqual({ name: 'pack', params: { name: 'RPG Heroes' } })
+    })
+
+    it('round-trips an encoded pack URL through parse and build', () => {
+      const url = '/assets/pack/RPG%20Heroes'
+      expect(buildUrl(parseRoute(url))).toBe(url)
     })
   })
 

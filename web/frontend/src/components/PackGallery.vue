@@ -135,12 +135,41 @@ const SECTIONS = [
   { key: 'files', label: 'Files' },
 ]
 
+// natural order: case-insensitive, "Series 5" before "Series 10"
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+
+// groups tagged packs together; untagged sink below, alphabetical throughout
+function firstTag(pack) {
+  const tags = tagsOf(pack)
+  return tags.length ? [...tags].sort(collator.compare)[0] : null
+}
+
+function byTag(a, b) {
+  const ta = firstTag(a)
+  const tb = firstTag(b)
+  if (ta !== tb) {
+    if (ta === null) return 1
+    if (tb === null) return -1
+    return collator.compare(ta, tb)
+  }
+  return collator.compare(a.name, b.name)
+}
+
+function byName(a, b) {
+  return collator.compare(a.name, b.name)
+}
+
 const sections = computed(() => {
   const visible = activeTag.value
     ? props.packs.filter(p => tagsOf(p).includes(activeTag.value))
     : props.packs
+  // an active filter is the grouping, so other tags stop steering the order
+  const cmp = activeTag.value ? byName : byTag
   return SECTIONS
-    .map(s => ({ label: s.label, packs: visible.filter(p => (p.section || '2d') === s.key) }))
+    .map(s => ({
+      label: s.label,
+      packs: visible.filter(p => (p.section || '2d') === s.key).sort(cmp),
+    }))
     .filter(s => s.packs.length)
 })
 
