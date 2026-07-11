@@ -719,10 +719,11 @@ def asset_file(asset_id: int, download: bool = False):
     if not p.exists():
         raise HTTPException(status_code=404, detail="File missing")
     media = mimetypes.guess_type(row["filename"])[0] or "application/octet-stream"
-    headers = {}
     if download:
-        headers["Content-Disposition"] = f'attachment; filename="{row["filename"]}"'
-    return FileResponse(p, media_type=media, headers=headers)
+        # FileResponse escapes the filename; hand-built headers wouldn't
+        return FileResponse(p, media_type=media, filename=row["filename"],
+                            content_disposition_type="attachment")
+    return FileResponse(p, media_type=media)
 
 
 @app.get("/api/pack-preview/{pack_name:path}")

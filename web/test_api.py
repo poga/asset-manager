@@ -1288,6 +1288,9 @@ def kinds_db(tmp_path):
             (6, 1, 'MixedPack/d.wgsl', 'd.wgsl', 'wgsl', 'fh6', 5, 'file'),
             (7, 1, 'MixedPack/e.wgsl', 'e.wgsl', 'wgsl', 'fh7', 5, 'file'),
             (8, 1, 'MixedPack/f.wgsl', 'f.wgsl', 'wgsl', 'fh8', 5, 'file');
+        -- row whose file is intentionally absent from disk
+        INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, file_size, asset_kind)
+            VALUES (9, 1, 'MixedPack/ghost.glsl', 'ghost.glsl', 'glsl', 'fh9', 7, 'file');
     """)
     conn.commit()
     conn.close()
@@ -1315,6 +1318,11 @@ def test_asset_file_download_disposition(kinds_db):
 
 def test_asset_file_404s(kinds_db):
     assert client.get("/api/asset/999/file").status_code == 404
+
+
+def test_asset_file_404s_when_file_missing_on_disk(kinds_db):
+    # DB row exists but the file was never written to disk
+    assert client.get("/api/asset/9/file").status_code == 404
 
 
 def test_image_serves_font_thumbnail(kinds_db):
