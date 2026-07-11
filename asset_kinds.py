@@ -19,6 +19,10 @@ ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
 MODEL_EXTENSIONS = {".glb", ".gltf"}
 FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2"}
 
+# OS/engine junk the catch-all must never index
+DENYLIST_NAMES = {".ds_store", "thumbs.db", "desktop.ini"}
+DENYLIST_EXTENSIONS = {".db", ".db-journal", ".import", ".meta", ".tmp", ".part"}
+
 SPECIMEN_SIZE = (512, 256)
 SPECIMEN_SAMPLE = "Aa Bb Cc 0123456789"
 SPECIMEN_PANGRAM = "The quick brown fox jumps"
@@ -141,7 +145,19 @@ class FontHandler(ExtensionHandler):
         return meta
 
 
-HANDLERS = [AsepriteHandler(), ImageHandler(), ModelHandler(), FontHandler()]
+class FileHandler:
+    """Catch-all: any unclaimed file becomes a downloadable 'file' asset."""
+
+    def match(self, path: Path) -> bool:
+        if path.name.lower() in DENYLIST_NAMES:
+            return False
+        return path.suffix.lower() not in DENYLIST_EXTENSIONS
+
+    def index_file(self, path: Path, ctx: IndexContext) -> AssetMeta:
+        return AssetMeta(asset_kind="file", extra_tags=["file"])
+
+
+HANDLERS = [AsepriteHandler(), ImageHandler(), ModelHandler(), FontHandler(), FileHandler()]
 
 
 def find_handler(path: Path):

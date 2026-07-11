@@ -387,7 +387,8 @@ class TestScanAssets:
         assert "animation.gif" in filenames
         assert "source.aseprite" in filenames
         assert "source2.ase" in filenames
-        assert "readme.txt" not in filenames
+        # catch-all claims unlisted extensions as kind='file'
+        assert "readme.txt" in filenames
 
 
 def test_scan_assets_skips_hidden_dirs():
@@ -1414,6 +1415,63 @@ class TestFontIndexing:
         row = conn.execute("SELECT * FROM assets WHERE filename = 'broken.ttf'").fetchone()
         assert row["asset_kind"] == "font"
         assert row["thumbnail_path"] is None
+
+
+class TestAnyfileIndexing:
+    def _index(self, root, db_path):
+        runner = typer.testing.CliRunner()
+        from index import app
+        return runner.invoke(app, ["index", str(root), "--db", str(db_path)])
+
+    def test_shader_indexed_as_file(self, tmp_path):
+        pack = tmp_path / "assets" / "ShaderPack"
+        pack.mkdir(parents=True)
+        shader = pack / "blur.glsl"
+        shader.write_text("void main() {}\n")
+        db_path = tmp_path / "assets.db"
+        result = self._index(tmp_path / "assets", db_path)
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        row = conn.execute("SELECT * FROM assets WHERE filename = 'blur.glsl'").fetchone()
+        assert row["asset_kind"] == "file"
+        assert row["filetype"] == "glsl"
+        assert row["file_size"] == shader.stat().st_size
+        assert row["width"] is None
+        tags = {r["name"] for r in conn.execute("""
+            SELECT t.name FROM asset_tags at
+            JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = ?
+        """, [row["id"]])}
+        assert "file" in tags
+
+    def test_junk_files_are_skipped(self, tmp_path):
+        pack = tmp_path / "assets" / "ShaderPack"
+        pack.mkdir(parents=True)
+        (pack / "blur.glsl").write_text("void main() {}\n")
+        (pack / ".DS_Store").write_bytes(b"junk")
+        (pack / "Thumbs.db").write_bytes(b"junk")
+        (pack / "scene.import").write_text("junk")
+        (pack / "notes.tmp").write_text("junk")
+        db_path = tmp_path / "assets.db"
+        result = self._index(tmp_path / "assets", db_path)
+        assert result.exit_code == 0, result.stdout
+        conn = index.get_db(db_path)
+        paths = [r["filename"] for r in conn.execute("SELECT filename FROM assets")]
+        assert paths == ["blur.glsl"]
+
+    def test_reindex_skips_unchanged_anyfiles(self, tmp_path):
+        pack = tmp_path / "assets" / "ShaderPack"
+        pack.mkdir(parents=True)
+        (pack / "blur.glsl").write_text("void main() {}\n")
+        db_path = tmp_path / "assets.db"
+        self._index(tmp_path / "assets", db_path)
+        result = self._index(tmp_path / "assets", db_path)
+        assert "Indexed 0 new/changed" in strip_ansi(result.stdout)
+
+    def test_catch_all_matches_unknown_extensions(self):
+        assert isinstance(asset_kinds.find_handler(Path("a/b.wgsl")), asset_kinds.FileHandler)
+        assert isinstance(asset_kinds.find_handler(Path("a/b.blend")), asset_kinds.FileHandler)
+        assert asset_kinds.find_handler(Path("a/.DS_Store")) is None
+        assert asset_kinds.find_handler(Path("a/b.meta")) is None
 
 
 # =============================================================================
