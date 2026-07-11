@@ -8,12 +8,14 @@
     <div class="detail-content">
       <ModelViewer
         v-if="asset.kind === 'model' || asset.kind === 'animation_bundle'"
+        :key="asset.id"
         :asset-id="asset.id"
         :filename="asset.filename"
         :api-base="API_BASE"
       />
       <FontTester
         v-else-if="asset.kind === 'font'"
+        :key="asset.id"
         :asset-id="asset.id"
         :api-base="API_BASE"
       />

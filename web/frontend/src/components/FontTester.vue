@@ -20,7 +20,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 const props = defineProps({
   assetId: { type: Number, required: true },
@@ -34,16 +34,21 @@ const error = ref(false)
 // FontFace names are raw strings; quotes are CSS-only syntax for the binding
 const family = `asset-font-${props.assetId}`
 const quotedFamily = `'asset-font-${props.assetId}'`
+let face = null
 
 onMounted(async () => {
   try {
-    const face = new FontFace(family, `url(${props.apiBase}/asset/${props.assetId}/file)`)
+    face = new FontFace(family, `url(${props.apiBase}/asset/${props.assetId}/file)`)
     await face.load()
     document.fonts?.add(face)
     loaded.value = true
   } catch {
     error.value = true
   }
+})
+
+onUnmounted(() => {
+  if (face) document.fonts?.delete(face)
 })
 </script>
 

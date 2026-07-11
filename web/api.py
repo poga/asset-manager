@@ -513,12 +513,12 @@ def delete_preview_override(asset_id: int):
 
 
 def _pack_section(n_3d: int, n_image: int, n_font: int, n_file: int) -> str:
-	"""Sidebar section: any 3D asset wins; else plurality, ties font > file > image."""
-	if n_3d:
-		return "3d"
-	ranked = [("fonts", n_font), ("files", n_file), ("2d", n_image)]
-	label, best = max(ranked, key=lambda kv: kv[1])
-	return label if best else "2d"
+    """Sidebar section: any 3D asset wins; else plurality, ties font > file > image."""
+    if n_3d:
+        return "3d"
+    ranked = [("fonts", n_font), ("files", n_file), ("2d", n_image)]
+    label, best = max(ranked, key=lambda kv: kv[1])
+    return label if best else "2d"
 
 
 @app.get("/api/filters")

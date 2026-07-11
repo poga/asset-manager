@@ -94,8 +94,7 @@ class ModelHandler(ExtensionHandler):
 
     def index_file(self, path: Path, ctx: IndexContext) -> AssetMeta:
         info = model_indexer.extract_model_info(path)
-        # KayKit animation bundles ship mannequin meshes, so has_mesh
-        # is unreliable. Use filename prefix + animations instead.
+        # has_mesh is unreliable for KayKit bundles; use Rig_ prefix + clips
         is_bundle = path.stem.startswith("Rig_") and bool(info.animations)
         meta = AssetMeta(
             asset_kind="animation_bundle" if is_bundle else "model",
@@ -129,8 +128,8 @@ def render_font_specimen(font_path: Path, out_path: Path) -> bool:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         img.save(out_path, format="PNG")
         return True
-    except Exception:
-        logger.warning("Cannot render font specimen: %s", font_path)
+    except Exception as e:
+        logger.warning("Cannot render font specimen %s: %s", font_path, e)
         return False
 
 

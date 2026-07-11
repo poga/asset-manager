@@ -368,8 +368,8 @@ class TestDetectPack:
 class TestScanAssets:
     """Tests for scan_assets function."""
 
-    def test_scans_image_and_aseprite_files(self, temp_dir):
-        """scan_assets should return both image and aseprite files."""
+    def test_scans_all_visible_files(self, temp_dir):
+        """scan_assets returns image/aseprite files plus catch-all files like readme.txt."""
         pack_dir = temp_dir / "TestPack"
         pack_dir.mkdir()
 
