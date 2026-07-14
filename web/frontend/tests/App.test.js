@@ -370,6 +370,32 @@ describe('App URL routing', () => {
     expect(wrapper.vm.assets[0].filename).toBe('home1.png')
   })
 
+  it('preserves tag filter when navigating back from asset to home', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    // Apply a tag filter from the search bar (URL stays home)
+    wrapper.findComponent(SearchBar).vm.$emit('search', { q: null, tag: ['forest'] })
+    await new Promise(r => setTimeout(r, 200))
+    await flushPromises()
+    expect(wrapper.findComponent(AssetGrid).exists()).toBe(true)
+
+    // Open an asset, then browser-back to home
+    wrapper.vm.selectAsset(123)
+    await flushPromises()
+    mockFetch.mockClear()
+
+    window.history.replaceState({}, '', '/assets/')
+    window.dispatchEvent(new PopStateEvent('popstate', {
+      state: { route: 'home' }
+    }))
+    await flushPromises()
+
+    // Search must be re-issued with the tag, still showing filtered results
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('tag=forest'))
+    expect(wrapper.findComponent(AssetGrid).exists()).toBe(true)
+  })
+
   it('loads pack assets when navigating to /pack/:name', async () => {
     // Set URL before mounting
     window.history.replaceState({}, '', '/assets/pack/fantasy-pack')
