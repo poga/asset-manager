@@ -1,5 +1,10 @@
 <template>
   <div class="asset-grid-container" @scroll="onScroll">
+    <div class="grid-toolbar">
+      <button class="select-toggle" :class="{ active: selectMode }" @click="toggleSelectMode">
+        {{ selectMode ? 'Done' : 'Select' }}
+      </button>
+    </div>
     <div class="result-count" v-if="assets.length > 0">
       {{ assets.length }} results
     </div>
@@ -14,9 +19,13 @@
       >
         <div
           class="asset-image-container"
+          :class="{ selected: selectedIds.includes(asset.id) }"
           :style="containerStyle(asset)"
-          @click="$emit('select', asset.id)"
+          @click="onCardClick(asset)"
         >
+          <span v-if="selectMode" class="select-check">
+            {{ selectedIds.includes(asset.id) ? '☑' : '☐' }}
+          </span>
           <div v-if="asset.kind === 'file'" class="file-badge">
             <span class="file-ext">.{{ fileExt(asset) }}</span>
             <span class="file-size" v-if="asset.file_size != null">{{ formatSize(asset.file_size) }}</span>
@@ -64,17 +73,28 @@
     <div v-if="assets.length === 0 && !loading" class="no-results">
       No results
     </div>
+    <BatchTagBar
+      v-if="selectMode && selectedIds.length"
+      :count="selectedIds.length"
+      :union-tags="selectionUnion"
+      @add="batchAdd"
+      @remove="batchRemove"
+      @clear="clearSelection"
+    />
   </div>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed, watch } from 'vue'
 import SpritePreview from './SpritePreview.vue'
+import BatchTagBar from './BatchTagBar.vue'
 import { formatSize } from '../utils/fileSize.js'
+import { batchAssetTags } from '../api/boards.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
-defineProps({
+const props = defineProps({
   assets: {
     type: Array,
     required: true
@@ -93,6 +113,56 @@ const emit = defineEmits(['select', 'view-pack', 'add-to-cart', 'load-more'])
 
 const hoveredId = ref(null)
 const thumbFailed = reactive({})
+
+const selectMode = ref(false)
+const selectedIds = ref([])
+const tagOverrides = reactive({})
+
+function toggleSelectMode() {
+  selectMode.value = !selectMode.value
+  if (!selectMode.value) selectedIds.value = []
+}
+
+function tagsOf(asset) {
+  return tagOverrides[asset.id] ?? asset.tags ?? []
+}
+
+function onCardClick(asset) {
+  if (!selectMode.value) { emit('select', asset.id); return }
+  const i = selectedIds.value.indexOf(asset.id)
+  if (i === -1) selectedIds.value.push(asset.id)
+  else selectedIds.value.splice(i, 1)
+}
+
+const selectionUnion = computed(() => {
+  const set = new Set()
+  for (const a of props.assets)
+    if (selectedIds.value.includes(a.id)) tagsOf(a).forEach(t => set.add(t))
+  return [...set].sort(collator.compare)
+})
+
+function applyResults(results) {
+  for (const r of results) tagOverrides[r.id] = r.tags
+}
+
+async function batchAdd(tag) {
+  applyResults((await batchAssetTags(selectedIds.value, tag, 'add')).results)
+}
+
+async function batchRemove(tag) {
+  applyResults((await batchAssetTags(selectedIds.value, tag, 'remove')).results)
+}
+
+function clearSelection() { selectedIds.value = [] }
+
+// keep selection for assets still shown; a disjoint new search drops them
+watch(() => props.assets, (newAssets) => {
+  const ids = new Set(newAssets.map(a => a.id))
+  selectedIds.value = selectedIds.value.filter(id => ids.has(id))
+  for (const k of Object.keys(tagOverrides)) {
+    if (!ids.has(Number(k))) delete tagOverrides[k]
+  }
+})
 
 function fileExt(asset) {
   const parts = asset.filename.split('.')
@@ -272,4 +342,11 @@ function onScroll(e) {
   font-weight: 700;
   color: var(--color-text-secondary);
 }
+
+.grid-toolbar { display: flex; justify-content: flex-end; padding: 0.25rem 0.5rem; }
+.select-toggle { padding: 0.3rem 0.75rem; border: 1px solid var(--color-border);
+  border-radius: 0.35rem; background: transparent; color: inherit; cursor: pointer; }
+.select-toggle.active { background: var(--color-accent); color: #fff; }
+.asset-image-container.selected { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.select-check { position: absolute; top: 0.4rem; left: 0.4rem; font-size: 1.1rem; z-index: 2; }
 </style>

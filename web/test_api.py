@@ -1430,5 +1430,99 @@ def test_filters_pack_sections(test_db):
     assert packs["creatures"]["section"] == "2d"
 
 
+def test_batch_asset_tags_add(test_db):
+    import api
+    api.set_db_path(test_db)
+    resp = client.post("/api/assets/tags",
+                       json={"asset_ids": [1, 2], "tag": " Dungeon ", "op": "add"})
+    assert resp.status_code == 200
+    results = {r["id"]: r["tags"] for r in resp.json()["results"]}
+    assert "dungeon" in results[1] and "dungeon" in results[2]  # trimmed + lowercased
+
+
+def test_batch_asset_tags_add_is_idempotent(test_db):
+    import api
+    api.set_db_path(test_db)
+    client.post("/api/assets/tags", json={"asset_ids": [1], "tag": "wip", "op": "add"})
+    resp = client.post("/api/assets/tags", json={"asset_ids": [1], "tag": "wip", "op": "add"})
+    assert resp.json()["results"][0]["tags"].count("wip") == 1
+
+
+def test_batch_asset_tags_remove(test_db):
+    import api
+    api.set_db_path(test_db)
+    client.post("/api/assets/tags", json={"asset_ids": [1, 2], "tag": "shared", "op": "add"})
+    resp = client.post("/api/assets/tags",
+                       json={"asset_ids": [1, 2], "tag": "shared", "op": "remove"})
+    for r in resp.json()["results"]:
+        assert "shared" not in r["tags"]
+
+
+def test_batch_asset_tags_remove_absent_is_noop(test_db):
+    import api
+    api.set_db_path(test_db)
+    resp = client.post("/api/assets/tags",
+                       json={"asset_ids": [1], "tag": "never-had-it", "op": "remove"})
+    assert resp.status_code == 200  # no error, asset unchanged
+
+
+def test_batch_asset_tags_skips_unknown_ids(test_db):
+    import api
+    api.set_db_path(test_db)
+    resp = client.post("/api/assets/tags",
+                       json={"asset_ids": [1, 9999], "tag": "keep", "op": "add"})
+    ids = [r["id"] for r in resp.json()["results"]]
+    assert ids == [1]  # unknown id skipped, present id still applied
+
+
+def test_batch_asset_tags_validation(test_db):
+    import api
+    api.set_db_path(test_db)
+    assert client.post("/api/assets/tags",
+                       json={"asset_ids": [1], "tag": "  ", "op": "add"}).status_code == 400
+    assert client.post("/api/assets/tags",
+                       json={"asset_ids": [], "tag": "x", "op": "add"}).status_code == 400
+    assert client.post("/api/assets/tags",
+                       json={"asset_ids": [1], "tag": "x", "op": "bogus"}).status_code == 422
+
+
+def test_batch_pack_tags_add_and_remove(test_db):
+    _insert_pack(test_db, 30, "Pack A")
+    _insert_pack(test_db, 31, "Pack B")
+    import api
+    api.set_db_path(test_db)
+
+    resp = client.post("/api/packs/tags",
+                       json={"pack_names": ["Pack A", "Pack B"], "tag": " Forest ", "op": "add"})
+    assert resp.status_code == 200
+    got = {r["name"]: r["tags"] for r in resp.json()["results"]}
+    assert got["Pack A"] == ["forest"] and got["Pack B"] == ["forest"]
+
+    resp = client.post("/api/packs/tags",
+                       json={"pack_names": ["Pack A", "Pack B"], "tag": "forest", "op": "remove"})
+    for r in resp.json()["results"]:
+        assert r["tags"] == []
+
+
+def test_batch_pack_tags_skips_unknown_names(test_db):
+    _insert_pack(test_db, 32, "Real Pack")
+    import api
+    api.set_db_path(test_db)
+    resp = client.post("/api/packs/tags",
+                       json={"pack_names": ["Real Pack", "Ghost Pack"], "tag": "x", "op": "add"})
+    names = [r["name"] for r in resp.json()["results"]]
+    assert names == ["Real Pack"]
+
+
+def test_batch_pack_tags_validation(test_db):
+    _insert_pack(test_db, 33, "V Pack")
+    import api
+    api.set_db_path(test_db)
+    assert client.post("/api/packs/tags",
+                       json={"pack_names": ["V Pack"], "tag": " ", "op": "add"}).status_code == 400
+    assert client.post("/api/packs/tags",
+                       json={"pack_names": [], "tag": "x", "op": "add"}).status_code == 400
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
