@@ -69,3 +69,17 @@ export function removeImageTag(assetId, tag) {
     method: 'DELETE'
   }).then(json)
 }
+
+export function batchAssetTags(assetIds, tag, op) {
+  return fetch(`${API_BASE}/assets/tags`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ asset_ids: assetIds, tag, op })
+  }).then(json)
+}
+
+export function batchPackTags(packNames, tag, op) {
+  return fetch(`${API_BASE}/packs/tags`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pack_names: packNames, tag, op })
+  }).then(json)
+}
