@@ -1486,5 +1486,43 @@ def test_batch_asset_tags_validation(test_db):
                        json={"asset_ids": [1], "tag": "x", "op": "bogus"}).status_code == 422
 
 
+def test_batch_pack_tags_add_and_remove(test_db):
+    _insert_pack(test_db, 30, "Pack A")
+    _insert_pack(test_db, 31, "Pack B")
+    import api
+    api.set_db_path(test_db)
+
+    resp = client.post("/api/packs/tags",
+                       json={"pack_names": ["Pack A", "Pack B"], "tag": " Forest ", "op": "add"})
+    assert resp.status_code == 200
+    got = {r["name"]: r["tags"] for r in resp.json()["results"]}
+    assert got["Pack A"] == ["forest"] and got["Pack B"] == ["forest"]
+
+    resp = client.post("/api/packs/tags",
+                       json={"pack_names": ["Pack A", "Pack B"], "tag": "forest", "op": "remove"})
+    for r in resp.json()["results"]:
+        assert r["tags"] == []
+
+
+def test_batch_pack_tags_skips_unknown_names(test_db):
+    _insert_pack(test_db, 32, "Real Pack")
+    import api
+    api.set_db_path(test_db)
+    resp = client.post("/api/packs/tags",
+                       json={"pack_names": ["Real Pack", "Ghost Pack"], "tag": "x", "op": "add"})
+    names = [r["name"] for r in resp.json()["results"]]
+    assert names == ["Real Pack"]
+
+
+def test_batch_pack_tags_validation(test_db):
+    _insert_pack(test_db, 33, "V Pack")
+    import api
+    api.set_db_path(test_db)
+    assert client.post("/api/packs/tags",
+                       json={"pack_names": ["V Pack"], "tag": " ", "op": "add"}).status_code == 400
+    assert client.post("/api/packs/tags",
+                       json={"pack_names": [], "tag": "x", "op": "add"}).status_code == 400
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

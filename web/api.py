@@ -66,6 +66,12 @@ class PackTagRequest(BaseModel):
     tag: str
 
 
+class BatchPackTagRequest(BaseModel):
+    pack_names: list[str]
+    tag: str
+    op: Literal["add", "remove"]
+
+
 class BoardCreateRequest(BaseModel):
     name: str
     tags: list[str] = []
@@ -855,6 +861,36 @@ def remove_pack_tag(pack_name: str, tag: str):
     tags = _pack_tag_list(conn, pack_id)
     conn.close()
     return {"tags": tags}
+
+
+@app.post("/api/packs/tags")
+def batch_pack_tags(request: BatchPackTagRequest):
+    """Add or remove one tag across many packs in a single transaction."""
+    from urllib.parse import unquote
+    tag = request.tag.strip().lower()
+    if not tag:
+        raise HTTPException(status_code=400, detail="Empty tag")
+    if not request.pack_names:
+        raise HTTPException(status_code=400, detail="No packs")
+    conn = get_db()
+    _ensure_pack_tags(conn)
+    wanted = [unquote(n) for n in request.pack_names]
+    marks = ",".join("?" * len(wanted))
+    found = [(r["id"], r["name"]) for r in conn.execute(
+        f"SELECT id, name FROM packs WHERE name IN ({marks})", wanted)]
+    if request.op == "add":
+        conn.executemany("INSERT OR IGNORE INTO pack_tags (pack_id, tag) VALUES (?, ?)",
+                         [(pid, tag) for pid, _ in found])
+    else:
+        ids = [pid for pid, _ in found]
+        if ids:
+            conn.execute(
+                f"DELETE FROM pack_tags WHERE tag = ? AND pack_id IN ({','.join('?' * len(ids))})",
+                [tag, *ids])
+    conn.commit()
+    results = [{"name": name, "tags": _pack_tag_list(conn, pid)} for pid, name in found]
+    conn.close()
+    return {"results": results}
 
 
 @app.post("/api/boards", status_code=201)
