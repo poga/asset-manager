@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import AssetGrid from '../src/components/AssetGrid.vue'
 
 const mockAssets = [
@@ -193,5 +193,53 @@ describe('AssetGrid file/font kinds', () => {
     await wrapper.find('img').trigger('error')
     expect(wrapper.find('.font-fallback').exists()).toBe(true)
     expect(wrapper.find('img').exists()).toBe(false)
+  })
+})
+
+describe('AssetGrid batch tagging', () => {
+  const assets = [
+    { id: 1, filename: 'a.png', path: '/a.png', width: 64, height: 64, pack: 'p', tags: ['wip'] },
+    { id: 2, filename: 'b.png', path: '/b.png', width: 64, height: 64, pack: 'p', tags: ['wip', 'hero'] },
+  ]
+
+  it('selects assets and batch-removes a tag via a union chip', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ results: [
+        { id: 1, tags: [] }, { id: 2, tags: ['hero'] },
+      ] }),
+    })
+    const wrapper = mount(AssetGrid, { props: { assets } })
+
+    await wrapper.find('.select-toggle').trigger('click')
+    const cards = wrapper.findAll('.asset-image-container')
+    await cards[0].trigger('click')
+    await cards[1].trigger('click')
+
+    expect(wrapper.emitted('select')).toBeUndefined()  // selecting != opening
+    expect(wrapper.find('.batch-count').text()).toContain('2')
+    // union of ['wip'] and ['wip','hero'] = ['hero','wip'] (sorted)
+    const chips = wrapper.findAll('.batch-chip').map(c => c.text().replace('×', '').trim())
+    expect(chips).toEqual(['hero', 'wip'])
+
+    // 'wip' is the second sorted chip
+    await wrapper.findAll('.batch-chip-remove')[1].trigger('click')
+    await flushPromises()
+
+    const [url, opts] = global.fetch.mock.calls.at(-1)
+    expect(url).toMatch(/\/assets\/tags$/)
+    expect(JSON.parse(opts.body)).toEqual({ asset_ids: [1, 2], tag: 'wip', op: 'remove' })
+    // overrides applied -> union recomputed to just ['hero']
+    expect(wrapper.findAll('.batch-chip').map(c => c.text().replace('×', '').trim())).toEqual(['hero'])
+  })
+
+  it('clears selection when the results change', async () => {
+    global.fetch = vi.fn()
+    const wrapper = mount(AssetGrid, { props: { assets } })
+    await wrapper.find('.select-toggle').trigger('click')
+    await wrapper.findAll('.asset-image-container')[0].trigger('click')
+    expect(wrapper.find('.batch-bar').exists()).toBe(true)
+    await wrapper.setProps({ assets: [{ id: 3, filename: 'c.png', path: '/c.png', width: 64, height: 64, pack: 'p', tags: [] }] })
+    expect(wrapper.find('.batch-bar').exists()).toBe(false)
   })
 })
