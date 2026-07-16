@@ -16,7 +16,7 @@ import sys
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -78,6 +78,12 @@ class BoardPatchRequest(BaseModel):
 
 class AssetTagRequest(BaseModel):
     tag: str
+
+
+class BatchAssetTagRequest(BaseModel):
+    asset_ids: list[int]
+    tag: str
+    op: Literal["add", "remove"]
 
 
 def set_db_path(path: Path):
@@ -468,6 +474,40 @@ def remove_asset_tag(asset_id: int, tag: str):
         [asset_id])]
     conn.close()
     return {"tags": tags}
+
+
+@app.post("/api/assets/tags")
+def batch_asset_tags(request: BatchAssetTagRequest):
+    """Add or remove one tag across many assets in a single transaction."""
+    tag = request.tag.strip().lower()
+    if not tag:
+        raise HTTPException(status_code=400, detail="Empty tag")
+    if not request.asset_ids:
+        raise HTTPException(status_code=400, detail="No assets")
+    conn = get_db()
+    marks = ",".join("?" * len(request.asset_ids))
+    ids = [r["id"] for r in conn.execute(
+        f"SELECT id FROM assets WHERE id IN ({marks})", request.asset_ids)]
+    if request.op == "add":
+        conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", [tag])
+        tag_id = conn.execute("SELECT id FROM tags WHERE name = ?", [tag]).fetchone()[0]
+        conn.executemany(
+            "INSERT OR IGNORE INTO asset_tags (asset_id, tag_id, source) VALUES (?, ?, 'user')",
+            [(aid, tag_id) for aid in ids])
+    elif ids:
+        row = conn.execute("SELECT id FROM tags WHERE name = ?", [tag]).fetchone()
+        if row:
+            conn.execute(
+                f"DELETE FROM asset_tags WHERE tag_id = ? AND asset_id IN ({','.join('?' * len(ids))})",
+                [row["id"], *ids])
+    conn.commit()
+    results = [
+        {"id": aid, "tags": [r["name"] for r in conn.execute(
+            "SELECT t.name FROM asset_tags at JOIN tags t ON at.tag_id = t.id "
+            "WHERE at.asset_id = ? ORDER BY t.name", [aid])]}
+        for aid in ids]
+    conn.close()
+    return {"results": results}
 
 
 @app.post("/api/asset/{asset_id}/preview-override")
