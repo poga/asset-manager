@@ -253,6 +253,40 @@ def test_search_offset_paginates_disjoint_pages(test_db):
     assert beyond == []
 
 
+def test_board_assets_sort_by_filename(tmp_path):
+    # boards store random-UUID paths, so path order is meaningless; sort by name
+    db_path = tmp_path / "board_sort.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript("""
+        CREATE TABLE packs (id INTEGER PRIMARY KEY, name TEXT, path TEXT,
+            source TEXT DEFAULT 'indexed', asset_count INTEGER DEFAULT 0);
+        CREATE TABLE assets (id INTEGER PRIMARY KEY, pack_id INTEGER, path TEXT UNIQUE,
+            filename TEXT, filetype TEXT, file_hash TEXT, file_size INTEGER,
+            width INTEGER, height INTEGER, preview_x INTEGER, preview_y INTEGER,
+            preview_width INTEGER, preview_height INTEGER, category TEXT,
+            asset_kind TEXT, rig TEXT, thumbnail_path TEXT);
+        CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+        CREATE TABLE asset_tags (asset_id INTEGER, tag_id INTEGER, source TEXT,
+            PRIMARY KEY (asset_id, tag_id));
+        CREATE TABLE asset_preview_overrides (path TEXT PRIMARY KEY,
+            use_full_image BOOLEAN DEFAULT TRUE);
+        INSERT INTO packs (id, name, path, source)
+            VALUES (1, 'My Board', 'boards/my-board', 'user');
+        INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash) VALUES
+            (1, 1, 'boards/my-board/0001.png', 'zebra.png', 'png', 'h1'),
+            (2, 1, 'boards/my-board/5555.png', 'apple.png', 'png', 'h2'),
+            (3, 1, 'boards/my-board/9999.png', 'Mango.png', 'png', 'h3');
+    """)
+    conn.commit()
+    conn.close()
+
+    from api import set_db_path
+    set_db_path(db_path)
+    data = client.get("/api/search?pack=My Board").json()
+    # case-insensitive name order, not path order (zebra, apple, Mango)
+    assert [a["filename"] for a in data["assets"]] == ["apple.png", "Mango.png", "zebra.png"]
+
+
 def test_similar_returns_similar_assets(test_db):
     """Find similar returns assets by visual similarity."""
     from api import set_db_path

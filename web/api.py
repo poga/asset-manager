@@ -210,6 +210,7 @@ def search(
     """Search assets by name, tags, or filters."""
     conn = get_db()
     _ensure_pack_tags(conn)
+    _ensure_board_columns(conn)
     conn.commit()
 
     conditions = []
@@ -249,9 +250,12 @@ def search(
 
     where = " AND ".join(conditions) if conditions else "1=1"
 
-    # Random order for empty search (discoverability), deterministic for filtered
+    # Random for empty search; boards sort by name (UUID paths), others by path
     is_empty_search = not q and not tag and not pack and not type and not kind
-    order_by = "RANDOM()" if is_empty_search else "a.path"
+    if is_empty_search:
+        order_by = "RANDOM()"
+    else:
+        order_by = "CASE WHEN p.source = 'user' THEN lower(a.filename) ELSE a.path END"
 
     sql = f"""
         SELECT a.id, a.path, a.filename, a.filetype, a.width, a.height,
