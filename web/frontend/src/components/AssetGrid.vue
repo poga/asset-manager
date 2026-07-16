@@ -154,7 +154,14 @@ async function batchRemove(tag) {
 
 function clearSelection() { selectedIds.value = [] }
 
-watch(() => props.assets, () => { selectedIds.value = [] })
+// keep selection for assets still shown; a disjoint new search drops them
+watch(() => props.assets, (newAssets) => {
+  const ids = new Set(newAssets.map(a => a.id))
+  selectedIds.value = selectedIds.value.filter(id => ids.has(id))
+  for (const k of Object.keys(tagOverrides)) {
+    if (!ids.has(Number(k))) delete tagOverrides[k]
+  }
+})
 
 function fileExt(asset) {
   const parts = asset.filename.split('.')

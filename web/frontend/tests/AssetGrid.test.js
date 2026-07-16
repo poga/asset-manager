@@ -242,4 +242,16 @@ describe('AssetGrid batch tagging', () => {
     await wrapper.setProps({ assets: [{ id: 3, filename: 'c.png', path: '/c.png', width: 64, height: 64, pack: 'p', tags: [] }] })
     expect(wrapper.find('.batch-bar').exists()).toBe(false)
   })
+
+  it('preserves selection when more results are appended (pagination)', async () => {
+    global.fetch = vi.fn()
+    const wrapper = mount(AssetGrid, { props: { assets } })
+    await wrapper.find('.select-toggle').trigger('click')
+    await wrapper.findAll('.asset-image-container')[0].trigger('click')  // select id 1
+    expect(wrapper.find('.batch-count').text()).toContain('1')
+    // append a superset (new array reference), as pagination does
+    await wrapper.setProps({ assets: [...assets, { id: 3, filename: 'c.png', path: '/c.png', width: 64, height: 64, pack: 'p', tags: [] }] })
+    expect(wrapper.find('.batch-bar').exists()).toBe(true)
+    expect(wrapper.find('.batch-count').text()).toContain('1')
+  })
 })
