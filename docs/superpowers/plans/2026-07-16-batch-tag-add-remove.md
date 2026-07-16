@@ -794,12 +794,14 @@ Add minimal styles:
 
 ```css
 .grid-toolbar { display: flex; justify-content: flex-end; padding: 0.25rem 0.5rem; }
-.select-toggle { padding: 0.3rem 0.75rem; border: 1px solid var(--border, #444);
+.select-toggle { padding: 0.3rem 0.75rem; border: 1px solid var(--color-border);
   border-radius: 0.35rem; background: transparent; color: inherit; cursor: pointer; }
-.select-toggle.active { background: var(--accent, #4a7); color: #fff; }
-.asset-image-container.selected { outline: 2px solid var(--accent, #4a7); outline-offset: 2px; }
+.select-toggle.active { background: var(--color-accent); color: #fff; }
+.asset-image-container.selected { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .select-check { position: absolute; top: 0.4rem; left: 0.4rem; font-size: 1.1rem; z-index: 2; }
 ```
+
+(Use the app's real design tokens — `--color-border`, `--color-accent` — with no hard-coded fallback, matching every other rule in these files. Do not invent tokens like `--border`/`--accent`.)
 
 (Ensure `.asset-image-container` is `position: relative`; it already is for the cart button overlay — confirm and add if missing.)
 
