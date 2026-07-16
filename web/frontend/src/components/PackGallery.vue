@@ -275,7 +275,7 @@ const selectionUnion = computed(() => {
   return [...set].sort(collator.compare)
 })
 
-async function applyResults(results) {
+function applyResults(results) {
   for (const r of results) tagOverrides[r.name] = r.tags
 }
 
@@ -563,10 +563,13 @@ function clearSelection() { selectedNames.value = [] }
 }
 
 .gallery-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.5rem; }
-.select-toggle { padding: 0.3rem 0.75rem; border: 1px solid var(--border, #444);
+.select-toggle { padding: 0.3rem 0.75rem; border: 1px solid var(--color-border);
   border-radius: 0.35rem; background: transparent; color: inherit; cursor: pointer; }
-.select-toggle.active { background: var(--accent, #4a7); color: #fff; }
+.select-toggle.active { background: var(--color-accent); color: #fff; }
 .gallery-card.selectable { cursor: pointer; }
-.gallery-card.selected { outline: 2px solid var(--accent, #4a7); outline-offset: 2px; }
-.select-check { position: absolute; top: 0.4rem; left: 0.4rem; font-size: 1.1rem; }
+.gallery-card.selected { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.select-check {
+  position: absolute; top: 0.4rem; right: 0.4rem; font-size: 1.1rem;
+  background: var(--color-bg-elevated); border-radius: 3px; padding: 0 2px;
+}
 </style>

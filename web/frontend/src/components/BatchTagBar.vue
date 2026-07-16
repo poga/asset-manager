@@ -39,27 +39,28 @@ function submitAdd() {
   position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%);
   display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
   max-width: min(90vw, 720px); padding: 0.6rem 1rem;
-  background: var(--panel-bg, #1e1e1e); color: var(--text, #eee);
-  border: 1px solid var(--border, #333); border-radius: 0.6rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35); z-index: 50;
+  background: var(--color-bg-elevated); color: var(--color-text-primary);
+  border: 1px solid var(--color-border); border-radius: 0.6rem;
+  box-shadow: var(--shadow-elevated); z-index: 50;
 }
 .batch-count { font-weight: 600; white-space: nowrap; }
 .batch-add-input {
-  padding: 0.3rem 0.5rem; border: 1px solid var(--border, #444);
+  padding: 0.3rem 0.5rem; border: 1px solid var(--color-border);
   border-radius: 0.35rem; background: transparent; color: inherit;
 }
 .batch-union { display: flex; flex-wrap: wrap; gap: 0.375rem; }
 .batch-chip {
   display: inline-flex; align-items: center; gap: 0.2rem;
   padding: 0.15rem 0.45rem; border-radius: 0.75rem;
-  background: var(--chip-bg, #333); font-size: 0.85rem;
+  background: var(--color-accent-light); color: var(--color-text-primary);
+  font-size: 0.85rem;
 }
 .batch-chip-remove {
   border: none; background: none; color: inherit; cursor: pointer;
   font-size: 1rem; line-height: 1; padding: 0;
 }
 .batch-clear {
-  border: none; background: none; color: var(--muted, #999);
+  border: none; background: none; color: var(--color-text-muted);
   cursor: pointer; text-decoration: underline;
 }
 </style>
