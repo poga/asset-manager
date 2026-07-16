@@ -232,3 +232,35 @@ describe('PackGallery kind sections', () => {
     expect(titles).toEqual(['2D', 'Fonts', 'Files'])
   })
 })
+
+describe('PackGallery batch tagging', () => {
+  it('selects packs in select mode and batch-adds a tag', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ results: [
+        { name: 'Minifantasy_Ancient_Forests', tags: ['forest', 'dungeon'] },
+      ] }),
+    })
+    const wrapper = mount(PackGallery, { props: { packs } })
+
+    await wrapper.find('.select-toggle').trigger('click')
+    await wrapper.findAll('.gallery-card')[0].trigger('click')
+
+    // selecting must NOT navigate into the pack
+    expect(wrapper.emitted('view-pack')).toBeUndefined()
+    expect(wrapper.find('.batch-bar').exists()).toBe(true)
+    expect(wrapper.find('.batch-count').text()).toContain('1')
+
+    await wrapper.find('.batch-add-input').setValue('dungeon')
+    await wrapper.find('.batch-add-input').trigger('keyup.enter')
+    await flushPromises()
+
+    const [url, opts] = mockFetch.mock.calls.at(-1)
+    expect(url).toMatch(/\/packs\/tags$/)
+    expect(JSON.parse(opts.body)).toEqual({
+      pack_names: ['Minifantasy_Ancient_Forests'], tag: 'dungeon', op: 'add',
+    })
+    // response applied via tagOverrides -> chip now visible on the card
+    expect(wrapper.findAll('.gallery-card')[0].text()).toContain('dungeon')
+  })
+})

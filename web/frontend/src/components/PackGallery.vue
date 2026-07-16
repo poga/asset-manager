@@ -1,5 +1,11 @@
 <template>
   <div class="pack-gallery">
+    <div class="gallery-toolbar">
+      <button class="select-toggle" :class="{ active: selectMode }" @click="toggleSelectMode">
+        {{ selectMode ? 'Done' : 'Select' }}
+      </button>
+    </div>
+
     <div v-if="allTags.length" class="tag-chips">
       <button
         v-for="t in allTags"
@@ -38,8 +44,12 @@
           v-for="pack in s.packs"
           :key="pack.name"
           class="gallery-card"
-          @click="$emit('view-pack', pack.name)"
+          :class="{ selectable: selectMode, selected: selectedNames.includes(pack.name) }"
+          @click="onCardClick(pack)"
         >
+          <span v-if="selectMode" class="select-check">
+            {{ selectedNames.includes(pack.name) ? '☑' : '☐' }}
+          </span>
           <div class="card-cover">
             <img
               v-if="!failedCovers[pack.name]"
@@ -81,6 +91,15 @@
         </div>
       </div>
     </section>
+
+    <BatchTagBar
+      v-if="selectMode && selectedNames.length"
+      :count="selectedNames.length"
+      :union-tags="selectionUnion"
+      @add="batchAdd"
+      @remove="batchRemove"
+      @clear="clearSelection"
+    />
   </div>
 </template>
 
@@ -88,6 +107,8 @@
 import { computed, reactive, ref } from 'vue'
 import { formatPackName } from '../utils/packName.js'
 import { tagHue } from '../utils/tagColor.js'
+import BatchTagBar from './BatchTagBar.vue'
+import { batchPackTags } from '../api/boards.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
@@ -107,6 +128,8 @@ const tagOverrides = reactive({})
 const activeTag = ref(null)
 const editingPack = ref(null)
 const newTag = ref('')
+const selectMode = ref(false)
+const selectedNames = ref([])
 
 const vFocus = { mounted: el => el.focus() }
 
@@ -232,6 +255,39 @@ async function removeTag(pack, tag) {
     }
   }
 }
+
+function toggleSelectMode() {
+  selectMode.value = !selectMode.value
+  if (!selectMode.value) selectedNames.value = []
+}
+
+function onCardClick(pack) {
+  if (!selectMode.value) { emit('view-pack', pack.name); return }
+  const i = selectedNames.value.indexOf(pack.name)
+  if (i === -1) selectedNames.value.push(pack.name)
+  else selectedNames.value.splice(i, 1)
+}
+
+const selectionUnion = computed(() => {
+  const set = new Set()
+  for (const p of props.packs)
+    if (selectedNames.value.includes(p.name)) tagsOf(p).forEach(t => set.add(t))
+  return [...set].sort(collator.compare)
+})
+
+async function applyResults(results) {
+  for (const r of results) tagOverrides[r.name] = r.tags
+}
+
+async function batchAdd(tag) {
+  applyResults((await batchPackTags(selectedNames.value, tag, 'add')).results)
+}
+
+async function batchRemove(tag) {
+  applyResults((await batchPackTags(selectedNames.value, tag, 'remove')).results)
+}
+
+function clearSelection() { selectedNames.value = [] }
 </script>
 
 <style scoped>
@@ -328,6 +384,7 @@ async function removeTag(pack, tag) {
 }
 
 .gallery-card {
+  position: relative;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   border-radius: 10px;
@@ -504,4 +561,12 @@ async function removeTag(pack, tag) {
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
 }
+
+.gallery-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.5rem; }
+.select-toggle { padding: 0.3rem 0.75rem; border: 1px solid var(--border, #444);
+  border-radius: 0.35rem; background: transparent; color: inherit; cursor: pointer; }
+.select-toggle.active { background: var(--accent, #4a7); color: #fff; }
+.gallery-card.selectable { cursor: pointer; }
+.gallery-card.selected { outline: 2px solid var(--accent, #4a7); outline-offset: 2px; }
+.select-check { position: absolute; top: 0.4rem; left: 0.4rem; font-size: 1.1rem; }
 </style>
