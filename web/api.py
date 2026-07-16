@@ -866,7 +866,6 @@ def remove_pack_tag(pack_name: str, tag: str):
 @app.post("/api/packs/tags")
 def batch_pack_tags(request: BatchPackTagRequest):
     """Add or remove one tag across many packs in a single transaction."""
-    from urllib.parse import unquote
     tag = request.tag.strip().lower()
     if not tag:
         raise HTTPException(status_code=400, detail="Empty tag")
@@ -874,7 +873,7 @@ def batch_pack_tags(request: BatchPackTagRequest):
         raise HTTPException(status_code=400, detail="No packs")
     conn = get_db()
     _ensure_pack_tags(conn)
-    wanted = [unquote(n) for n in request.pack_names]
+    wanted = request.pack_names
     marks = ",".join("?" * len(wanted))
     found = [(r["id"], r["name"]) for r in conn.execute(
         f"SELECT id, name FROM packs WHERE name IN ({marks})", wanted)]

@@ -92,6 +92,7 @@ import { formatSize } from '../utils/fileSize.js'
 import { batchAssetTags } from '../api/boards.js'
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
 const props = defineProps({
   assets: {
@@ -137,7 +138,7 @@ const selectionUnion = computed(() => {
   const set = new Set()
   for (const a of props.assets)
     if (selectedIds.value.includes(a.id)) tagsOf(a).forEach(t => set.add(t))
-  return [...set].sort()
+  return [...set].sort(collator.compare)
 })
 
 function applyResults(results) {
