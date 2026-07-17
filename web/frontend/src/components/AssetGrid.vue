@@ -1,5 +1,5 @@
 <template>
-  <div class="asset-grid-container" @scroll="onScroll">
+  <div ref="containerRef" class="asset-grid-container" @scroll="onScroll">
     <div class="grid-toolbar">
       <button class="select-toggle" :class="{ active: selectMode }" @click="toggleSelectMode">
         {{ selectMode ? 'Done' : 'Select' }}
@@ -85,7 +85,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import SpritePreview from './SpritePreview.vue'
 import BatchTagBar from './BatchTagBar.vue'
 import { formatSize } from '../utils/fileSize.js'
@@ -179,6 +179,8 @@ function containerStyle(asset) {
   }
 }
 
+const containerRef = ref(null)
+
 // fire before the user hits the bottom so the next page streams in seamlessly
 function onScroll(e) {
   const el = e.currentTarget
@@ -186,6 +188,22 @@ function onScroll(e) {
     emit('load-more')
   }
 }
+
+// no scroll fires until content overflows; page until it fills or runs out
+async function fillViewport() {
+  await nextTick()
+  const el = containerRef.value
+  if (!el || props.loading || el.clientHeight === 0) return
+  if (el.scrollHeight <= el.clientHeight) emit('load-more')
+}
+
+watch(() => props.assets, fillViewport)
+
+onMounted(() => {
+  fillViewport()
+  window.addEventListener('resize', fillViewport)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', fillViewport))
 </script>
 
 <style scoped>
