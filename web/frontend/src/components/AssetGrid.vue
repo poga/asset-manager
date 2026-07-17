@@ -208,7 +208,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', fillViewport))
 
 <style scoped>
 .asset-grid-container {
-  padding: 1rem 1.25rem 2rem;
+  padding: 0 1.25rem 2rem;
 }
 
 .result-count {
@@ -361,7 +361,17 @@ onBeforeUnmount(() => window.removeEventListener('resize', fillViewport))
   color: var(--color-text-secondary);
 }
 
-.grid-toolbar { display: flex; justify-content: flex-end; padding: 0.25rem 0.5rem; }
+/* full-bleed so the pinned bar covers content scrolling beneath it */
+.grid-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 -1.25rem;
+  padding: 0.5rem 1.25rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-bg-base);
+}
 .select-toggle { padding: 0.3rem 0.75rem; border: 1px solid var(--color-border);
   border-radius: 0.35rem; background: transparent; color: inherit; cursor: pointer; }
 .select-toggle.active { background: var(--color-accent); color: #fff; }
