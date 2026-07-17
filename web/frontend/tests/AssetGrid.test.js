@@ -166,6 +166,65 @@ describe('AssetGrid', () => {
   })
 })
 
+describe('AssetGrid viewport filling', () => {
+  // simulate a scroll container of a given content/viewport height
+  function setLayout(el, { scrollHeight, clientHeight }) {
+    Object.defineProperty(el, 'scrollHeight', { value: scrollHeight, configurable: true })
+    Object.defineProperty(el, 'clientHeight', { value: clientHeight, configurable: true })
+  }
+
+  it('requests another page when content does not fill the scroll container', async () => {
+    const wrapper = mount(AssetGrid, { props: { assets: mockAssets, loading: false } })
+    setLayout(wrapper.element, { scrollHeight: 400, clientHeight: 900 })
+    await wrapper.setProps({ assets: [...mockAssets] })  // a page arrives
+    await flushPromises()
+    expect(wrapper.emitted('load-more')).toBeTruthy()
+  })
+
+  it('does not request more once content overflows the scroll container', async () => {
+    const wrapper = mount(AssetGrid, { props: { assets: mockAssets, loading: false } })
+    setLayout(wrapper.element, { scrollHeight: 1600, clientHeight: 900 })
+    await wrapper.setProps({ assets: [...mockAssets] })
+    await flushPromises()
+    expect(wrapper.emitted('load-more')).toBeFalsy()
+  })
+
+  it('does not request more while a page load is already in flight', async () => {
+    const wrapper = mount(AssetGrid, { props: { assets: mockAssets, loading: true } })
+    setLayout(wrapper.element, { scrollHeight: 400, clientHeight: 900 })
+    await wrapper.setProps({ assets: [...mockAssets] })
+    await flushPromises()
+    expect(wrapper.emitted('load-more')).toBeFalsy()
+  })
+
+  it('pages repeatedly until the container fills, then stops (big-screen scenario)', async () => {
+    const CLIENT = 900, ROW_H = 150, PER_ROW = 5
+    const make = (n) => Array.from({ length: n }, (_, i) => ({ id: i + 1, filename: `a${i}.png`, width: 64, height: 64, pack: 'p' }))
+    const wrapper = mount(AssetGrid, { props: { assets: make(10), loading: false } })
+
+    // content height tracks item count against a fixed tall viewport
+    let total = 10
+    const step = async () => {
+      const rows = Math.ceil(total / PER_ROW)
+      setLayout(wrapper.element, { scrollHeight: rows * ROW_H, clientHeight: CLIENT })
+      await wrapper.setProps({ assets: make(total) })
+      await flushPromises()
+    }
+
+    // play App.loadMore: append a page each time the grid asks for more
+    await step()
+    let handled = 0
+    for (let i = 0; i < 40 && (wrapper.emitted('load-more')?.length ?? 0) > handled; i++) {
+      handled = wrapper.emitted('load-more').length
+      total += 10
+      await step()
+    }
+
+    expect(total).toBeGreaterThan(30)  // auto-loaded several pages, not just one
+    expect(total).toBeLessThan(300)    // and terminated once the viewport filled
+  })
+})
+
 describe('AssetGrid file/font kinds', () => {
   const fileAsset = {
     id: 10, filename: 'blur.glsl', pack: 'Shaders', kind: 'file',
