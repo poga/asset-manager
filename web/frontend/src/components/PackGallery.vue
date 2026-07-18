@@ -1,22 +1,24 @@
 <template>
   <div class="pack-gallery">
-    <div class="gallery-toolbar">
-      <button class="select-toggle" :class="{ active: selectMode }" @click="toggleSelectMode">
-        {{ selectMode ? 'Done' : 'Select' }}
-      </button>
-    </div>
+    <div class="gallery-header">
+      <div class="gallery-toolbar">
+        <button class="select-toggle" :class="{ active: selectMode }" @click="toggleSelectMode">
+          {{ selectMode ? 'Done' : 'Select' }}
+        </button>
+      </div>
 
-    <div v-if="allTags.length" class="tag-chips">
-      <button
-        v-for="t in allTags"
-        :key="t.tag"
-        class="chip"
-        :class="{ active: activeTag === t.tag }"
-        :style="{ '--tag-hue': tagHue(t.tag) }"
-        @click="toggleTag(t.tag)"
-      >
-        {{ t.tag }} <span class="chip-count">{{ t.count }}</span>
-      </button>
+      <div v-if="allTags.length" class="tag-chips">
+        <button
+          v-for="t in allTags"
+          :key="t.tag"
+          class="chip"
+          :class="{ active: activeTag === t.tag }"
+          :style="{ '--tag-hue': tagHue(t.tag) }"
+          @click="toggleTag(t.tag)"
+        >
+          {{ t.tag }} <span class="chip-count">{{ t.count }}</span>
+        </button>
+      </div>
     </div>
 
     <div class="new-board-block">
@@ -297,17 +299,22 @@ function clearSelection() { selectedNames.value = [] }
   padding: 0 1.25rem 2rem;
 }
 
+/* pins the Select toolbar and tag filters together atop the scroll area */
+.gallery-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 -1.25rem;
+  padding: 0.75rem 1.25rem 0;
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
 .tag-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin: 0 -1.25rem;
-  padding: 1rem 1.25rem 0.875rem;
-  position: sticky;
-  top: 0;
-  background: var(--color-bg-surface);
-  border-bottom: 1px solid var(--color-border);
-  z-index: 1;
+  padding-bottom: 0.875rem;
 }
 
 .chip {
