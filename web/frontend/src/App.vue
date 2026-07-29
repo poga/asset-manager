@@ -424,8 +424,9 @@ function handlePopState(event) {
     // Only re-fetch if we were on a non-home view (similar/pack) or had pack filters
     if (!isDefaultHomeView.value || hadPackFilter) {
       selectedPacks.value = []  // Clear pack filter (triggers watcher, but we also call search)
-      search({ q: null, tag: [] })
-      isDefaultHomeView.value = true
+      // Keep the active search; home popstate only clears the pack scope
+      search(currentSearchParams.value)
+      isDefaultHomeView.value = !hasActiveSearch(currentSearchParams.value)
     }
     // Otherwise, keep existing assets - just close asset detail view
   } else if (route.name === 'asset') {
