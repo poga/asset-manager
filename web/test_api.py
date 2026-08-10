@@ -1004,7 +1004,7 @@ class Test3DSerialization:
         set_db_path(test_db)
         conn = sqlite3.connect(test_db)
         conn.execute("INSERT INTO assets (path, filename, filetype, file_hash, asset_kind) VALUES ('a.png','a.png','png','h3','image')")
-        conn.execute("INSERT INTO assets (path, filename, filetype, file_hash, asset_kind) VALUES ('b.glb','b.glb','glb','h4','model')")
+        conn.execute("INSERT INTO assets (path, filename, filetype, file_hash, asset_kind, thumbnail_path) VALUES ('b.glb','b.glb','glb','h4','model','t/b.png')")
         conn.commit(); conn.close()
         r = _client.get("/api/search?kind=model")
         kinds = {a["filename"]: a["kind"] for a in r.json()["assets"]}
@@ -1325,6 +1325,12 @@ def kinds_db(tmp_path):
         -- row whose file is intentionally absent from disk
         INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, file_size, asset_kind)
             VALUES (9, 1, 'MixedPack/ghost.glsl', 'ghost.glsl', 'glsl', 'fh9', 7, 'file');
+        INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, file_size, asset_kind, thumbnail_path) VALUES
+            (10, 1, 'MixedPack/hero.glb', 'hero.glb', 'glb', 'fh10', 9, 'model', '.index/thumbs/pixel.png'),
+            (11, 1, 'MixedPack/zebra.glb', 'zebra.glb', 'glb', 'fh11', 9, 'model', '.index/thumbs/pixel.png');
+        -- 3D row that never got a thumbnail rendered
+        INSERT INTO assets (id, pack_id, path, filename, filetype, file_hash, file_size, asset_kind)
+            VALUES (12, 1, 'MixedPack/rock.glb', 'rock.glb', 'glb', 'fh12', 9, 'model');
     """)
     conn.commit()
     conn.close()
@@ -1378,10 +1384,33 @@ def test_search_returns_file_size(kinds_db):
 
 def test_kind_only_search_is_deterministic(kinds_db):
     # kind-only search must not fall into RANDOM() empty-search ordering
-    p1 = [a["path"] for a in client.get("/api/search", params={"kind": "file"}).json()["assets"]]
-    p2 = [a["path"] for a in client.get("/api/search", params={"kind": "file"}).json()["assets"]]
+    p1 = [a["path"] for a in client.get("/api/search", params={"kind": "model"}).json()["assets"]]
+    p2 = [a["path"] for a in client.get("/api/search", params={"kind": "model"}).json()["assets"]]
+    assert len(p1) > 1
     assert p1 == sorted(p1)
     assert p2 == sorted(p2)
+
+
+def test_search_hides_file_kind(kinds_db):
+    # /api/image always 404s for kind=file, so those rows never show a preview
+    r = client.get("/api/search", params={"q": "wgsl"})
+    assert r.json()["assets"] == []
+    assert client.get("/api/search", params={"kind": "file"}).json()["assets"] == []
+
+
+def test_search_hides_3d_without_thumbnail(kinds_db):
+    names = [a["filename"] for a in client.get("/api/search",
+                                               params={"kind": "model"}).json()["assets"]]
+    assert names == ["hero.glb", "zebra.glb"]
+
+
+def test_search_keeps_images_with_null_kind(test_db):
+    # legacy 2D rows carry no asset_kind; the preview filter must not drop them
+    import api
+    api.set_db_path(test_db)
+    names = sorted(a["filename"] for a in client.get("/api/search",
+                                                     params={"q": "png"}).json()["assets"])
+    assert names == ["goblin.png", "orc.png"]
 
 
 def test_asset_detail_includes_file_size(kinds_db):

@@ -209,6 +209,20 @@ def health():
     return {"status": "ok"}
 
 
+# kinds whose /api/image response is a generated thumbnail, not the raw file
+_THUMBNAIL_KINDS = {"model", "animation_bundle", "font"}
+
+# rows /api/image can never illustrate: raw files, and thumbnail kinds with no
+# thumbnail rendered. NULL asset_kind means a legacy 2D image, so keep it.
+_HAS_PREVIEW_SQL = (
+    "a.asset_kind IS NOT 'file' AND ("
+    "a.asset_kind IS NULL"
+    f" OR a.asset_kind NOT IN ({', '.join('?' * len(_THUMBNAIL_KINDS))})"
+    " OR a.thumbnail_path IS NOT NULL)"
+)
+_HAS_PREVIEW_PARAMS = sorted(_THUMBNAIL_KINDS)
+
+
 @app.get("/api/search")
 def search(
     q: Optional[str] = None,
@@ -225,8 +239,8 @@ def search(
     _ensure_board_columns(conn)
     conn.commit()
 
-    conditions = []
-    params = []
+    conditions = [_HAS_PREVIEW_SQL]
+    params = list(_HAS_PREVIEW_PARAMS)
 
     if q:
         conditions.append("(a.filename LIKE ? OR a.path LIKE ?)")
@@ -638,8 +652,6 @@ def filters():
 ASEPRITE_EXTENSIONS = {".aseprite", ".ase"}
 
 
-# kinds whose /api/image response is a generated thumbnail, not the raw file
-_THUMBNAIL_KINDS = {"model", "animation_bundle", "font"}
 
 
 @app.get("/api/image/{asset_id}")
