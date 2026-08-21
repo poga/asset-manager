@@ -10,7 +10,7 @@ from PIL import Image
 
 BOARD_ROOT = ".boards"
 ALLOWED_EXTS = {"png", "jpg", "jpeg", "gif", "webp"}
-MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 
 def slugify(name: str) -> str:
