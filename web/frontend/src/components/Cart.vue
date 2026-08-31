@@ -82,13 +82,10 @@ defineEmits(['remove', 'clear', 'download', 'toggle-panel'])
 }
 
 .cart-title {
+  margin-right: auto;
   font-weight: 600;
   font-size: 0.875rem;
   color: var(--color-text-primary);
-}
-
-.cart-title {
-  margin-right: auto;
 }
 
 .clear-btn {
