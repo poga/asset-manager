@@ -56,4 +56,19 @@ describe('Cart', () => {
     })
     expect(wrapper.text()).toContain('2')
   })
+
+  it('emits clear when clear button clicked', async () => {
+    const wrapper = mount(Cart, {
+      props: { items: mockItems }
+    })
+    await wrapper.find('.clear-btn').trigger('click')
+    expect(wrapper.emitted('clear')).toBeTruthy()
+  })
+
+  it('disables clear button when cart is empty', () => {
+    const wrapper = mount(Cart, {
+      props: { items: [] }
+    })
+    expect(wrapper.find('.clear-btn').element.disabled).toBe(true)
+  })
 })

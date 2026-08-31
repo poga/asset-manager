@@ -3,6 +3,14 @@
   <div class="cart">
     <div class="cart-header">
       <span class="cart-title">Cart</span>
+      <button
+        class="clear-btn"
+        :disabled="items.length === 0"
+        @click="$emit('clear')"
+        title="Clear cart"
+      >
+        Clear
+      </button>
       <button class="icon-btn" @click="$emit('toggle-panel')" title="Close cart">
         <span>✕</span>
       </button>
@@ -55,7 +63,7 @@ defineProps({
   items: { type: Array, required: true }
 })
 
-defineEmits(['remove', 'download', 'toggle-panel'])
+defineEmits(['remove', 'clear', 'download', 'toggle-panel'])
 </script>
 
 <style scoped>
@@ -67,7 +75,7 @@ defineEmits(['remove', 'download', 'toggle-panel'])
 
 .cart-header {
   display: flex;
-  justify-content: space-between;
+  gap: 0.5rem;
   align-items: center;
   padding: 1rem;
   border-bottom: 1px solid var(--color-border);
@@ -77,6 +85,29 @@ defineEmits(['remove', 'download', 'toggle-panel'])
   font-weight: 600;
   font-size: 0.875rem;
   color: var(--color-text-primary);
+}
+
+.cart-title {
+  margin-right: auto;
+}
+
+.clear-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  transition: color 150ms;
+}
+
+.clear-btn:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+.clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .icon-btn {
