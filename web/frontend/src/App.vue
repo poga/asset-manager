@@ -89,6 +89,7 @@
           <Cart
             :items="cartItems"
             @remove="removeFromCart"
+            @clear="clearCart"
             @download="downloadCart"
             @toggle-panel="cartOpen = false"
           />
@@ -344,6 +345,10 @@ function addToCart(asset) {
 
 function removeFromCart(id) {
   cartItems.value = cartItems.value.filter(item => item.id !== id)
+}
+
+function clearCart() {
+  cartItems.value = []
 }
 
 async function downloadCart() {
